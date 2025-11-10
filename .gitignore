@@ -1,0 +1,4 @@
+private_assets/
+__pycache__/
+*.pyc
+.venv/
