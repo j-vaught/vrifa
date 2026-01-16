@@ -276,7 +276,7 @@ def parse_args() -> argparse.Namespace:
         default=0.2,
         help=(
             "Target ROI fraction that defines the difference the dynamic reference should "
-            "maintain (0.0-1.0, default 0.2 for 20% of the ROI)."
+            "maintain (0.0-1.0, default 0.2 for 20%% of the ROI)."
         ),
     )
     parser.add_argument(
@@ -289,7 +289,7 @@ def parse_args() -> argparse.Namespace:
         "--annotation-formats",
         type=str,
         default="",
-        help="Comma-separated annotation formats to export (coco,yolo).",
+        help="Comma-separated annotation formats to export (coco, yolov5, darknet).",
     )
     parser.add_argument(
         "--annotation-mode",
@@ -433,10 +433,10 @@ def parse_args() -> argparse.Namespace:
         for segment in args.annotation_formats.split(",")
         if segment.strip()
     ]
-    valid_formats = {"coco", "yolo"}
+    valid_formats = {"coco", "yolov5", "darknet"}
     for fmt in raw_formats:
         if fmt not in valid_formats:
-            parser.error("--annotation-formats expects coco and/or yolo.")
+            parser.error("--annotation-formats expects coco, yolov5, and/or darknet.")
     args.annotation_formats = raw_formats
     if args.annotation_formats:
         if args.annotation_mode == "count" and args.annotation_count <= 0:
@@ -676,59 +676,60 @@ def choose_annotation_indices(
     return []
 
 
-def export_annotation_outputs(
-    args: argparse.Namespace,
+def export_coco_format(
+    output_dir: Path,
     records: list[AnnotationFrame],
     selected_indices: list[int],
     width: int,
     height: int,
 ) -> None:
-    if not records or not args.annotation_formats or not selected_indices:
-        return
+    """Export annotations in COCO format matching formatCOCO example structure."""
+    coco_root = output_dir / "formatCOCO"
+    ensure_dir(coco_root)
+    annotations_dir = coco_root / "annotations"
+    ensure_dir(annotations_dir)
+    images_dir = coco_root / "images" / "default"
+    ensure_dir(images_dir)
 
-    annotation_root = args.output_dir / "annotations"
-    ensure_dir(annotation_root)
-    frames_dir = annotation_root / "frames"
-    ensure_dir(frames_dir)
     selected_records = [records[idx] for idx in selected_indices]
-    frames_rel = frames_dir.relative_to(args.output_dir)
 
-    if "coco" in args.annotation_formats:
-        coco_path = annotation_root / "coco_annotations.json"
-        coco_output = {
-            "info": {},
-            "licenses": [],
-            "images": [],
-            "annotations": [],
-            "categories": [
-                {"id": 1, "name": "flow_front", "supercategory": "flow"}
-            ],
-        }
-        annotation_id = 1
-    else:
-        coco_output = None
-        annotation_id = 1
-
-    if "yolo" in args.annotation_formats:
-        yolo_dir = annotation_root / "yolo"
-        ensure_dir(yolo_dir)
-    else:
-        yolo_dir = None
+    coco_output = {
+        "licenses": [{"name": "", "id": 0, "url": ""}],
+        "info": {
+            "contributor": "",
+            "date_created": "",
+            "description": "",
+            "url": "",
+            "version": "",
+            "year": "",
+        },
+        "categories": [
+            {"id": 1, "name": "dry", "supercategory": ""},
+            {"id": 2, "name": "wet", "supercategory": ""},
+        ],
+        "images": [],
+        "annotations": [],
+    }
+    annotation_id = 1
 
     for image_id, record in enumerate(selected_records, start=1):
         frame_filename = f"frame_{record.frame_index:06d}.png"
-        frame_path = frames_dir / frame_filename
+        frame_path = images_dir / frame_filename
         cv2.imwrite(str(frame_path), record.frame_bgr)
 
-        if coco_output is not None:
-            coco_output["images"].append(
-                {
-                    "id": image_id,
-                    "file_name": str(frames_rel / frame_filename),
-                    "width": width,
-                    "height": height,
-                }
-            )
+        coco_output["images"].append(
+            {
+                "id": image_id,
+                "width": width,
+                "height": height,
+                "file_name": frame_filename,
+                "license": 0,
+                "flickr_url": "",
+                "coco_url": "",
+                "date_captured": 0,
+            }
+        )
+
         for bbox in record.boxes:
             x, y, w, h, area, segmentation = (
                 bbox.x,
@@ -743,31 +744,152 @@ def export_annotation_outputs(
                     "id": annotation_id,
                     "image_id": image_id,
                     "category_id": 1,
-                    "bbox": [x, y, w, h],
-                    "area": area,
-                    "iscrowd": 0,
                     "segmentation": [segmentation] if segmentation else [],
+                    "area": area,
+                    "bbox": [x, y, w, h],
+                    "iscrowd": 0,
+                    "attributes": {"occluded": False, "rotation": 0.0},
                 }
             )
             annotation_id += 1
 
-        if yolo_dir is not None:
-            label_path = yolo_dir / f"frame_{record.frame_index:06d}.txt"
-            with label_path.open("w") as label_handle:
-                for bbox in record.boxes:
-                    x = bbox.x
-                    y = bbox.y
-                    w = bbox.w
-                    h = bbox.h
-                    cx = x + w / 2
-                    cy = y + h / 2
-                    label_handle.write(
-                        f"0 {cx/width:.6f} {cy/height:.6f} {w/width:.6f} {h/height:.6f}\n"
-                    )
+    coco_path = annotations_dir / "instances_default.json"
+    with coco_path.open("w") as handle:
+        json.dump(coco_output, handle, separators=(",", ":"))
 
-    if coco_output is not None:
-        with coco_path.open("w") as handle:
-            json.dump(coco_output, handle, indent=2)
+
+def export_yolov5_format(
+    output_dir: Path,
+    records: list[AnnotationFrame],
+    selected_indices: list[int],
+    width: int,
+    height: int,
+) -> None:
+    """Export annotations in YOLOv5/v8 format with segmentation polygons."""
+    yolo_root = output_dir / "formatYOLO"
+    ensure_dir(yolo_root)
+    images_dir = yolo_root / "images" / "train"
+    ensure_dir(images_dir)
+    labels_dir = yolo_root / "labels" / "train"
+    ensure_dir(labels_dir)
+
+    selected_records = [records[idx] for idx in selected_indices]
+    train_list = []
+
+    for record in selected_records:
+        frame_filename = f"frame_{record.frame_index:06d}.png"
+        frame_path = images_dir / frame_filename
+        cv2.imwrite(str(frame_path), record.frame_bgr)
+        train_list.append(f"data/images/train/{frame_filename}")
+
+        label_path = labels_dir / f"frame_{record.frame_index:06d}.txt"
+        with label_path.open("w") as label_handle:
+            for bbox in record.boxes:
+                segmentation = bbox.segmentation
+                if segmentation and len(segmentation) >= 6:
+                    normalized_points = []
+                    for i in range(0, len(segmentation), 2):
+                        px = segmentation[i] / width
+                        py = segmentation[i + 1] / height
+                        normalized_points.append(f"{px:.6f}")
+                        normalized_points.append(f"{py:.6f}")
+                    label_handle.write(f"0 {' '.join(normalized_points)}\n")
+                else:
+                    x, y, w, h = bbox.x, bbox.y, bbox.w, bbox.h
+                    pts = [
+                        f"{x/width:.6f}", f"{y/height:.6f}",
+                        f"{(x+w)/width:.6f}", f"{y/height:.6f}",
+                        f"{(x+w)/width:.6f}", f"{(y+h)/height:.6f}",
+                        f"{x/width:.6f}", f"{(y+h)/height:.6f}",
+                    ]
+                    label_handle.write(f"0 {' '.join(pts)}\n")
+
+    data_yaml = {
+        "names": {0: "dry", 1: "wet"},
+        "path": ".",
+        "train": "train.txt",
+    }
+    data_yaml_path = yolo_root / "data.yaml"
+    with data_yaml_path.open("w") as handle:
+        yaml.safe_dump(data_yaml, handle, sort_keys=False)
+
+    train_txt_path = yolo_root / "train.txt"
+    with train_txt_path.open("w") as handle:
+        for entry in train_list:
+            handle.write(f"{entry}\n")
+
+
+def export_darknet_format(
+    output_dir: Path,
+    records: list[AnnotationFrame],
+    selected_indices: list[int],
+    width: int,
+    height: int,
+) -> None:
+    """Export annotations in Darknet YOLO format with bounding boxes."""
+    darknet_root = output_dir / "formatYOLO_v2"
+    ensure_dir(darknet_root)
+    obj_train_data = darknet_root / "obj_train_data"
+    ensure_dir(obj_train_data)
+
+    selected_records = [records[idx] for idx in selected_indices]
+    train_list = []
+
+    for record in selected_records:
+        frame_filename = f"frame_{record.frame_index:06d}.png"
+        frame_path = obj_train_data / frame_filename
+        cv2.imwrite(str(frame_path), record.frame_bgr)
+        train_list.append(f"data/obj_train_data/{frame_filename}")
+
+        label_path = obj_train_data / f"frame_{record.frame_index:06d}.txt"
+        with label_path.open("w") as label_handle:
+            for bbox in record.boxes:
+                x, y, w, h = bbox.x, bbox.y, bbox.w, bbox.h
+                cx = (x + w / 2) / width
+                cy = (y + h / 2) / height
+                nw = w / width
+                nh = h / height
+                label_handle.write(f"0 {cx:.6f} {cy:.6f} {nw:.6f} {nh:.6f}\n")
+
+    obj_data_path = darknet_root / "obj.data"
+    with obj_data_path.open("w") as handle:
+        handle.write("classes = 2\n")
+        handle.write("train = data/train.txt\n")
+        handle.write("names = data/obj.names\n")
+        handle.write("backup = backup/\n")
+
+    obj_names_path = darknet_root / "obj.names"
+    with obj_names_path.open("w") as handle:
+        handle.write("dry\n")
+        handle.write("wet\n")
+
+    train_txt_path = darknet_root / "train.txt"
+    with train_txt_path.open("w") as handle:
+        for entry in train_list:
+            handle.write(f"{entry}\n")
+
+
+def export_annotation_outputs(
+    args: argparse.Namespace,
+    records: list[AnnotationFrame],
+    selected_indices: list[int],
+    width: int,
+    height: int,
+) -> None:
+    """Export annotations in selected formats (coco, yolov5, darknet)."""
+    if not records or not args.annotation_formats or not selected_indices:
+        return
+
+    if "coco" in args.annotation_formats:
+        export_coco_format(args.output_dir, records, selected_indices, width, height)
+
+    if "yolov5" in args.annotation_formats:
+        export_yolov5_format(args.output_dir, records, selected_indices, width, height)
+
+    if "darknet" in args.annotation_formats:
+        export_darknet_format(args.output_dir, records, selected_indices, width, height)
+
+
 def convert_frame_to_colorspace(frame_bgr: np.ndarray, colorspace: str) -> np.ndarray:
     if colorspace == "CIELAB":
         return cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2LAB)

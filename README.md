@@ -1,6 +1,107 @@
 # VRIFA – Resin Infusion Flow-Front Assessment
 
-Lightweight CLI script (`vrifa.py`) that reads an infusion video, detects the advancing resin front, and writes masks, overlays, heatmaps, optional MP4s, and COCO/YOLO annotations.
+Lightweight CLI script (`vrifa.py`) that reads an infusion video, detects the advancing resin front, and writes masks, overlays, heatmaps, optional MP4s, and machine learning annotation exports.
+
+## Annotation Export Formats
+
+VRIFA supports three annotation export formats for training machine learning models. Each format creates a self-contained directory structure with images and labels.
+
+### COCO Format (`--annotation-formats coco`)
+
+Standard COCO format for object detection and instance segmentation.
+
+**Output Structure:**
+```
+output_dir/
+└── formatCOCO/
+    ├── annotations/
+    │   └── instances_default.json    # COCO annotations with segmentation polygons
+    └── images/
+        └── default/
+            ├── frame_000000.png
+            ├── frame_000500.png
+            └── ...
+```
+
+**Features:**
+- Two categories: `dry` (id: 1) and `wet` (id: 2)
+- Full segmentation polygon coordinates
+- Bounding boxes with area calculations
+- Compatible with: COCO API, Detectron2, MMDetection, CVAT import
+
+### YOLOv5/v8 Format (`--annotation-formats yolov5`)
+
+Ultralytics YOLO format with segmentation polygons for instance segmentation training.
+
+**Output Structure:**
+```
+output_dir/
+└── formatYOLO/
+    ├── data.yaml          # Dataset configuration
+    ├── train.txt          # List of training image paths
+    ├── images/
+    │   └── train/
+    │       ├── frame_000000.png
+    │       └── ...
+    └── labels/
+        └── train/
+            ├── frame_000000.txt    # Segmentation labels (normalized polygons)
+            └── ...
+```
+
+**Label Format:** `class_id x1 y1 x2 y2 x3 y3 ...` (normalized 0-1 polygon coordinates)
+
+**Features:**
+- Two classes: `dry` (0) and `wet` (1)
+- Normalized polygon segmentation coordinates
+- Compatible with: YOLOv5-seg, YOLOv8-seg, Ultralytics training
+
+### Darknet Format (`--annotation-formats darknet`)
+
+Classic Darknet YOLO format with bounding box annotations.
+
+**Output Structure:**
+```
+output_dir/
+└── formatYOLO_v2/
+    ├── obj.data           # Dataset configuration
+    ├── obj.names          # Class names (dry, wet)
+    ├── train.txt          # List of training image paths
+    └── obj_train_data/
+        ├── frame_000000.png
+        ├── frame_000000.txt    # Bounding box labels
+        └── ...
+```
+
+**Label Format:** `class_id center_x center_y width height` (normalized 0-1 bbox coordinates)
+
+**Features:**
+- Two classes: `dry` (0) and `wet` (1)
+- Normalized bounding box format
+- Compatible with: Darknet, YOLOv3/v4, AlexeyAB/darknet
+
+### Export Examples
+
+Export all three formats with 50 evenly sampled frames:
+```bash
+python vrifa.py \
+  --video-path input.mp4 \
+  --output-dir outputs \
+  --annotation-formats coco,yolov5,darknet \
+  --annotation-mode count \
+  --annotation-count 50
+```
+
+Export COCO format only, every 10th processed frame:
+```bash
+python vrifa.py \
+  --video-path input.mp4 \
+  --annotation-formats coco \
+  --annotation-mode stride \
+  --annotation-stride 10
+```
+
+---
 
 ## Prerequisites
 - Python 3.10+ recommended
@@ -28,7 +129,7 @@ Defaults: processes every frame, crops a 15% margin on all sides, uses CIELAB co
 - Outputs land under `--output-dir` (default `flow_front_outputs`):
   - `masks/`, `overlays/`, `heatmap/` for per-frame PNGs (if enabled)
   - `videos/overlay.mp4`, `mask.mp4`, `heatmap.mp4` (if enabled)
-  - `annotations/` for COCO JSON, YOLO txt files, and extracted frames (if annotation export is enabled)
+  - `formatCOCO/`, `formatYOLO/`, `formatYOLO_v2/` for ML annotation exports (if enabled)
   - `run_summary.yaml` with all run settings and timing
 
 ## Boolean Flag Syntax
@@ -84,7 +185,7 @@ Most on/off flags expect the literal strings `true/false` (case-insensitive). `-
 - `--lock-frames N` : pixel must stay filled N consecutive processed frames to “stick” (0 disables).
 
 **Annotations (optional)**
-- `--annotation-formats coco,yolo`
+- `--annotation-formats coco,yolov5,darknet` (see Export Formats section above)
 - `--annotation-mode {all,count,stride}`
 - `--annotation-count N` (used with `count`)
 - `--annotation-stride N` (used with `stride`)
@@ -103,7 +204,7 @@ python vrifa.py \
   --write-videos
 ```
 
-Dynamic reference with linear lag and COCO annotations on 50 evenly spaced frames:
+Dynamic reference with linear lag and all annotation formats on 50 evenly spaced frames:
 ```bash
 python vrifa.py \
   --video-path input_1.mp4 \
@@ -112,7 +213,7 @@ python vrifa.py \
   --dynamic-lag-linear \
   --dynamic-lag-linear-start 0 \
   --dynamic-lag-linear-max 45 \
-  --annotation-formats coco \
+  --annotation-formats coco,yolov5,darknet \
   --annotation-mode count \
   --annotation-count 50
 ```
