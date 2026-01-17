@@ -183,6 +183,11 @@ def parse_args() -> argparse.Namespace:
         help="Value added after scaling the threshold (before clamping to 0-255).",
     )
     parser.add_argument(
+        "--darken-only",
+        action="store_true",
+        help="Only detect areas that got darker (lower L* or brightness). Ignores brightening.",
+    )
+    parser.add_argument(
         "--write-videos",
         action="store_true",
         help="Quick flag to enable all MP4 outputs (mask, overlay, heatmap).",
@@ -978,10 +983,20 @@ def detect_front(
     morph_shape: str,
     morph_close_iterations: int,
     morph_open_iterations: int,
+    darken_only: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     weights = channel_weights.reshape(1, 1, -1)
-    diff = (frame_converted - reference_converted) * weights
-    delta = np.sqrt(np.sum(diff * diff, axis=2))
+    if darken_only:
+        # Only detect darkening: reference - frame (positive when frame is darker)
+        # For LAB, channel 0 is L* (lightness), for RGB/grayscale lower = darker
+        diff = (reference_converted - frame_converted) * weights
+        # Use first channel (L* for LAB, or intensity) for signed comparison
+        delta = diff[:, :, 0] if diff.shape[2] > 0 else diff[:, :, 0]
+        # Zero out negative values (brightening)
+        delta = np.maximum(delta, 0)
+    else:
+        diff = (frame_converted - reference_converted) * weights
+        delta = np.sqrt(np.sum(diff * diff, axis=2))
     delta *= roi_mask
 
     if blur_enabled:
@@ -1238,6 +1253,7 @@ def main() -> None:
                     args.morph_shape,
                     args.morph_close_iterations,
                     args.morph_open_iterations,
+                    args.darken_only,
                 )
                 mask = apply_locking(mask, lock_frames, lock_state)
                 overlay = create_overlay(frame_bgr, mask)
@@ -1391,6 +1407,7 @@ def main() -> None:
         "contrast_threshold": args.contrast_threshold,
         "contrast_percentile": args.contrast_percentile,
         "threshold_offset": args.threshold_offset,
+        "darken_only": args.darken_only,
         "write_mask_pngs": bool(outputs_to_write["mask_png"]),
         "write_overlay_pngs": bool(outputs_to_write["overlay_png"]),
         "write_heatmap_pngs": bool(outputs_to_write["heatmap_png"]),
