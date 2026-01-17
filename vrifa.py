@@ -179,18 +179,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--threshold-offset",
         type=float,
-        default=0.0,
+        default=-30.0,
         help="Value added after scaling the threshold (before clamping to 0-255).",
     )
     parser.add_argument(
         "--darken-only",
-        action="store_true",
-        help="Only detect areas that got darker (lower L* or brightness). Ignores brightening.",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Only detect areas that got darker (lower L* or brightness). Ignores brightening. Use --no-darken-only to disable.",
     )
     parser.add_argument(
         "--peak-reference",
-        action="store_true",
-        help="Compare each pixel to its historical maximum brightness instead of a fixed reference frame. Useful when pixels start dark, brighten, then darken again.",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Compare each pixel to its historical maximum brightness instead of a fixed reference frame. Use --no-peak-reference to disable.",
     )
     parser.add_argument(
         "--write-videos",
@@ -298,8 +300,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--annotation-formats",
         type=str,
-        default="",
-        help="Comma-separated annotation formats to export (coco, yolov5, darknet).",
+        default="coco",
+        help="Comma-separated annotation formats to export (coco, yolov5, darknet). Default: coco.",
     )
     parser.add_argument(
         "--annotation-mode",
