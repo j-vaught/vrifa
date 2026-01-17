@@ -188,6 +188,11 @@ def parse_args() -> argparse.Namespace:
         help="Only detect areas that got darker (lower L* or brightness). Ignores brightening.",
     )
     parser.add_argument(
+        "--peak-reference",
+        action="store_true",
+        help="Compare each pixel to its historical maximum brightness instead of a fixed reference frame. Useful when pixels start dark, brighten, then darken again.",
+    )
+    parser.add_argument(
         "--write-videos",
         action="store_true",
         help="Quick flag to enable all MP4 outputs (mask, overlay, heatmap).",
@@ -984,14 +989,20 @@ def detect_front(
     morph_close_iterations: int,
     morph_open_iterations: int,
     darken_only: bool = False,
+    peak_brightness_map: Optional[np.ndarray] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     weights = channel_weights.reshape(1, 1, -1)
     if darken_only:
         # Only detect darkening: reference - frame (positive when frame is darker)
         # For LAB, channel 0 is L* (lightness), for RGB/grayscale lower = darker
-        diff = (reference_converted - frame_converted) * weights
-        # Use first channel (L* for LAB, or intensity) for signed comparison
-        delta = diff[:, :, 0] if diff.shape[2] > 0 else diff[:, :, 0]
+        if peak_brightness_map is not None:
+            # Use the historical peak brightness as reference
+            current_brightness = frame_converted[:, :, 0]
+            delta = (peak_brightness_map - current_brightness) * weights[0, 0, 0]
+        else:
+            diff = (reference_converted - frame_converted) * weights
+            # Use first channel (L* for LAB, or intensity) for signed comparison
+            delta = diff[:, :, 0] if diff.shape[2] > 0 else diff[:, :, 0]
         # Zero out negative values (brightening)
         delta = np.maximum(delta, 0)
     else:
@@ -1082,6 +1093,10 @@ def main() -> None:
     first_frame_converted = (
         convert_frame_to_colorspace(first_frame_bgr, args.colorspace).astype(np.float32)
     )
+    # Initialize peak brightness tracking (first channel, e.g., L* for LAB)
+    peak_brightness_map: Optional[np.ndarray] = None
+    if args.peak_reference:
+        peak_brightness_map = first_frame_converted[:, :, 0].copy()
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or None
     reference_mode = args.ref_mode
     absolute_reference = first_frame_converted
@@ -1237,6 +1252,10 @@ def main() -> None:
 
             if should_process:
                 compute_start = time.monotonic()
+                # Update peak brightness map with current frame (before detection)
+                if peak_brightness_map is not None:
+                    current_brightness = frame_converted[:, :, 0]
+                    peak_brightness_map = np.maximum(peak_brightness_map, current_brightness)
                 mask, heatmap = detect_front(
                     frame_bgr,
                     frame_converted,
@@ -1254,6 +1273,7 @@ def main() -> None:
                     args.morph_close_iterations,
                     args.morph_open_iterations,
                     args.darken_only,
+                    peak_brightness_map if args.peak_reference else None,
                 )
                 mask = apply_locking(mask, lock_frames, lock_state)
                 overlay = create_overlay(frame_bgr, mask)
@@ -1408,6 +1428,7 @@ def main() -> None:
         "contrast_percentile": args.contrast_percentile,
         "threshold_offset": args.threshold_offset,
         "darken_only": args.darken_only,
+        "peak_reference": args.peak_reference,
         "write_mask_pngs": bool(outputs_to_write["mask_png"]),
         "write_overlay_pngs": bool(outputs_to_write["overlay_png"]),
         "write_heatmap_pngs": bool(outputs_to_write["heatmap_png"]),
