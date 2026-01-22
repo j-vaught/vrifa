@@ -3,7 +3,7 @@
 \usepackage{tikz}
 \usepackage{graphicx}
 \usepackage{xcolor}
-\usepackage{fontspec}
+\usefonttheme{serif}
 \usepackage{listings}
 
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, calc}
@@ -35,7 +35,7 @@
 % TikZ styles - sharp corners, straight lines
 \tikzstyle{process} = [rectangle, minimum width=2.5cm, minimum height=0.8cm,
                        text centered, draw=black, fill=white, line width=0.5pt]
-\tikzstyle{decision} = [rectangle, minimum width=2cm, minimum height=0.8cm,
+\tikzstyle{decision} = [rectangle, minimum width=2.5cm, minimum height=0.8cm,
                         text centered, draw=black, fill=garnet!20, line width=0.5pt]
 \tikzstyle{io} = [rectangle, minimum width=2.5cm, minimum height=0.8cm,
                   text centered, draw=black, fill=atlantic!20, line width=0.5pt]
@@ -43,7 +43,7 @@
 
 \title{\textbf{VRIFA}}
 \subtitle{VARTM Resin Infusion Flow-Front Assessment}
-\author{Automated Flow-Front Detection for Composite Manufacturing}
+\author{JC Vaught\\[0.2cm]\small IMSEL Research Group}
 \date{}
 
 \begin{document}
@@ -60,49 +60,27 @@
 \end{center}
 \end{frame}
 
-%% SLIDE 2: PROBLEM STATEMENT
-\begin{frame}{The Challenge: VARTM Process Monitoring}
-\begin{columns}[T]
-\begin{column}{0.55\textwidth}
+%% SLIDE 2: VARTM FLOW FRONT TRACKING
+\begin{frame}{VARTM Flow Front Tracking}
 \textbf{Vacuum-Assisted Resin Transfer Molding (VARTM)}
 \begin{itemize}
     \item Resin infuses dry fiber reinforcement under vacuum
-    \item Flow front progression must be tracked
-    \item Manual monitoring is labor-intensive
-    \item Lighting variations cause false detections
+    \item Flow front progression must be tracked to ensure complete wet-out and detect dry spots
+    \item Lighting variations and reflections cause detection challenges
 \end{itemize}
-\vspace{0.5cm}
+
+\vspace{0.8cm}
 \textbf{Key Insight:}
 \begin{itemize}
     \item Dry fabric $\rightarrow$ \textbf{lighter} (reflects light)
     \item Wet fabric $\rightarrow$ \textbf{darker} (absorbs light)
 \end{itemize}
-\end{column}
-\begin{column}{0.42\textwidth}
-\begin{tikzpicture}[scale=0.75, transform shape]
-    \node[io] (video) at (0,4) {Video Input};
-    \node[process] (detect) at (0,2.5) {Detection};
-    \node[decision] (challenge) at (0,1) {Challenges};
-    \node[process] (output) at (0,-0.5) {Flow Front};
-
-    \draw[arrow] (video) -- (detect);
-    \draw[arrow] (detect) -- (challenge);
-    \draw[arrow] (challenge) -- (output);
-
-    \node[right=0.3cm of challenge, text width=3cm, font=\scriptsize] {
-        \textcolor{garnet}{Glare}\\
-        \textcolor{garnet}{Shadows}\\
-        \textcolor{garnet}{Auto-exposure}
-    };
-\end{tikzpicture}
-\end{column}
-\end{columns}
 \end{frame}
 
 %% SLIDE 3: ALGORITHM PIPELINE
 \begin{frame}{VRIFA Processing Pipeline}
 \begin{center}
-\begin{tikzpicture}[scale=0.85, transform shape, node distance=0.4cm]
+\begin{tikzpicture}[scale=1.02, transform shape, node distance=0.4cm]
     % Row 1
     \node[io] (input) {Video Frame};
     \node[process, right=of input] (roi) {ROI Crop};
@@ -142,58 +120,77 @@
     \draw[arrow] (overlay) -- (heatmap);
     \draw[arrow] (heatmap) -- (annot);
 
-    % Labels
-    \node[below=0.1cm of peak, font=\scriptsize, text=garnet] {per-pixel max};
-    \node[below=0.1cm of thresh, font=\scriptsize, text=garnet] {-30 offset};
+    % Labels above blocks
+    \node[above=0.1cm of input, font=\scriptsize, text=gray70] {load};
+    \node[above=0.1cm of roi, font=\scriptsize, text=gray70] {focus};
+    \node[above=0.1cm of color, font=\scriptsize, text=gray70] {convert};
+    \node[above=0.1cm of peak, font=\scriptsize, text=gray70] {track};
+    \node[below=0.1cm of diff, font=\scriptsize, text=gray70] {compare};
+    \node[above=0.1cm of thresh, font=\scriptsize, text=gray70] {segment};
+    \node[above=0.1cm of morph, font=\scriptsize, text=gray70] {clean};
+    \node[above=0.1cm of temporal, font=\scriptsize, text=gray70] {stabilize};
+
+    % Dashed box around outputs
+    \node[draw=gray70, dashed, line width=0.5pt, fit=(mask)(overlay)(heatmap)(annot), inner sep=0.15cm] (outputbox) {};
+    \node[below=0.1cm of outputbox, font=\scriptsize, text=gray70] {outputs};
 \end{tikzpicture}
 \end{center}
 \end{frame}
 
-%% SLIDE 4: KEY INNOVATION
-\begin{frame}{Key Innovation: Darken-Only + Peak Reference}
+%% SLIDE 4: DEVIATION FROM STANDARD
+\begin{frame}{Deviation from Standard Flow Tracking}
 \begin{columns}[T]
 \begin{column}{0.48\textwidth}
 \textbf{Darken-Only Detection}
-\begin{tikzpicture}[scale=0.7, transform shape]
-    \draw[fill=gray!20, draw=black] (0,0) rectangle (4,3);
-    \node at (2,2.5) {\small Reference Frame};
+\begin{tikzpicture}[scale=0.9, transform shape]
+    % Reference Frame (left)
+    \draw[fill=gray!20, draw=black] (0,0) rectangle (2.5,2.5);
+    \node at (1.25,2.1) {\scriptsize Reference};
 
-    \draw[fill=gray!40, draw=black] (0,-3.5) rectangle (4,-0.5);
-    \node at (2,-1) {\small Current Frame};
-    \draw[fill=congaree!60] (1,-2.5) rectangle (3,-1.5);
-    \node[white] at (2,-2) {\small Resin};
+    % Current Frame (right)
+    \draw[fill=gray!40, draw=black] (4,0) rectangle (6.5,2.5);
+    \node at (5.25,2.1) {\scriptsize Current};
+    \draw[fill=congaree!60] (4.5,0.4) rectangle (6,1.4);
+    \node[white] at (5.25,0.9) {\scriptsize Resin};
 
-    \draw[arrow, line width=1pt, garnet] (2,-0.5) -- (2,0);
-    \node[right, garnet, font=\small] at (2.1,-0.25) {darker = wet};
+    % Arrow
+    \draw[arrow, line width=1pt, garnet] (2.5,1.25) -- (4,1.25);
+    \node[above, garnet, font=\scriptsize] at (3.25,1.25) {dark = wet};
 \end{tikzpicture}
 \vspace{0.3cm}
 
-Only detects \textbf{darkening} pixels\\
-Ignores: specular highlights, auto-exposure
+\begin{itemize}
+    \item Standard: absolute difference
+    \item VRIFA: only detects \textbf{darkening}
+    \item Ignores specular highlights, auto-exposure
+\end{itemize}
 \end{column}
 \begin{column}{0.48\textwidth}
 \textbf{Peak Brightness Reference}
-\begin{tikzpicture}[scale=0.7, transform shape]
-    \draw[->] (0,0) -- (4.5,0) node[right] {\scriptsize time};
-    \draw[->] (0,0) -- (0,3) node[above] {\scriptsize brightness};
+\begin{tikzpicture}[scale=0.7, xscale=1.5]
+    \draw[->] (0,0) -- (4.5,0) node[right, scale=1, transform shape=false] {\scriptsize time};
+    \draw[->] (0,0) -- (0,3) node[above, scale=1, transform shape=false] {\scriptsize brightness};
 
     % Brightness curve
     \draw[thick, atlantic] (0.2,1) -- (1,2.2) -- (2,2.5) -- (2.5,2.3) -- (3,1.5) -- (4,0.8);
 
     % Peak line
     \draw[dashed, garnet, thick] (0.2,2.5) -- (4,2.5);
-    \node[garnet, font=\scriptsize] at (4.3,2.5) {peak};
+    \node[garnet, font=\scriptsize, scale=1, transform shape=false] at (4.3,2.5) {peak};
 
     % Detection zone
     \draw[<->, horseshoe, thick] (3.5,0.8) -- (3.5,2.5);
-    \node[horseshoe, font=\scriptsize, right] at (3.5,1.6) {detection};
+    \node[horseshoe, font=\scriptsize, right, scale=1, transform shape=false] at (3.5,1.6) {detection};
 
-    \node[font=\scriptsize] at (2,-0.5) {Pixel brightness over time};
+    \node[font=\scriptsize, scale=1, transform shape=false] at (2,-0.5) {Pixel brightness over time};
 \end{tikzpicture}
 \vspace{0.3cm}
 
-Each pixel compared to its \textbf{historical maximum}\\
-Handles: shadows, lighting stabilization
+\begin{itemize}
+    \item Standard: fixed reference frame
+    \item VRIFA: per-pixel \textbf{historical max}
+    \item Handles shadows, lighting stabilization
+\end{itemize}
 \end{column}
 \end{columns}
 \end{frame}
@@ -219,17 +216,20 @@ Handles: shadows, lighting stabilization
 \end{itemize}
 \end{column}
 \begin{column}{0.45\textwidth}
-\begin{tikzpicture}[scale=0.75, transform shape]
-    \node[io, minimum width=3cm] (vrifa) at (0,3) {VRIFA};
+\begin{tikzpicture}[scale=0.8, transform shape]
+    % Center hub
+    \node[io, minimum width=2cm, minimum height=1cm] (vrifa) at (0,0) {\textbf{VRIFA}};
 
-    \node[process, minimum width=2.2cm] (mask) at (-2,1) {Masks};
-    \node[process, minimum width=2.2cm] (overlay) at (0,1) {Overlays};
-    \node[process, minimum width=2.2cm] (heat) at (2,1) {Heatmaps};
+    % 6 outputs in a circle (60 degrees apart)
+    \def\radius{2.5cm}
+    \node[process, minimum width=1.8cm] (mask) at (90:\radius) {Masks};
+    \node[process, minimum width=1.8cm] (overlay) at (30:\radius) {Overlays};
+    \node[decision, minimum width=1.8cm] (coco) at (-30:\radius) {COCO};
+    \node[decision, minimum width=1.8cm] (yolo) at (-90:\radius) {YOLO};
+    \node[decision, minimum width=1.8cm] (dark) at (-150:\radius) {Darknet};
+    \node[process, minimum width=1.8cm] (heat) at (150:\radius) {Heatmaps};
 
-    \node[decision, minimum width=2.2cm] (coco) at (-2,-1) {COCO};
-    \node[decision, minimum width=2.2cm] (yolo) at (0,-1) {YOLO};
-    \node[decision, minimum width=2.2cm] (dark) at (2,-1) {Darknet};
-
+    % Spokes from center to each output
     \draw[arrow] (vrifa) -- (mask);
     \draw[arrow] (vrifa) -- (overlay);
     \draw[arrow] (vrifa) -- (heat);
@@ -241,54 +241,45 @@ Handles: shadows, lighting stabilization
 \end{columns}
 \end{frame}
 
-%% SLIDE 6: DEMO
-\begin{frame}{Demo: Processing Results}
-\begin{columns}[T]
-\begin{column}{0.48\textwidth}
-\textbf{Input Frame}
+%% SLIDE 6: DEMO - Frame 18
+\begin{frame}{}
 \begin{center}
-\includegraphics[width=0.9\textwidth]{output_input2_peak_annotated/formatCOCO/images/default/frame_000048.png}
-\end{center}
-\small Frame 48 -- Early infusion
-\end{column}
-\begin{column}{0.48\textwidth}
-\textbf{Later Frame}
-\begin{center}
-\includegraphics[width=0.9\textwidth]{output_input2_peak_annotated/formatCOCO/images/default/frame_000088.png}
-\end{center}
-\small Frame 88 -- Advanced flow front
-\end{column}
-\end{columns}
-
-\vspace{0.3cm}
-\begin{center}
-\texttt{python vrifa.py --video-path input.mp4 --write-videos}
+\begin{tikzpicture}
+    % 2x2 grid of images
+    \node at (0,0) {\includegraphics[width=0.42\textwidth]{demo_output/input/frame_000018.png}};
+    \node at (7,0) {\includegraphics[width=0.42\textwidth]{demo_output/overlays/frame_000018.png}};
+    \node at (0,-4) {\includegraphics[width=0.42\textwidth]{demo_output/masks/frame_000018.png}};
+    \node at (7,-4) {\includegraphics[width=0.42\textwidth]{demo_output/heatmap/frame_000018.png}};
+\end{tikzpicture}
 \end{center}
 \end{frame}
 
-%% SLIDE 7: OUTRO
+%% SLIDE 7: DEMO - Frame 88
+\begin{frame}{}
+\begin{center}
+\begin{tikzpicture}
+    % 2x2 grid of images
+    \node at (0,0) {\includegraphics[width=0.42\textwidth]{demo_output/input/frame_000088.png}};
+    \node at (7,0) {\includegraphics[width=0.42\textwidth]{demo_output/overlays/frame_000088.png}};
+    \node at (0,-4) {\includegraphics[width=0.42\textwidth]{demo_output/masks/frame_000088.png}};
+    \node at (7,-4) {\includegraphics[width=0.42\textwidth]{demo_output/heatmap/frame_000088.png}};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+%% SLIDE 8: OUTRO
 \begin{frame}
 \begin{center}
 \vspace{1cm}
-{\Huge\textcolor{garnet}{\textbf{VRIFA}}}
+{\Huge\textcolor{garnet}{\textbf{Questions?}}}
 
-\vspace{0.5cm}
-{\Large VARTM Resin Infusion Flow-Front Assessment}
+\vspace{1.5cm}
+{\Large\textbf{JC Vaught}}
 
-\vspace{1cm}
-\begin{tikzpicture}
-\node[rectangle, draw=black, line width=1pt, minimum width=8cm, minimum height=2cm, fill=white] {
-\begin{minipage}{7.5cm}
-\centering
-\textbf{Features}\\[0.2cm]
-Darken-only detection | Peak brightness tracking\\
-Adaptive thresholding | Multi-format ML export\\
-Temporal filtering | Configurable ROI
-\end{minipage}
-};
-\end{tikzpicture}
+\vspace{0.3cm}
+{\large jvaught@sc.edu}
 
-\vspace{0.8cm}
+\vspace{1.2cm}
 \texttt{github.com/j-vaught/vrifa}
 \end{center}
 \end{frame}
