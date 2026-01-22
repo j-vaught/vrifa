@@ -49,14 +49,42 @@
 \begin{document}
 
 %% SLIDE 1: INTRO
-\begin{frame}
-\titlepage
-\begin{center}
-\begin{tikzpicture}
-\node[rectangle, draw=garnet, line width=1.5pt, minimum width=10cm, minimum height=1.2cm, fill=garnet!10] {
-    \textcolor{garnet}{\textbf{Computer Vision for VARTM Process Monitoring}}
-};
+\begin{frame}[plain]
+\begin{tikzpicture}[remember picture, overlay]
+    \draw[garnet, line width=3pt]
+        ([shift={(0.3cm,-0.3cm)}]current page.north west) rectangle
+        ([shift={(-0.3cm,0.3cm)}]current page.south east);
 \end{tikzpicture}
+\begin{center}
+\vspace{1.5cm}
+
+% Title
+{\fontsize{48}{52}\selectfont\textcolor{garnet}{\textbf{VRIFA}}}
+
+\vspace{0.4cm}
+
+% Horizontal line
+\textcolor{garnet}{\rule{8cm}{1.5pt}}
+
+\vspace{0.4cm}
+
+% Subtitle
+{\Large VARTM Resin Infusion Flow-Front Assessment}
+
+\vspace{0.3cm}
+
+{\normalsize Computer Vision for Process Monitoring}
+
+\vspace{1.2cm}
+
+% Author
+{\large\textbf{JC Vaught}}
+
+\vspace{0.2cm}
+
+{\normalsize IMSEL Research Group}
+
+\vfill
 \end{center}
 \end{frame}
 
@@ -268,19 +296,42 @@
 \end{frame}
 
 %% SLIDE 8: OUTRO
-\begin{frame}
+\begin{frame}[plain]
+\begin{tikzpicture}[remember picture, overlay]
+    \draw[garnet, line width=3pt]
+        ([shift={(0.3cm,-0.3cm)}]current page.north west) rectangle
+        ([shift={(-0.3cm,0.3cm)}]current page.south east);
+\end{tikzpicture}
 \begin{center}
-\vspace{1cm}
-{\Huge\textcolor{garnet}{\textbf{Questions?}}}
-
 \vspace{1.5cm}
-{\Large\textbf{JC Vaught}}
 
-\vspace{0.3cm}
-{\large jvaught@sc.edu}
+% Questions
+{\fontsize{48}{52}\selectfont\textcolor{garnet}{\textbf{Questions?}}}
 
-\vspace{1.2cm}
-\texttt{github.com/j-vaught/vrifa}
+\vspace{0.6cm}
+
+% Horizontal line
+\textcolor{garnet}{\rule{6cm}{1.5pt}}
+
+\vspace{1cm}
+
+% Author
+{\large\textbf{JC Vaught}}
+
+\vspace{0.15cm}
+
+{\normalsize jvaught@sc.edu}
+
+\vspace{0.15cm}
+
+{\normalsize IMSEL Research Group}
+
+\vspace{1cm}
+
+% GitHub
+\textcolor{gray70}{\texttt{github.com/j-vaught/vrifa}}
+
+\vfill
 \end{center}
 \end{frame}
 
