@@ -2,24 +2,6 @@
 
 A computer vision tool for automated detection and tracking of resin flow fronts in Vacuum-Assisted Resin Transfer Molding (VARTM) processes. VRIFA processes video recordings of composite manufacturing to generate binary masks, visual overlays, temporal heatmaps, and machine learning training datasets.
 
-## Citation
-
-If you use VRIFA in your research, please cite:
-
-```bibtex
-@article{vrifa2025,
-  title     = {VRIFA: Automated Flow-Front Detection for VARTM Process Monitoring},
-  author    = {[Author Names]},
-  journal   = {[Journal Name]},
-  year      = {2025},
-  volume    = {[Volume]},
-  pages     = {[Pages]},
-  doi       = {[DOI]}
-}
-```
-
-> **Note:** Citation details will be updated upon publication.
-
 ## Features
 
 - **Darken-only detection** to track resin wetting (ignores brightening artifacts)
@@ -490,6 +472,23 @@ annotation_formats: ['coco']
 Use this file to reproduce exact configurations or document experimental setups.
 
 ---
+
+## Sample Data
+
+The `data/` folder contains input videos used for the example runs. The `outputs_run*/` folders contain COCO annotations and run summaries, but not the extracted image frames (to keep the repository size manageable).
+
+To regenerate the frames from an input video, use ffmpeg:
+
+```bash
+mkdir -p frames
+ffmpeg -i data/input_1.mp4 frames/frame_%06d.png
+```
+
+Or run VRIFA directly on the input video to produce both frames and annotations:
+
+```bash
+python vrifa.py --video-path data/input_1.mp4 --output-dir outputs_run --annotation-formats coco
+```
 
 ## License
 

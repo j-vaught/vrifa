@@ -45,7 +45,7 @@ private_assets/
 flow_front_outputs/
 test_output/
 *_outputs/
-*.mp4
+outputs_run*/formatCOCO/images/
 
 # Jupyter
 .ipynb_checkpoints/
