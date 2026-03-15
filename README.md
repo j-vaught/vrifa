@@ -6,7 +6,7 @@ A computer vision tool for automated detection and tracking of resin flow fronts
 
 YOLO object detection overlay on a VARTM infusion, trained on VRIFA-generated annotations:
 
-https://github.com/j-vaught/vrifa/raw/main/yolo_overlay_input4.mp4
+<video src="https://github.com/j-vaught/vrifa/releases/download/v0.1.0/yolo_overlay_input4.mp4" controls width="100%"></video>
 
 ## Features
 
