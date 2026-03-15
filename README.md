@@ -69,7 +69,7 @@ python vrifa.py --video-path data/input_1.mp4 --output-dir outputs_run --annotat
 
 ## License
 
-[Add license information]
+MIT License. See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
