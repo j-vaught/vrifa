@@ -51,11 +51,28 @@ pub struct MorphologyParams {
     pub morph_open_iterations: usize,
 }
 
+#[derive(Clone, Debug)]
+pub struct MorphologyDebug {
+    pub delta_blur: Array2<f32>,
+    pub delta_norm: Array2<u8>,
+    pub binary: Array2<u8>,
+    pub mask: Array2<u8>,
+}
+
 pub fn detect_mask_from_delta(
     delta: &Array2<f32>,
     roi_mask: &Array2<u8>,
     params: &MorphologyParams,
 ) -> Result<(Array2<u8>, Array2<u8>)> {
+    let debug = detect_mask_from_delta_debug(delta, roi_mask, params)?;
+    Ok((debug.mask, debug.delta_norm))
+}
+
+pub fn detect_mask_from_delta_debug(
+    delta: &Array2<f32>,
+    roi_mask: &Array2<u8>,
+    params: &MorphologyParams,
+) -> Result<MorphologyDebug> {
     let delta_blur = if params.blur_enabled {
         let mut kernel = params.blur_kernel;
         if kernel % 2 == 0 {
@@ -87,6 +104,7 @@ pub fn detect_mask_from_delta(
         255.0,
         imgproc::THRESH_BINARY,
     )?;
+    let binary_pre_morph = binary.try_clone()?;
 
     let mut kernel_size = params.morph_kernel + (1 - params.morph_kernel % 2);
     if kernel_size == 0 {
@@ -130,7 +148,12 @@ pub fn detect_mask_from_delta(
         binary = filter_min_area(&binary, params.min_area)?;
     }
 
-    Ok((cvutil::mat_to_array2_u8(&binary)?, delta_norm))
+    Ok(MorphologyDebug {
+        delta_blur,
+        delta_norm,
+        binary: cvutil::mat_to_array2_u8(&binary_pre_morph)?,
+        mask: cvutil::mat_to_array2_u8(&binary)?,
+    })
 }
 
 fn normalize_minmax_to_u8(delta: &Array2<f32>) -> Result<Array2<u8>> {

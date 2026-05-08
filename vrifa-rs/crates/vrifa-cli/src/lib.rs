@@ -3,8 +3,9 @@ use chrono::{SecondsFormat, Utc};
 use clap::{ArgAction, Parser};
 use indexmap::IndexMap;
 use ndarray::Array3;
+use ndarray_npy::write_npy;
 use serde_yaml::Value;
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -18,7 +19,7 @@ use vrifa_core::overlay::create_overlay;
 use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
 use vrifa_core::roi::{build_roi_mask, resolve_roi_margins};
-use vrifa_core::{detect_front, DetectFrontParams};
+use vrifa_core::{detect_front, detect_front_debug, DetectFrontDebug, DetectFrontParams};
 use vrifa_io::{AsyncVideoWriter, VideoReader};
 
 #[derive(Parser, Debug)]
@@ -123,6 +124,10 @@ pub struct CliArgs {
     dynamic_lag_linear_start: usize,
     #[arg(long)]
     dynamic_lag_log: Option<PathBuf>,
+    #[arg(long)]
+    debug_dump_frames: Option<String>,
+    #[arg(long)]
+    debug_dump_dir: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug)]
@@ -355,7 +360,14 @@ impl TryFrom<CliArgs> for Config {
 
 pub fn run() -> Result<()> {
     let args = CliArgs::parse();
-    run_config(Config::try_from(args)?)
+    let debug_dump_frames = parse_frame_list(args.debug_dump_frames.as_deref())?;
+    let debug_dump_dir = args.debug_dump_dir.clone();
+    let config = Config::try_from(args)?;
+    if let Some(frames) = debug_dump_frames {
+        let output_dir = debug_dump_dir.unwrap_or_else(|| config.output_dir.clone());
+        return dump_debug_stages(config, &frames, &output_dir);
+    }
+    run_config(config)
 }
 
 pub fn run_config(config: Config) -> Result<()> {
@@ -717,6 +729,260 @@ pub fn run_config(config: Config) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
+struct StageDumpFrame {
+    frame_converted: Array3<f32>,
+    detect: DetectFrontDebug,
+    mask: ndarray::Array2<u8>,
+    overlay: Array3<u8>,
+}
+
+fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Result<()> {
+    let targets: BTreeSet<usize> = frames.iter().copied().collect();
+    if targets.is_empty() {
+        bail!("--debug-dump-frames requires at least one positive frame index");
+    }
+    fs::create_dir_all(output_dir)?;
+
+    let mut reader = VideoReader::open(&config.video_path)?;
+    let metadata = reader.metadata();
+    let Some((_, first_frame_bgr)) = reader.read_next()? else {
+        bail!("failed to read reference frame");
+    };
+    let first_frame_converted = convert_to_f32(&first_frame_bgr, config.colorspace)?;
+
+    let absolute_index = match config.ref_mode {
+        ReferenceMode::Absolute(index) => Some(index),
+        _ => None,
+    };
+    let absolute_reference = if let Some(index) = absolute_index {
+        if let Some(total) = metadata.total_frames {
+            if index >= total {
+                bail!("requested absolute frame index exceeds video length");
+            }
+        }
+        let frame = reader
+            .read_frame_at_zero_based(index)
+            .with_context(|| format!("reading absolute reference frame {index}"))?
+            .ok_or_else(|| anyhow!("unable to read absolute reference frame {index}"))?;
+        convert_to_f32(&frame, config.colorspace)?
+    } else {
+        first_frame_converted.clone()
+    };
+
+    let mut running_reference = first_frame_converted.clone();
+    let mut prev_buffer: Option<VecDeque<Array3<f32>>> = match config.ref_mode {
+        ReferenceMode::Prev(offset) => Some(VecDeque::with_capacity(offset)),
+        _ => None,
+    };
+    let mut dynamic_reader = if matches!(config.ref_mode, ReferenceMode::Dynamic) {
+        Some(VideoReader::open(&config.video_path)?)
+    } else {
+        None
+    };
+    let mut dynamic_cache: IndexMap<usize, Array3<f32>> = IndexMap::new();
+    let mut dynamic_measurements: Vec<(f32, f32)> = Vec::new();
+    let mut dynamic_factor: Option<f32> = None;
+
+    let roi_margins = resolve_roi_margins(
+        config.roi_margin,
+        config.roi_margin_top,
+        config.roi_margin_bottom,
+        config.roi_margin_left,
+        config.roi_margin_right,
+    );
+    let roi_mask = build_roi_mask(
+        (first_frame_converted.dim().0, first_frame_converted.dim().1),
+        roi_margins,
+    );
+    let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
+    let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
+    let mut peak_brightness_map = if config.peak_reference {
+        Some(
+            first_frame_converted
+                .slice(ndarray::s![.., .., 0])
+                .to_owned(),
+        )
+    } else {
+        None
+    };
+
+    let params = DetectFrontParams {
+        blur_kernel: config.blur_kernel,
+        morph_kernel: config.morph_kernel,
+        min_area: config.min_area,
+        manual_threshold: config.contrast_threshold,
+        percentile_threshold: config.contrast_percentile,
+        threshold_offset: config.threshold_offset,
+        channel_weights: config.channel_weights.clone(),
+        blur_enabled: !config.skip_blur,
+        morph_shape: config.morph_shape,
+        morph_close_iterations: config.morph_close_iterations,
+        morph_open_iterations: config.morph_open_iterations,
+        darken_only: config.darken_only,
+    };
+
+    reader.seek_zero()?;
+    let mut dumped = BTreeSet::new();
+
+    while let Some((frame_index, frame_bgr)) = reader.read_next()? {
+        let frame_converted = convert_to_f32(&frame_bgr, config.colorspace)?;
+        let reference_for_frame = match config.ref_mode {
+            ReferenceMode::First => first_frame_converted.clone(),
+            ReferenceMode::Absolute(_) => absolute_reference.clone(),
+            ReferenceMode::Running => running_reference.clone(),
+            ReferenceMode::Prev(offset) => {
+                if let Some(buffer) = &prev_buffer {
+                    if buffer.len() >= offset {
+                        buffer
+                            .front()
+                            .cloned()
+                            .unwrap_or_else(|| first_frame_converted.clone())
+                    } else {
+                        first_frame_converted.clone()
+                    }
+                } else {
+                    first_frame_converted.clone()
+                }
+            }
+            ReferenceMode::Dynamic => {
+                let dynamic_params = DynamicReferenceParams {
+                    factor: dynamic_factor,
+                    target_fraction: config.dynamic_target_fraction,
+                    lag_scale: config.dynamic_lag_scale,
+                    linear_mode: config.dynamic_lag_linear,
+                    linear_start: config.dynamic_lag_linear_start,
+                    linear_max: config.dynamic_lag_linear_max,
+                    total_frames: metadata.total_frames,
+                };
+                let ref_index = select_dynamic_reference_index(
+                    frame_index,
+                    metadata.fps as f32,
+                    roi_pixels,
+                    &dynamic_params,
+                );
+                fetch_reference_converted(
+                    ref_index,
+                    dynamic_reader.as_mut(),
+                    &mut dynamic_cache,
+                    config.dynamic_ref_cache_size,
+                    &first_frame_converted,
+                    config.colorspace,
+                )?
+            }
+        };
+
+        if frame_index % config.frame_step == 0 {
+            if config.peak_reference {
+                peak_brightness_map = Some(update_peak_brightness(
+                    &frame_converted,
+                    peak_brightness_map.as_ref(),
+                )?);
+            }
+
+            let detect = detect_front_debug(
+                &frame_converted,
+                &reference_for_frame,
+                &roi_mask,
+                &params,
+                peak_brightness_map
+                    .as_ref()
+                    .filter(|_| config.peak_reference),
+            )?;
+            let mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
+
+            if targets.contains(&frame_index) {
+                let overlay = create_overlay(&frame_bgr, &mask)?;
+                write_stage_dump_frame(
+                    output_dir,
+                    frame_index,
+                    &StageDumpFrame {
+                        frame_converted: frame_converted.clone(),
+                        detect: detect.clone(),
+                        mask,
+                        overlay,
+                    },
+                )?;
+                dumped.insert(frame_index);
+                if dumped.len() == targets.len() {
+                    break;
+                }
+            }
+
+            if matches!(config.ref_mode, ReferenceMode::Dynamic) {
+                let mask_area = detect.mask.iter().filter(|value| **value > 0).count();
+                if dynamic_factor.is_none()
+                    && metadata.fps > 0.0
+                    && frame_index > 1
+                    && mask_area > 0
+                {
+                    let time_seconds = (frame_index - 1) as f32 / metadata.fps as f32;
+                    dynamic_measurements.push((time_seconds, mask_area as f32));
+                    if dynamic_measurements.len() >= config.dynamic_calibration_frames {
+                        dynamic_factor =
+                            vrifa_core::reference::compute_dynamic_factor(&dynamic_measurements);
+                    }
+                }
+            }
+        }
+
+        if let Some(buffer) = prev_buffer.as_mut() {
+            if let ReferenceMode::Prev(offset) = config.ref_mode {
+                if buffer.len() == offset {
+                    buffer.pop_front();
+                }
+                buffer.push_back(frame_converted.clone());
+            }
+        }
+        if matches!(config.ref_mode, ReferenceMode::Running) {
+            let alpha = config.ref_running_alpha;
+            for (running, current) in running_reference.iter_mut().zip(frame_converted.iter()) {
+                *running = (1.0 - alpha) * *running + alpha * *current;
+            }
+        }
+    }
+
+    if dumped != targets {
+        let missing: Vec<usize> = targets.difference(&dumped).copied().collect();
+        bail!("failed to dump requested frame(s): {missing:?}");
+    }
+
+    println!(
+        "Dumped stage intermediates for frame(s) {:?} to {}",
+        frames,
+        output_dir.display()
+    );
+    Ok(())
+}
+
+fn write_stage_dump_frame(
+    output_dir: &Path,
+    frame_index: usize,
+    dump: &StageDumpFrame,
+) -> Result<()> {
+    let frame_dir = output_dir.join(format!("frame_{frame_index:06}"));
+    fs::create_dir_all(&frame_dir)?;
+    save_npy(
+        &frame_dir.join("frame_converted.npy"),
+        &dump.frame_converted,
+    )?;
+    save_npy(&frame_dir.join("delta.npy"), &dump.detect.delta)?;
+    save_npy(&frame_dir.join("delta_blur.npy"), &dump.detect.delta_blur)?;
+    save_npy(&frame_dir.join("delta_norm.npy"), &dump.detect.delta_norm)?;
+    save_npy(&frame_dir.join("binary.npy"), &dump.detect.binary)?;
+    save_npy(&frame_dir.join("mask.npy"), &dump.mask)?;
+    save_npy(&frame_dir.join("overlay.npy"), &dump.overlay)?;
+    save_npy(&frame_dir.join("heatmap.npy"), &dump.detect.heatmap)?;
+    Ok(())
+}
+
+fn save_npy<T>(path: &Path, array: &T) -> Result<()>
+where
+    T: ndarray_npy::WriteNpyExt,
+{
+    write_npy(path, array).with_context(|| format!("writing {}", path.display()))
+}
+
 fn convert_to_f32(frame_bgr: &Array3<u8>, colorspace: ColorSpace) -> Result<Array3<f32>> {
     Ok(convert_frame_to_colorspace(frame_bgr, colorspace)?.mapv(|value| value as f32))
 }
@@ -756,6 +1022,30 @@ fn parse_bool(text: &str, flag: &str) -> Result<bool> {
         "0" | "false" | "no" | "off" => Ok(false),
         _ => bail!("{flag} expects true/false but got '{text}'"),
     }
+}
+
+fn parse_frame_list(value: Option<&str>) -> Result<Option<Vec<usize>>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let mut frames = Vec::new();
+    for segment in value
+        .split(',')
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+    {
+        let frame = segment
+            .parse::<usize>()
+            .with_context(|| format!("invalid frame index '{segment}'"))?;
+        if frame == 0 {
+            bail!("frame indices are 1-based and must be >= 1");
+        }
+        frames.push(frame);
+    }
+    if frames.is_empty() {
+        bail!("--debug-dump-frames requires at least one frame index");
+    }
+    Ok(Some(frames))
 }
 
 fn parse_bool_optional(value: Option<&str>, flag: &str) -> Result<Option<bool>> {

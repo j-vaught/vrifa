@@ -47,6 +47,16 @@ pub struct DetectFrontParams {
     pub darken_only: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct DetectFrontDebug {
+    pub delta: Array2<f32>,
+    pub delta_blur: Array2<f32>,
+    pub delta_norm: Array2<u8>,
+    pub binary: Array2<u8>,
+    pub mask: Array2<u8>,
+    pub heatmap: Array3<u8>,
+}
+
 impl Default for DetectFrontParams {
     fn default() -> Self {
         Self {
@@ -73,6 +83,23 @@ pub fn detect_front(
     params: &DetectFrontParams,
     peak_brightness_map: Option<&Array2<f32>>,
 ) -> Result<(Array2<u8>, Array3<u8>)> {
+    let debug = detect_front_debug(
+        frame_converted,
+        reference_converted,
+        roi_mask,
+        params,
+        peak_brightness_map,
+    )?;
+    Ok((debug.mask, debug.heatmap))
+}
+
+pub fn detect_front_debug(
+    frame_converted: &Array3<f32>,
+    reference_converted: &Array3<f32>,
+    roi_mask: &Array2<u8>,
+    params: &DetectFrontParams,
+    peak_brightness_map: Option<&Array2<f32>>,
+) -> Result<DetectFrontDebug> {
     let delta = delta::compute_delta(
         frame_converted,
         reference_converted,
@@ -81,7 +108,7 @@ pub fn detect_front(
         params.darken_only,
         peak_brightness_map,
     )?;
-    let (mask, delta_norm) = morphology::detect_mask_from_delta(
+    let morphology = morphology::detect_mask_from_delta_debug(
         &delta,
         roi_mask,
         &MorphologyParams {
@@ -97,6 +124,13 @@ pub fn detect_front(
             morph_open_iterations: params.morph_open_iterations,
         },
     )?;
-    let heatmap = heatmap::apply_turbo_colormap(&delta_norm)?;
-    Ok((mask, heatmap))
+    let heatmap = heatmap::apply_turbo_colormap(&morphology.delta_norm)?;
+    Ok(DetectFrontDebug {
+        delta,
+        delta_blur: morphology.delta_blur,
+        delta_norm: morphology.delta_norm,
+        binary: morphology.binary,
+        mask: morphology.mask,
+        heatmap,
+    })
 }

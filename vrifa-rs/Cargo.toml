@@ -21,6 +21,7 @@ ffmpeg-next = "8.1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 indexmap = { version = "2", features = ["serde"] }
 ndarray = { version = "0.17", features = ["rayon", "serde"] }
+ndarray-npy = "0.10"
 numpy = "0.28"
 opencv = { version = "0.98.2", default-features = false, features = ["clang-runtime"] }
 pyo3 = { version = "0.28", features = ["extension-module"] }
