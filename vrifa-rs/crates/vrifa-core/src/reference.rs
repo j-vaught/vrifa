@@ -35,6 +35,23 @@ pub struct DynamicReferenceParams {
     pub total_frames: Option<usize>,
 }
 
+pub fn compute_dynamic_delta_t_seconds(
+    frame_index: usize,
+    fps: f32,
+    roi_pixels: usize,
+    params: &DynamicReferenceParams,
+) -> Option<f32> {
+    if params.linear_mode || frame_index <= 1 || roi_pixels == 0 || fps <= 0.0 {
+        return None;
+    }
+    let factor = params.factor?.max(1e-9);
+    let time_current = (frame_index - 1) as f32 / fps;
+    let target_area = params.target_fraction.clamp(0.0, 1.0) * roi_pixels as f32;
+    let mut delta_t = ((target_area / factor) + time_current.sqrt()).powi(2) - time_current;
+    delta_t *= params.lag_scale.max(0.0);
+    Some(delta_t.max(0.0))
+}
+
 pub fn select_dynamic_reference_index(
     frame_index: usize,
     fps: f32,
@@ -58,17 +75,16 @@ pub fn select_dynamic_reference_index(
         return frame_index.saturating_sub(delta_frames).max(1);
     }
 
-    let Some(factor) = params.factor else {
+    if params.factor.is_none() {
         return 1;
-    };
+    }
     if roi_pixels == 0 || fps <= 0.0 {
         return 1;
     }
     let time_current = (frame_index - 1) as f32 / fps;
-    let target_area = params.target_fraction.clamp(0.0, 1.0) * roi_pixels as f32;
-    let factor = factor.max(1e-9);
-    let mut delta_t = ((target_area / factor) + time_current.sqrt()).powi(2) - time_current;
-    delta_t *= params.lag_scale.max(0.0);
+    let Some(delta_t) = compute_dynamic_delta_t_seconds(frame_index, fps, roi_pixels, params) else {
+        return 1;
+    };
     let ref_time = (time_current - delta_t.max(0.0)).max(0.0);
     let ref_index = (ref_time * fps) as usize + 1;
     ref_index.clamp(1, frame_index - 1)
