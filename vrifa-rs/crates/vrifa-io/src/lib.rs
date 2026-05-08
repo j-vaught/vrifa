@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use ndarray::{Array2, Array3};
 use opencv::core::{Mat, Size};
+use opencv::imgcodecs;
 use opencv::prelude::*;
 use opencv::videoio;
 use std::path::Path;
@@ -214,37 +215,24 @@ impl VideoWriter {
 
 pub fn write_bgr_png(path: impl AsRef<Path>, frame: &BgrFrame) -> Result<()> {
     let path = path.as_ref();
-    let (height, width, channels) = frame.dim();
+    let (_, _, channels) = frame.dim();
     if channels != 3 {
         return Err(anyhow!(
             "BGR PNG frame must have 3 channels, got {channels}"
         ));
     }
-    let mut img = image::RgbImage::new(width as u32, height as u32);
-    for y in 0..height {
-        for x in 0..width {
-            img.put_pixel(
-                x as u32,
-                y as u32,
-                image::Rgb([frame[(y, x, 2)], frame[(y, x, 1)], frame[(y, x, 0)]]),
-            );
-        }
-    }
-    img.save(path)
+    // Match Python's cv2.imwrite output to keep parity artifacts deterministic.
+    let mat = cvutil::array3_u8_to_mat(frame)?;
+    imgcodecs::imwrite_def(&path.to_string_lossy(), &mat)
         .with_context(|| format!("writing PNG {}", path.display()))?;
     Ok(())
 }
 
 pub fn write_gray_png(path: impl AsRef<Path>, frame: &Array2<u8>) -> Result<()> {
     let path = path.as_ref();
-    let (height, width) = frame.dim();
-    let mut img = image::GrayImage::new(width as u32, height as u32);
-    for y in 0..height {
-        for x in 0..width {
-            img.put_pixel(x as u32, y as u32, image::Luma([frame[(y, x)]]));
-        }
-    }
-    img.save(path)
+    // Match Python's cv2.imwrite output to keep parity artifacts deterministic.
+    let mat = cvutil::array2_u8_to_mat(frame)?;
+    imgcodecs::imwrite_def(&path.to_string_lossy(), &mat)
         .with_context(|| format!("writing PNG {}", path.display()))?;
     Ok(())
 }
