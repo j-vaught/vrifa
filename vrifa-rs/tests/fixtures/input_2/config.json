@@ -1,0 +1,23 @@
+{
+  "annotation_segmentation_max_edge_length": 0.0,
+  "annotation_segmentation_tolerance": 0.0,
+  "blur_enabled": true,
+  "blur_kernel": 9,
+  "channel_weights": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "colorspace": "CIELAB",
+  "darken_only": true,
+  "lock_frames": 3,
+  "manual_threshold": null,
+  "min_area": 400,
+  "morph_close_iterations": 1,
+  "morph_kernel": 13,
+  "morph_open_iterations": 1,
+  "morph_shape": "ellipse",
+  "peak_reference": true,
+  "percentile_threshold": null,
+  "threshold_offset": -30.0
+}

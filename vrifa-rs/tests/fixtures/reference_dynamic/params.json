@@ -1,0 +1,12 @@
+{
+  "factor": 304.0559159102154,
+  "fps": 29.97,
+  "frame_index": 180,
+  "lag_scale": 0.8,
+  "linear_max": 120,
+  "linear_mode": false,
+  "linear_start": 10,
+  "roi_pixels": 921600,
+  "target_fraction": 0.0125,
+  "total_frames": 706
+}

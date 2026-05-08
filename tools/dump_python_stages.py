@@ -295,6 +295,7 @@ def main() -> int:
                         "delta_blur": stages["delta_blur"],
                         "delta_norm": stages["delta_norm"],
                         "binary": stages["binary"],
+                        "mask_pre_lock": stages["mask_pre_lock"],
                         "mask": mask,
                         "overlay": overlay,
                         "heatmap": stages["heatmap"],
