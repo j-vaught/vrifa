@@ -46,6 +46,7 @@ flow_front_outputs/
 test_output/
 *_outputs/
 outputs_run*/formatCOCO/images/
+vrifa-rs/target/
 
 # Jupyter
 .ipynb_checkpoints/
