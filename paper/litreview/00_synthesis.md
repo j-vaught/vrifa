@@ -65,7 +65,7 @@ For the SciTech extended abstract, a single-page Related Work block can be assem
 
 ## 5. The single-sentence elevator positioning
 
-> VRIFA is the first open, MIT-licensed CLI tool that turns ordinary VARTM infusion video into time-resolved 2D flow-front geometry and detector-ready supervision in COCO, YOLOv5, and Darknet formats simultaneously, using a directional peak-brightness rule that matches the monotonic optical signature of resin wetting and a fully logged `run_summary.yaml` for reproducibility, with a 91-trial ablation that improves a multi-metric agreement objective from 0.583 to 0.807 against a human-labeled subset.
+> VRIFA is the first open, MIT-licensed CLI tool that turns ordinary VARTM infusion video into time-resolved 2D flow-front geometry and detector-ready supervision in COCO, YOLOv5, and Darknet formats simultaneously, using a directional peak-brightness rule that matches the monotonic optical signature of resin wetting, with a 91-trial ablation that improves a multi-metric agreement objective from 0.583 to 0.807 against a human-labeled subset.
 
 ## 6. The single-paragraph elevator positioning
 
