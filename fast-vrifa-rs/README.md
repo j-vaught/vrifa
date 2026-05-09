@@ -1,19 +1,19 @@
 # fast-vrifa-rs
 
-This workspace is the bring-up area for a GPU-oriented VRIFA implementation. The first milestone keeps parity trivial by delegating execution to the locked CPU binary while the backend trait, crate layout, and verification path are established.
+This workspace is the bring-up area for a GPU-oriented VRIFA implementation. The current milestone keeps the default CLI path delegated to the locked CPU binary, and adds a `wgpu` path for the first three stages: BGR upload, CIELAB conversion, ROI mask construction, and darken-only delta.
 
 ## Layout
 
-- `crates/fast-vrifa-core` defines the backend trait and shared device-side placeholders.
+- `crates/fast-vrifa-core` defines the backend trait and the CPU fallback implementation.
 - `crates/fast-vrifa-cuda` is the future CUDA backend crate.
-- `crates/fast-vrifa-wgpu` is the future wgpu backend crate.
+- `crates/fast-vrifa-wgpu` holds the Metal/Vulkan/DX12 compute path for the first staged GPU bring-up.
 - `crates/fast-vrifa-cli` builds the `fast-vrifa` binary.
 - `crates/fast-vrifa-py` builds the `fast_vrifa` Python binding surface.
 - `tests/parity` holds the local parity smoke harness for bring-up work.
 
 ## Build
 
-Build the delegated scaffold:
+Build the delegated CLI:
 
 ```bash
 cargo build --release -p fast-vrifa-cli
@@ -21,16 +21,21 @@ cargo build --release -p fast-vrifa-cli
 
 On macOS with Homebrew OpenCV, set `PKG_CONFIG_PATH=/opt/homebrew/opt/opencv/lib/pkgconfig` before running Cargo.
 
-Build the placeholder backend variants:
+Build the `wgpu` path:
+
+```bash
+cargo build --release -p fast-vrifa-cli --features wgpu
+```
+
+Build the CUDA placeholder:
 
 ```bash
 cargo build --release -p fast-vrifa-cli --features cuda
-cargo build --release -p fast-vrifa-cli --features wgpu
 ```
 
 ## Run
 
-The scaffold binary forwards all CLI arguments to the locked CPU implementation. Build the reference binary first:
+The default binary forwards all CLI arguments to the locked CPU implementation. Build the reference binary first:
 
 ```bash
 cd ../vrifa-rs
@@ -42,15 +47,31 @@ cd ../fast-vrifa-rs
   --write-videos
 ```
 
+Run the staged `wgpu` path:
+
+```bash
+./target/release/fast-vrifa \
+  --backend wgpu \
+  --video-path ../data/input_1.mp4 \
+  --output-dir /tmp/fast_vrifa_wgpu \
+  --write-mask-pngs true \
+  --write-overlay-pngs true \
+  --write-heatmap-pngs true \
+  --roi-margin 0.15 \
+  --annotation-formats coco
+```
+
 If the CPU binary lives somewhere else, set `VRIFA_BIN=/path/to/vrifa` before running `fast-vrifa`.
 
 ## Verify
 
 ```bash
 PKG_CONFIG_PATH=/opt/homebrew/opt/opencv/lib/pkgconfig cargo test --workspace
+PKG_CONFIG_PATH=/opt/homebrew/opt/opencv/lib/pkgconfig cargo test --workspace --features wgpu
+PKG_CONFIG_PATH=/opt/homebrew/opt/opencv/lib/pkgconfig cargo test --workspace --features cuda
 tests/parity/run_smoke.sh
 ```
 
 ## Current Status
 
-This branch is the workspace scaffold only. The binary and binding surface are wired, the backend crates compile, and parity is guaranteed by delegation. GPU kernels and backend execution land in later increments.
+The default path still delegates to the locked CPU binary. With `--backend wgpu`, `fast-vrifa` now runs colorspace, ROI, and darken-only delta on Metal via `wgpu`, downloads the delta plane, and finishes the remaining stages on the CPU. No intentional divergences are documented for this increment.

@@ -19,7 +19,15 @@ wgpu = ["dep:fast-vrifa-wgpu"]
 
 [dependencies]
 anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
 fast-vrifa-core = { path = "../fast-vrifa-core" }
 fast-vrifa-cuda = { path = "../fast-vrifa-cuda", optional = true }
 fast-vrifa-wgpu = { path = "../fast-vrifa-wgpu", optional = true }
+indexmap.workspace = true
+ndarray.workspace = true
+serde_yaml.workspace = true
+vrifa-annotations.workspace = true
 vrifa-cli.workspace = true
+vrifa-core.workspace = true
+vrifa-io.workspace = true

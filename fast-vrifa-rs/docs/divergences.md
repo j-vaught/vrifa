@@ -2,4 +2,4 @@
 
 No intentional divergences are documented yet.
 
-The scaffold milestone delegates execution to the locked CPU implementation, so output parity is exact by construction. Add a new entry here only when a GPU backend forces a documented numerical or semantic difference.
+The current `wgpu` milestone uses an exact BGR->CIELAB lookup table generated from the locked CPU conversion to keep stage-1 parity exact. Add a new entry here only when a backend forces a documented numerical or semantic difference.

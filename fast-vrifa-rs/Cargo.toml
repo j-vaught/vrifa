@@ -15,9 +15,18 @@ repository = "https://github.com/j-vaught/vrifa"
 
 [workspace.dependencies]
 anyhow = "1"
+bytemuck = { version = "1", features = ["derive"] }
+chrono = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+indexmap = "2"
 ndarray = { version = "0.17", features = ["rayon", "serde"] }
 numpy = "0.28"
+pollster = "0.3"
 pyo3 = { version = "0.28", features = ["extension-module"] }
 serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+wgpu = "0.20"
+vrifa-annotations = { path = "../vrifa-rs/crates/vrifa-annotations" }
 vrifa-cli = { path = "../vrifa-rs/crates/vrifa-cli" }
 vrifa-core = { path = "../vrifa-rs/crates/vrifa-core" }
+vrifa-io = { path = "../vrifa-rs/crates/vrifa-io" }

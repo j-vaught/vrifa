@@ -5,4 +5,10 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+anyhow.workspace = true
+bytemuck.workspace = true
 fast-vrifa-core = { path = "../fast-vrifa-core" }
+ndarray.workspace = true
+pollster.workspace = true
+vrifa-core.workspace = true
+wgpu.workspace = true
