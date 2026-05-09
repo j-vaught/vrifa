@@ -88,7 +88,10 @@
       //   long left past the layout, down to row-1 mid, right into Morphology.
       let elbow-out = 0.55
       let elbow-back = 0.55
-      let intermediate-y = -cell-h - row-pad / 2
+      // Center the horizontal segment between row 0's bottom and row 1's top.
+      let row0-bottom = -cell-h
+      let row1-top = -(cell-h + gap + row-pad)
+      let intermediate-y = (row0-bottom + row1-top) / 2
       let entry-y = -next-row * (cell-h + gap + row-pad) - cell-h / 2
       line(
         (x0, y0),
