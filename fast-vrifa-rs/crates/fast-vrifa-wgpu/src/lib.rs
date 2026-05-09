@@ -806,7 +806,7 @@ fn load_or_build_lab_lut() -> Result<Vec<u32>> {
 #[cfg(test)]
 mod tests {
     use super::WgpuBackend;
-    use fast_vrifa_core::{ImageBackend, RoiMargins};
+    use fast_vrifa_core::{ImageBackend, PeakImageBackend, RoiMargins};
     use ndarray::array;
 
     #[test]
@@ -835,5 +835,25 @@ mod tests {
             .unwrap();
         assert_eq!(backend.download_mask_u8(&mask).unwrap().shape(), &[1, 2]);
         assert_eq!(backend.download_plane_f32(&delta).unwrap().shape(), &[1, 2]);
+    }
+
+    #[test]
+    fn wgpu_backend_extracts_and_updates_peak_plane() {
+        let backend = WgpuBackend::new().unwrap();
+        let frame = array![[[0u8, 0u8, 0u8], [255u8, 255u8, 255u8]]];
+        let uploaded = backend.upload_frame_bgr(&frame).unwrap();
+        let converted = backend.convert_bgr_to_lab(&uploaded).unwrap();
+
+        let l_plane = backend.extract_l_plane(&converted).unwrap();
+        let extracted = backend.download_plane_f32(&l_plane).unwrap();
+        let host = backend.download_frame_f32(&converted).unwrap();
+        assert_eq!(extracted[(0, 0)], host[(0, 0, 0)]);
+        assert_eq!(extracted[(0, 1)], host[(0, 1, 0)]);
+
+        let peak = backend
+            .update_peak_brightness_device(&converted, Some(&l_plane))
+            .unwrap();
+        let peak_host = backend.download_plane_f32(&peak).unwrap();
+        assert_eq!(peak_host, extracted);
     }
 }

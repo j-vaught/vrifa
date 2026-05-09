@@ -510,7 +510,7 @@ fn load_or_build_lab_lut() -> Result<Vec<u32>> {
 #[cfg(test)]
 mod tests {
     use super::{pack_bgr_pixels, roi_bounds, CudaBackend};
-    use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, RoiMargins};
+    use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
     use ndarray::array;
 
     #[test]
@@ -543,5 +543,25 @@ mod tests {
             },
         );
         assert_eq!(bounds, (10, 80, 10, 170));
+    }
+
+    #[test]
+    fn cuda_peak_path_matches_extracted_l_plane_when_available() {
+        let backend = CudaBackend::new();
+        if !matches!(backend.status(), BackendStatus::Ready) {
+            return;
+        }
+
+        let frame = array![[[0u8, 0u8, 0u8], [255u8, 255u8, 255u8]]];
+        let uploaded = backend.upload_frame_bgr(&frame).unwrap();
+        let converted = backend.convert_bgr_to_lab(&uploaded).unwrap();
+        let l_plane = backend.extract_l_plane(&converted).unwrap();
+        let peak = backend
+            .update_peak_brightness_device(&converted, Some(&l_plane))
+            .unwrap();
+        assert_eq!(
+            backend.download_plane_f32(&peak).unwrap(),
+            backend.download_plane_f32(&l_plane).unwrap()
+        );
     }
 }
