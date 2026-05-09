@@ -41,7 +41,7 @@ use raw_video::{
 };
 
 #[cfg(feature = "cuda")]
-use fast_vrifa_cuda::CudaBackend;
+use fast_vrifa_cuda::{CudaBackend, CudaBatchDetectorOptions};
 #[cfg(feature = "wgpu")]
 use fast_vrifa_wgpu::WgpuBackend;
 
@@ -54,6 +54,7 @@ const COLOR_PNG_WORKERS: usize = 2;
 const COLOR_PNG_QUEUE: usize = 16;
 const COCO_PNG_WORKERS: usize = 12;
 const COCO_PNG_QUEUE: usize = 32;
+const CUDA_BATCH_SIZE: usize = 32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendMode {
@@ -276,6 +277,9 @@ fn run_cuda_backend(config: Config, options: &FastCliOptions) -> Result<()> {
                 .unwrap_or("CUDA runtime initialization failed");
             bail!("--backend cuda is unavailable on this machine: {detail}");
         }
+        if can_use_cuda_batched_peak_fast_path(&config) {
+            return run_cuda_batched_peak_pipeline(config, &backend, options);
+        }
         return run_hybrid_pipeline(config, &backend, options);
     }
 
@@ -284,6 +288,226 @@ fn run_cuda_backend(config: Config, options: &FastCliOptions) -> Result<()> {
         let _ = (config, options);
         bail!("--backend cuda requires building fast-vrifa with --features cuda");
     }
+}
+
+fn can_use_cuda_batched_peak_fast_path(config: &Config) -> bool {
+    matches!(config.colorspace, ColorSpace::Cielab)
+        && config.darken_only
+        && config.peak_reference
+        && matches!(config.ref_mode, ReferenceMode::First)
+        && config.contrast_threshold.is_none()
+        && config.contrast_percentile.is_none()
+        && config.annotation_formats.is_empty()
+        && !config.write_mask_pngs
+        && !config.write_overlay_pngs
+        && !config.write_heatmap_pngs
+}
+
+#[cfg(feature = "cuda")]
+fn run_cuda_batched_peak_pipeline(
+    config: Config,
+    backend: &CudaBackend,
+    options: &FastCliOptions,
+) -> Result<()> {
+    fs::create_dir_all(&config.output_dir)?;
+    let mut reader = VideoReader::open(&config.video_path)?;
+    let metadata = reader.metadata();
+
+    let roi_margins = resolve_roi_margins(
+        config.roi_margin,
+        config.roi_margin_top,
+        config.roi_margin_bottom,
+        config.roi_margin_left,
+        config.roi_margin_right,
+    );
+    let device_roi_mask = backend.build_roi_mask((metadata.height, metadata.width), roi_margins)?;
+    let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
+    let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
+
+    let video_dir = config.output_dir.join("videos");
+    let raw_stream_dir = config.output_dir.join(".streams");
+    let expected_video_frames = metadata
+        .total_frames
+        .map(|total_frames| total_frames / config.frame_step.max(1));
+    let need_mask_stream = config.write_mask_video || config.write_overlay_video;
+    let need_delta_norm_stream = config.write_heatmap_video;
+    let mut mask_writer = None;
+    let mut delta_norm_writer = None;
+    if need_mask_stream || need_delta_norm_stream {
+        fs::create_dir_all(&raw_stream_dir)?;
+        if need_mask_stream {
+            mask_writer = Some(AsyncRawVideoWriter::open(
+                raw_stream_dir.join("mask.raw"),
+                metadata.fps,
+                metadata.width,
+                metadata.height,
+                RawPixelFormat::Gray8,
+                expected_video_frames,
+                32,
+            )?);
+        }
+        if need_delta_norm_stream {
+            delta_norm_writer = Some(AsyncRawVideoWriter::open(
+                raw_stream_dir.join("delta_norm.raw"),
+                metadata.fps,
+                metadata.width,
+                metadata.height,
+                RawPixelFormat::Gray8,
+                expected_video_frames,
+                32,
+            )?);
+        }
+    }
+
+    let need_host_mask = config.write_mask_video || config.write_overlay_video;
+    let need_host_delta_norm = config.write_heatmap_video;
+    let batch_options = CudaBatchDetectorOptions {
+        channel_weight: config.channel_weights[0],
+        blur_kernel: config.blur_kernel,
+        blur_enabled: !config.skip_blur,
+        threshold_offset: config.threshold_offset,
+        morph_shape: config.morph_shape,
+        morph_kernel: config.morph_kernel,
+        morph_close_iterations: config.morph_close_iterations,
+        morph_open_iterations: config.morph_open_iterations,
+        min_area: config.min_area,
+        lock_frames: config.lock_frames,
+        need_host_mask,
+        need_host_delta_norm,
+    };
+    let mut detector_state =
+        backend.create_batch_detector_state(roi_mask.dim(), config.lock_frames)?;
+
+    let mut processed = 0usize;
+    let mut processing_time_accum = 0.0f64;
+    let run_start = Instant::now();
+    let mut batch_indices: Vec<usize> = Vec::with_capacity(CUDA_BATCH_SIZE);
+    let mut batch_frames: Vec<Array3<u8>> = Vec::with_capacity(CUDA_BATCH_SIZE);
+
+    let mut process_batch = |batch_indices: &mut Vec<usize>,
+                             batch_frames: &mut Vec<Array3<u8>>|
+     -> Result<()> {
+        if batch_frames.is_empty() {
+            return Ok(());
+        }
+        let compute_start = Instant::now();
+        let outputs =
+            backend.process_peak_detector_batch(batch_frames, &device_roi_mask, &mut detector_state, &batch_options)?;
+        for ((frame_index, _frame_bgr), output) in batch_indices
+            .drain(..)
+            .zip(batch_frames.drain(..))
+            .zip(outputs.into_iter())
+        {
+            if let Some(writer) = mask_writer.as_mut() {
+                writer.write_gray(Arc::new(
+                    output
+                        .mask
+                        .clone()
+                        .ok_or_else(|| anyhow!("mask video staging requires a host mask"))?,
+                ))?;
+            }
+            if let Some(writer) = delta_norm_writer.as_mut() {
+                writer.write_gray(Arc::new(
+                    output
+                        .delta_norm
+                        .clone()
+                        .ok_or_else(|| anyhow!("heatmap video staging requires host delta_norm"))?,
+                ))?;
+            }
+            let _ = frame_index;
+            processed += 1;
+        }
+        processing_time_accum += compute_start.elapsed().as_secs_f64();
+        Ok(())
+    };
+
+    while let Some((frame_index, frame_bgr)) = reader.read_next()? {
+        if frame_index % config.frame_step != 0 {
+            continue;
+        }
+        batch_indices.push(frame_index);
+        batch_frames.push(frame_bgr);
+        if batch_frames.len() == CUDA_BATCH_SIZE {
+            process_batch(&mut batch_indices, &mut batch_frames)?;
+        }
+    }
+    process_batch(&mut batch_indices, &mut batch_frames)?;
+
+    let mask_artifact = if let Some(writer) = mask_writer.take() {
+        Some(writer.close()?)
+    } else {
+        None
+    };
+    let delta_norm_artifact = if let Some(writer) = delta_norm_writer.take() {
+        Some(writer.close()?)
+    } else {
+        None
+    };
+
+    if options.ffmpeg_postprocess {
+        fs::create_dir_all(&video_dir)?;
+        let ffmpeg_bin = env::var_os("FFMPEG_BIN").unwrap_or_else(|| OsString::from("ffmpeg"));
+        if config.write_mask_video {
+            if let Some(artifact) = mask_artifact.as_ref() {
+                finalize_raw_stream_to_mp4(&ffmpeg_bin, artifact, video_dir.join("mask.mp4"))?;
+            }
+            if let Some(mask_artifact) = mask_artifact.as_ref() {
+                postprocess_overlay_video(
+                    &config,
+                    metadata.fps,
+                    metadata.width,
+                    metadata.height,
+                    mask_artifact,
+                    &raw_stream_dir,
+                    &ffmpeg_bin,
+                    video_dir.join("overlay.mp4"),
+                )?;
+            }
+        }
+        if config.write_heatmap_video {
+            if let Some(delta_norm_artifact) = delta_norm_artifact.as_ref() {
+                postprocess_heatmap_video(
+                    metadata.fps,
+                    metadata.width,
+                    metadata.height,
+                    delta_norm_artifact,
+                    &raw_stream_dir,
+                    &ffmpeg_bin,
+                    video_dir.join("heatmap.mp4"),
+                )?;
+            }
+        }
+    }
+
+    let avg_compute_time = if processed > 0 {
+        processing_time_accum / processed as f64
+    } else {
+        0.0
+    };
+    let run_total_time = run_start.elapsed().as_secs_f64();
+    let roi_fraction = roi_pixels as f64 / (metadata.width * metadata.height) as f64;
+    let video_duration = metadata.total_frames.map(|frames| frames as f64 / metadata.fps);
+    write_run_summary(
+        &config,
+        metadata.total_frames,
+        processed,
+        metadata.fps,
+        video_duration,
+        roi_pixels,
+        roi_fraction,
+        avg_compute_time,
+        run_total_time,
+        None,
+        None,
+        None,
+        None,
+    )?;
+    println!(
+        "Processed {processed} frames. Outputs saved to {}. Summary written to {}",
+        config.output_dir.display(),
+        config.output_dir.join("run_summary.yaml").display()
+    );
+    Ok(())
 }
 
 fn run_hybrid_pipeline<B>(config: Config, backend: &B, options: &FastCliOptions) -> Result<()>
