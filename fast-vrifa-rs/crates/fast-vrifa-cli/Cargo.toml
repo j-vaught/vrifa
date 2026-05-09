@@ -25,6 +25,7 @@ fast-vrifa-core = { path = "../fast-vrifa-core" }
 fast-vrifa-cuda = { path = "../fast-vrifa-cuda", optional = true }
 fast-vrifa-wgpu = { path = "../fast-vrifa-wgpu", optional = true }
 indexmap.workspace = true
+memmap2.workspace = true
 ndarray.workspace = true
 opencv = { workspace = true, features = ["imgproc"] }
 serde_yaml.workspace = true

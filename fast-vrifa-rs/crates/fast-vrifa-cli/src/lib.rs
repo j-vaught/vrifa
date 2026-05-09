@@ -32,7 +32,12 @@ use vrifa_core::reference::{
 };
 use vrifa_core::roi::resolve_roi_margins;
 use vrifa_core::threshold;
-use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
+use vrifa_io::{AsyncPngWriter, VideoReader};
+
+mod raw_video;
+use raw_video::{
+    finalize_raw_stream_to_mp4, AsyncRawVideoWriter, RawPixelFormat, RawVideoArtifact,
+};
 
 #[cfg(feature = "cuda")]
 use fast_vrifa_cuda::CudaBackend;
@@ -55,6 +60,12 @@ pub enum BackendMode {
     Cpu,
     Wgpu,
     Cuda,
+}
+
+#[derive(Clone, Debug)]
+struct FastCliOptions {
+    backend: BackendMode,
+    ffmpeg_postprocess: bool,
 }
 
 impl BackendMode {
@@ -81,8 +92,9 @@ struct DetectionOutputs {
 
 pub fn run() -> Result<()> {
     let raw_args: Vec<OsString> = env::args_os().collect();
-    let (backend, stripped_args) = parse_backend_args(raw_args)?;
-    if matches!(backend, BackendMode::Delegate) || contains_debug_dump_flags(&stripped_args) {
+    let (options, stripped_args) = parse_fast_args(raw_args)?;
+    if matches!(options.backend, BackendMode::Delegate) || contains_debug_dump_flags(&stripped_args)
+    {
         let status = forward_to_reference(stripped_args.iter().skip(1))?;
         return handle_reference_status(status);
     }
@@ -91,7 +103,7 @@ pub fn run() -> Result<()> {
         .context("parsing fast-vrifa CLI arguments")?;
     let config = Config::try_from(cli_args)?;
 
-    run_with_backend(config, backend)
+    run_with_options(config, &options)
 }
 
 pub fn run_config(config: Config) -> Result<()> {
@@ -99,16 +111,23 @@ pub fn run_config(config: Config) -> Result<()> {
 }
 
 pub fn run_with_backend_name(config: Config, backend: &str) -> Result<()> {
-    let backend = BackendMode::parse(backend)?;
-    run_with_backend(config, backend)
+    run_with_backend(config, BackendMode::parse(backend)?)
 }
 
 pub fn run_with_backend(config: Config, backend: BackendMode) -> Result<()> {
-    match backend {
+    let options = FastCliOptions {
+        backend,
+        ffmpeg_postprocess: false,
+    };
+    run_with_options(config, &options)
+}
+
+fn run_with_options(config: Config, options: &FastCliOptions) -> Result<()> {
+    match options.backend {
         BackendMode::Delegate => run_config(config),
-        BackendMode::Cpu => run_cpu_backend(config),
-        BackendMode::Wgpu => run_wgpu_backend(config),
-        BackendMode::Cuda => run_cuda_backend(config),
+        BackendMode::Cpu => run_cpu_backend(config, options),
+        BackendMode::Wgpu => run_wgpu_backend(config, options),
+        BackendMode::Cuda => run_cuda_backend(config, options),
     }
 }
 
@@ -162,11 +181,14 @@ fn handle_reference_status(status: ExitStatus) -> Result<()> {
     bail!("reference vrifa terminated by signal");
 }
 
-fn parse_backend_args(raw_args: Vec<OsString>) -> Result<(BackendMode, Vec<OsString>)> {
+fn parse_fast_args(raw_args: Vec<OsString>) -> Result<(FastCliOptions, Vec<OsString>)> {
     let mut args = raw_args.into_iter();
     let program = args.next().unwrap_or_else(|| OsString::from("fast-vrifa"));
     let mut stripped = vec![program];
-    let mut backend = BackendMode::Delegate;
+    let mut options = FastCliOptions {
+        backend: BackendMode::Delegate,
+        ffmpeg_postprocess: false,
+    };
 
     while let Some(arg) = args.next() {
         if let Some(text) = arg.to_str() {
@@ -174,7 +196,7 @@ fn parse_backend_args(raw_args: Vec<OsString>) -> Result<(BackendMode, Vec<OsStr
                 let value = args
                     .next()
                     .ok_or_else(|| anyhow!("--backend requires a value"))?;
-                backend = BackendMode::parse(
+                options.backend = BackendMode::parse(
                     value
                         .to_str()
                         .ok_or_else(|| anyhow!("--backend value must be valid UTF-8"))?,
@@ -182,14 +204,26 @@ fn parse_backend_args(raw_args: Vec<OsString>) -> Result<(BackendMode, Vec<OsStr
                 continue;
             }
             if let Some(value) = text.strip_prefix("--backend=") {
-                backend = BackendMode::parse(value)?;
+                options.backend = BackendMode::parse(value)?;
+                continue;
+            }
+            if text == "--ffmpeg-postprocess" {
+                options.ffmpeg_postprocess = true;
+                continue;
+            }
+            if text == "--no-ffmpeg-postprocess" {
+                options.ffmpeg_postprocess = false;
+                continue;
+            }
+            if let Some(value) = text.strip_prefix("--ffmpeg-postprocess=") {
+                options.ffmpeg_postprocess = parse_fast_bool_flag(value, "--ffmpeg-postprocess")?;
                 continue;
             }
         }
         stripped.push(arg);
     }
 
-    Ok((backend, stripped))
+    Ok((options, stripped))
 }
 
 fn contains_debug_dump_flags(args: &[OsString]) -> bool {
@@ -204,26 +238,34 @@ fn contains_debug_dump_flags(args: &[OsString]) -> bool {
     })
 }
 
-fn run_cpu_backend(config: Config) -> Result<()> {
-    let backend = CpuBackend;
-    run_hybrid_pipeline(config, &backend)
+fn parse_fast_bool_flag(raw: &str, flag: &str) -> Result<bool> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "true" | "yes" | "1" => Ok(true),
+        "false" | "no" | "0" => Ok(false),
+        other => bail!("{flag} expects true/false/yes/no/1/0, got '{other}'"),
+    }
 }
 
-fn run_wgpu_backend(config: Config) -> Result<()> {
+fn run_cpu_backend(config: Config, options: &FastCliOptions) -> Result<()> {
+    let backend = CpuBackend;
+    run_hybrid_pipeline(config, &backend, options)
+}
+
+fn run_wgpu_backend(config: Config, options: &FastCliOptions) -> Result<()> {
     #[cfg(feature = "wgpu")]
     {
         let backend = WgpuBackend::new().context("initializing wgpu backend")?;
-        return run_hybrid_pipeline(config, &backend);
+        return run_hybrid_pipeline(config, &backend, options);
     }
 
     #[cfg(not(feature = "wgpu"))]
     {
-        let _ = config;
+        let _ = (config, options);
         bail!("--backend wgpu requires building fast-vrifa with --features wgpu");
     }
 }
 
-fn run_cuda_backend(config: Config) -> Result<()> {
+fn run_cuda_backend(config: Config, options: &FastCliOptions) -> Result<()> {
     #[cfg(feature = "cuda")]
     {
         let backend = CudaBackend::new();
@@ -233,17 +275,17 @@ fn run_cuda_backend(config: Config) -> Result<()> {
                 .unwrap_or("CUDA runtime initialization failed");
             bail!("--backend cuda is unavailable on this machine: {detail}");
         }
-        return run_hybrid_pipeline(config, &backend);
+        return run_hybrid_pipeline(config, &backend, options);
     }
 
     #[cfg(not(feature = "cuda"))]
     {
-        let _ = config;
+        let _ = (config, options);
         bail!("--backend cuda requires building fast-vrifa with --features cuda");
     }
 }
 
-fn run_hybrid_pipeline<B>(config: Config, backend: &B) -> Result<()>
+fn run_hybrid_pipeline<B>(config: Config, backend: &B, options: &FastCliOptions) -> Result<()>
 where
     B: PeakImageBackend,
 {
@@ -382,36 +424,46 @@ where
         .transpose()?;
 
     let video_dir = config.output_dir.join("videos");
+    let raw_stream_dir = config.output_dir.join(".streams");
+    let expected_video_frames = metadata
+        .total_frames
+        .map(|total_frames| total_frames / config.frame_step.max(1));
     let mut mask_writer = None;
     let mut overlay_writer = None;
     let mut heat_writer = None;
     if config.write_mask_video || config.write_overlay_video || config.write_heatmap_video {
-        fs::create_dir_all(&video_dir)?;
+        fs::create_dir_all(&raw_stream_dir)?;
         if config.write_mask_video {
-            mask_writer = Some(AsyncVideoWriter::open(
-                video_dir.join("mask.mp4"),
+            mask_writer = Some(AsyncRawVideoWriter::open(
+                raw_stream_dir.join("mask.raw"),
                 metadata.fps,
                 metadata.width,
                 metadata.height,
-                false,
+                RawPixelFormat::Gray8,
+                expected_video_frames,
+                32,
             )?);
         }
         if config.write_overlay_video {
-            overlay_writer = Some(AsyncVideoWriter::open(
-                video_dir.join("overlay.mp4"),
+            overlay_writer = Some(AsyncRawVideoWriter::open(
+                raw_stream_dir.join("overlay.raw"),
                 metadata.fps,
                 metadata.width,
                 metadata.height,
-                true,
+                RawPixelFormat::Bgr24,
+                expected_video_frames,
+                32,
             )?);
         }
         if config.write_heatmap_video {
-            heat_writer = Some(AsyncVideoWriter::open(
-                video_dir.join("heatmap.mp4"),
+            heat_writer = Some(AsyncRawVideoWriter::open(
+                raw_stream_dir.join("heatmap.raw"),
                 metadata.fps,
                 metadata.width,
                 metadata.height,
-                true,
+                RawPixelFormat::Bgr24,
+                expected_video_frames,
+                32,
             )?);
         }
     }
@@ -800,14 +852,15 @@ where
         }
     }
 
+    let mut raw_video_artifacts: Vec<(RawVideoArtifact, &'static str)> = Vec::new();
     if let Some(writer) = mask_writer.take() {
-        writer.close()?;
+        raw_video_artifacts.push((writer.close()?, "mask.mp4"));
     }
     if let Some(writer) = overlay_writer.take() {
-        writer.close()?;
+        raw_video_artifacts.push((writer.close()?, "overlay.mp4"));
     }
     if let Some(writer) = heat_writer.take() {
-        writer.close()?;
+        raw_video_artifacts.push((writer.close()?, "heatmap.mp4"));
     }
     if let Some(writer) = coco_image_writer.take() {
         writer.close()?;
@@ -820,6 +873,13 @@ where
     }
     if let Some(writer) = heatmap_png_writer.take() {
         writer.close()?;
+    }
+    if options.ffmpeg_postprocess && !raw_video_artifacts.is_empty() {
+        fs::create_dir_all(&video_dir)?;
+        let ffmpeg_bin = env::var_os("FFMPEG_BIN").unwrap_or_else(|| OsString::from("ffmpeg"));
+        for (artifact, output_name) in &raw_video_artifacts {
+            finalize_raw_stream_to_mp4(&ffmpeg_bin, artifact, video_dir.join(output_name))?;
+        }
     }
 
     if !config.annotation_formats.is_empty() {
@@ -1313,7 +1373,7 @@ fn yaml_f32(value: f32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        delegated_backend_label, parse_backend_args, reference_binary_candidates, BackendMode,
+        delegated_backend_label, parse_fast_args, reference_binary_candidates, BackendMode,
     };
     use std::ffi::OsString;
 
@@ -1337,8 +1397,24 @@ mod tests {
             OsString::from("--video-path"),
             OsString::from("data/input_1.mp4"),
         ];
-        let (backend, stripped) = parse_backend_args(args).unwrap();
-        assert_eq!(backend, BackendMode::Wgpu);
+        let (options, stripped) = parse_fast_args(args).unwrap();
+        assert_eq!(options.backend, BackendMode::Wgpu);
+        assert_eq!(stripped.len(), 3);
+        assert_eq!(stripped[1], OsString::from("--video-path"));
+    }
+
+    #[test]
+    fn ffmpeg_postprocess_flag_is_removed_before_forwarding() {
+        let args = vec![
+            OsString::from("fast-vrifa"),
+            OsString::from("--backend=cuda"),
+            OsString::from("--ffmpeg-postprocess"),
+            OsString::from("--video-path"),
+            OsString::from("data/input_2.mp4"),
+        ];
+        let (options, stripped) = parse_fast_args(args).unwrap();
+        assert_eq!(options.backend, BackendMode::Cuda);
+        assert!(options.ffmpeg_postprocess);
         assert_eq!(stripped.len(), 3);
         assert_eq!(stripped[1], OsString::from("--video-path"));
     }
