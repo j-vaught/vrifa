@@ -19,7 +19,9 @@ use vrifa_core::morphology::MorphShape;
 use vrifa_core::overlay::create_overlay;
 use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
-use vrifa_core::roi::{build_roi_mask_with_override, clip_mask_to_roi, resolve_roi_margins};
+use vrifa_core::roi::{
+    build_roi_mask_with_override, clip_mask_to_roi, is_rectangular_roi_mask, resolve_roi_margins,
+};
 use vrifa_core::{detect_front, detect_front_debug, DetectFrontDebug, DetectFrontParams};
 use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
 
@@ -507,7 +509,10 @@ pub fn run_config(config: Config) -> Result<()> {
             )?);
         }
     }
-    let stream_coco_images = metadata.total_frames.map(|frames| frames > 300).unwrap_or(true)
+    let stream_coco_images = metadata
+        .total_frames
+        .map(|frames| frames > 300)
+        .unwrap_or(true)
         && config.annotation_mode == "all"
         && config.annotation_formats.len() == 1
         && config.annotation_formats[0] == "coco";
@@ -612,12 +617,8 @@ pub fn run_config(config: Config) -> Result<()> {
                     .as_ref()
                     .filter(|_| config.peak_reference),
             )?;
-            let mut mask = apply_locking(
-                &mask_raw,
-                config.lock_frames,
-                lock_state.as_mut(),
-            )?;
-            if config.roi_mask.is_some() {
+            let mut mask = apply_locking(&mask_raw, config.lock_frames, lock_state.as_mut())?;
+            if config.roi_mask.is_some() && !is_rectangular_roi_mask(&roi_mask) {
                 clip_mask_to_roi(&mut mask, &roi_mask);
             }
             let mask = Arc::new(mask);
@@ -951,7 +952,7 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
                     .filter(|_| config.peak_reference),
             )?;
             let mut mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
-            if config.roi_mask.is_some() {
+            if config.roi_mask.is_some() && !is_rectangular_roi_mask(&roi_mask) {
                 clip_mask_to_roi(&mut mask, &roi_mask);
             }
 
@@ -1329,23 +1330,42 @@ fn write_run_summary(
     );
     put!(
         "roi_margin",
-        config.roi_mask.is_none().then_some(yaml_f32(config.roi_margin))
+        config
+            .roi_mask
+            .is_none()
+            .then_some(yaml_f32(config.roi_margin))
     );
     put!(
         "roi_margin_top",
-        config.roi_mask.is_none().then(|| config.roi_margin_top.map(yaml_f32)).flatten()
+        config
+            .roi_mask
+            .is_none()
+            .then(|| config.roi_margin_top.map(yaml_f32))
+            .flatten()
     );
     put!(
         "roi_margin_bottom",
-        config.roi_mask.is_none().then(|| config.roi_margin_bottom.map(yaml_f32)).flatten()
+        config
+            .roi_mask
+            .is_none()
+            .then(|| config.roi_margin_bottom.map(yaml_f32))
+            .flatten()
     );
     put!(
         "roi_margin_left",
-        config.roi_mask.is_none().then(|| config.roi_margin_left.map(yaml_f32)).flatten()
+        config
+            .roi_mask
+            .is_none()
+            .then(|| config.roi_margin_left.map(yaml_f32))
+            .flatten()
     );
     put!(
         "roi_margin_right",
-        config.roi_mask.is_none().then(|| config.roi_margin_right.map(yaml_f32)).flatten()
+        config
+            .roi_mask
+            .is_none()
+            .then(|| config.roi_margin_right.map(yaml_f32))
+            .flatten()
     );
     put!("blur_kernel", config.blur_kernel);
     put!("skip_blur", config.skip_blur);
@@ -1409,7 +1429,11 @@ pub fn resolve_configured_roi_mask(
     } else {
         None
     };
-    Ok(build_roi_mask_with_override(shape, roi_margins, supplied.as_ref()))
+    Ok(build_roi_mask_with_override(
+        shape,
+        roi_margins,
+        supplied.as_ref(),
+    ))
 }
 
 pub fn config_from_paths(video_path: PathBuf, output_dir: PathBuf) -> Config {

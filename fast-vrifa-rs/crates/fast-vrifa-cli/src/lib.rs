@@ -33,7 +33,7 @@ use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::reference::{
     compute_dynamic_factor, select_dynamic_reference_index, DynamicReferenceParams,
 };
-use vrifa_core::roi::clip_mask_to_roi;
+use vrifa_core::roi::{clip_mask_to_roi, is_rectangular_roi_mask};
 use vrifa_core::threshold;
 use vrifa_io::{write_bgr_png, write_gray_png, VideoMetadata, VideoReader};
 
@@ -69,6 +69,13 @@ struct FastCliOptions {
     ffmpeg_postprocess: bool,
     mask_only: bool,
     coco_bbox_only: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RunOptions {
+    pub ffmpeg_postprocess: bool,
+    pub mask_only: bool,
+    pub coco_bbox_only: bool,
 }
 
 impl BackendMode {
@@ -214,7 +221,10 @@ fn build_output_worker_context(
 ) -> OutputWorkerContext {
     let coco_only = config.annotation_formats.len() == 1 && config.annotation_formats[0] == "coco";
     let coco_bbox_only = options.effective_coco_bbox_only();
-    let has_non_coco_formats = config.annotation_formats.iter().any(|format| format != "coco");
+    let has_non_coco_formats = config
+        .annotation_formats
+        .iter()
+        .any(|format| format != "coco");
     let store_frame_for_export = !config.annotation_formats.is_empty()
         && (has_non_coco_formats || (coco_only && !coco_bbox_only && !stream_coco_images));
     OutputWorkerContext {
@@ -339,11 +349,19 @@ pub fn run_with_backend_name(config: Config, backend: &str) -> Result<()> {
 }
 
 pub fn run_with_backend(config: Config, backend: BackendMode) -> Result<()> {
+    run_with_backend_options(config, backend, RunOptions::default())
+}
+
+pub fn run_with_backend_options(
+    config: Config,
+    backend: BackendMode,
+    options: RunOptions,
+) -> Result<()> {
     let options = FastCliOptions {
         backend,
-        ffmpeg_postprocess: false,
-        mask_only: false,
-        coco_bbox_only: false,
+        ffmpeg_postprocess: options.ffmpeg_postprocess,
+        mask_only: options.mask_only,
+        coco_bbox_only: options.coco_bbox_only,
     };
     run_with_options(config, &options)
 }
@@ -548,9 +566,8 @@ fn run_cuda_batched_peak_pipeline(
     options: &FastCliOptions,
 ) -> Result<()> {
     fs::create_dir_all(&config.output_dir)?;
-    let capture =
-        videoio::VideoCapture::from_file_def(&config.video_path.to_string_lossy())
-            .with_context(|| format!("opening video {}", config.video_path.display()))?;
+    let capture = videoio::VideoCapture::from_file_def(&config.video_path.to_string_lossy())
+        .with_context(|| format!("opening video {}", config.video_path.display()))?;
     if !capture.is_opened()? {
         bail!("unable to open video: {}", config.video_path.display());
     }
@@ -563,7 +580,8 @@ fn run_cuda_batched_peak_pipeline(
         height: capture.get(videoio::CAP_PROP_FRAME_HEIGHT)? as usize,
     };
 
-    let roi_mask = vrifa_cli::resolve_configured_roi_mask(&config, (metadata.height, metadata.width))?;
+    let roi_mask =
+        vrifa_cli::resolve_configured_roi_mask(&config, (metadata.height, metadata.width))?;
     let device_roi_mask = backend.upload_mask_u8(&roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
 
@@ -633,9 +651,7 @@ fn run_cuda_batched_peak_pipeline(
         || output_context.annotations_enabled;
     let output_pool = needs_output_workers.then(|| OutputWorkerPool::new(output_context.clone()));
 
-    let need_host_mask = needs_output_workers
-        || config.write_mask_video
-        || write_overlay_video;
+    let need_host_mask = needs_output_workers || config.write_mask_video || write_overlay_video;
     let need_host_delta_norm = write_heatmap_pngs || write_heatmap_video;
     let batch_options = CudaBatchDetectorOptions {
         channel_weight: config.channel_weights[0],
@@ -679,9 +695,8 @@ fn run_cuda_batched_peak_pipeline(
         let compute_start = Instant::now();
         let device_bgr = backend.upload_frame_bgr(&frame_bgr)?;
         let device_lab = backend.convert_bgr_to_lab(&device_bgr)?;
-        detector_state.peak = Some(
-            backend.update_peak_brightness_device(&device_lab, detector_state.peak.as_ref())?,
-        );
+        detector_state.peak =
+            Some(backend.update_peak_brightness_device(&device_lab, detector_state.peak.as_ref())?);
         let delta = backend.compute_delta_darken_only_device(
             &device_lab,
             detector_state
@@ -692,7 +707,11 @@ fn run_cuda_batched_peak_pipeline(
             batch_options.channel_weight,
         )?;
         let delta_norm = backend
-            .blur_and_normalize_delta(&delta, batch_options.blur_kernel, batch_options.blur_enabled)?
+            .blur_and_normalize_delta(
+                &delta,
+                batch_options.blur_kernel,
+                batch_options.blur_enabled,
+            )?
             .ok_or_else(|| anyhow!("CUDA streamed path requires device blur+normalize"))?;
         let mut mask = backend
             .threshold_and_morph_mask_auto(
@@ -719,8 +738,10 @@ fn run_cuda_batched_peak_pipeline(
                 .ok_or_else(|| anyhow!("CUDA streamed path requires device locking"))?;
         }
 
-        let mut host_mask = need_host_mask.then(|| backend.download_mask_u8(&mask)).transpose()?;
-        if config.roi_mask.is_some() {
+        let mut host_mask = need_host_mask
+            .then(|| backend.download_mask_u8(&mask))
+            .transpose()?;
+        if config.roi_mask.is_some() && !is_rectangular_roi_mask(&roi_mask) {
             if let Some(mask) = host_mask.as_mut() {
                 clip_mask_to_roi(mask, &roi_mask);
             }
@@ -848,7 +869,9 @@ fn run_cuda_batched_peak_pipeline(
     };
     let run_total_time = run_start.elapsed().as_secs_f64();
     let roi_fraction = roi_pixels as f64 / (metadata.width * metadata.height) as f64;
-    let video_duration = metadata.total_frames.map(|frames| frames as f64 / metadata.fps);
+    let video_duration = metadata
+        .total_frames
+        .map(|frames| frames as f64 / metadata.fps);
     write_run_summary(
         &config,
         metadata.total_frames,
@@ -1397,7 +1420,7 @@ where
                 )?);
                 host_delta_norm = Some(detect.delta_norm);
             }
-            if config.roi_mask.is_some() {
+            if config.roi_mask.is_some() && !is_rectangular_roi_mask(&roi_mask) {
                 if let Some(mask) = host_mask.as_mut() {
                     clip_mask_to_roi(mask, &roi_mask);
                 }
@@ -2064,23 +2087,42 @@ fn write_run_summary(
     );
     put!(
         "roi_margin",
-        config.roi_mask.is_none().then_some(yaml_f32(config.roi_margin))
+        config
+            .roi_mask
+            .is_none()
+            .then_some(yaml_f32(config.roi_margin))
     );
     put!(
         "roi_margin_top",
-        config.roi_mask.is_none().then(|| config.roi_margin_top.map(yaml_f32)).flatten()
+        config
+            .roi_mask
+            .is_none()
+            .then(|| config.roi_margin_top.map(yaml_f32))
+            .flatten()
     );
     put!(
         "roi_margin_bottom",
-        config.roi_mask.is_none().then(|| config.roi_margin_bottom.map(yaml_f32)).flatten()
+        config
+            .roi_mask
+            .is_none()
+            .then(|| config.roi_margin_bottom.map(yaml_f32))
+            .flatten()
     );
     put!(
         "roi_margin_left",
-        config.roi_mask.is_none().then(|| config.roi_margin_left.map(yaml_f32)).flatten()
+        config
+            .roi_mask
+            .is_none()
+            .then(|| config.roi_margin_left.map(yaml_f32))
+            .flatten()
     );
     put!(
         "roi_margin_right",
-        config.roi_mask.is_none().then(|| config.roi_margin_right.map(yaml_f32)).flatten()
+        config
+            .roi_mask
+            .is_none()
+            .then(|| config.roi_margin_right.map(yaml_f32))
+            .flatten()
     );
     put!("blur_kernel", config.blur_kernel);
     put!("skip_blur", config.skip_blur);
