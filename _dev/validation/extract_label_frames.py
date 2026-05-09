@@ -31,6 +31,12 @@ def slugify(name: str) -> str:
 
 
 def extract_one(video_path: Path, output_root: Path) -> list[Path]:
+    """Extract anchor frames into a flat directory.
+
+    Filenames are prefixed with the sample slug so makesense.ai can ingest
+    every frame in a single drop without filename collisions. The
+    agreement script later parses the slug back out of the filename.
+    """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise RuntimeError(f"unable to open {video_path}")
@@ -40,8 +46,7 @@ def extract_one(video_path: Path, output_root: Path) -> list[Path]:
         raise RuntimeError(f"no frames reported for {video_path}")
 
     slug = slugify(video_path.stem)
-    sample_dir = output_root / slug
-    sample_dir.mkdir(parents=True, exist_ok=True)
+    output_root.mkdir(parents=True, exist_ok=True)
 
     indices = [max(0, min(total - 1, int(round(p * (total - 1))))) for p in PERCENTILES]
     indices = sorted(set(indices))
@@ -52,7 +57,7 @@ def extract_one(video_path: Path, output_root: Path) -> list[Path]:
         if not ok:
             print(f"  WARN failed to read {video_path.name} frame {idx}")
             continue
-        out_path = sample_dir / f"frame_{idx:06d}.png"
+        out_path = output_root / f"{slug}__frame_{idx:06d}.png"
         cv2.imwrite(str(out_path), frame)
         written.append(out_path)
     cap.release()
