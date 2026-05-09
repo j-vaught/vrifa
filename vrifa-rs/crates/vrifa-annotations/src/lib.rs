@@ -17,6 +17,12 @@ pub struct AnnotationFrame {
     pub boxes: Vec<AnnotationBox>,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct AnnotationExportOptions {
+    pub coco_bbox_only: bool,
+    pub coco_source_video: Option<String>,
+}
+
 pub fn export_annotation_outputs(
     output_dir: impl AsRef<Path>,
     records: &[AnnotationFrame],
@@ -24,13 +30,14 @@ pub fn export_annotation_outputs(
     width: usize,
     height: usize,
     formats: &[String],
+    options: &AnnotationExportOptions,
 ) -> Result<()> {
     let output_dir = output_dir.as_ref();
     if records.is_empty() || selected_indices.is_empty() || formats.is_empty() {
         return Ok(());
     }
     if formats.iter().any(|fmt| fmt == "coco") {
-        coco::export(output_dir, records, selected_indices, width, height)?;
+        coco::export(output_dir, records, selected_indices, width, height, options)?;
     }
     if formats.iter().any(|fmt| fmt == "yolov5") {
         yolov5::export(output_dir, records, selected_indices, width, height)?;
@@ -75,6 +82,10 @@ pub mod coco {
         categories: Vec<Category>,
         images: Vec<Image>,
         annotations: Vec<Annotation>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        images_omitted: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source_video: Option<String>,
     }
 
     #[derive(Serialize)]
@@ -137,12 +148,15 @@ pub mod coco {
         selected_indices: &[usize],
         width: usize,
         height: usize,
+        options: &AnnotationExportOptions,
     ) -> Result<()> {
         let coco_root = output_dir.join("formatCOCO");
         let annotations_dir = coco_root.join("annotations");
         let images_dir = coco_root.join("images").join("default");
         ensure_dir(&annotations_dir)?;
-        ensure_dir(&images_dir)?;
+        if !options.coco_bbox_only {
+            ensure_dir(&images_dir)?;
+        }
 
         let mut output = CocoOutput {
             licenses: vec![License {
@@ -172,6 +186,8 @@ pub mod coco {
             ],
             images: Vec::new(),
             annotations: Vec::new(),
+            images_omitted: options.coco_bbox_only.then_some(true),
+            source_video: options.coco_source_video.clone(),
         };
 
         let selected_records: Vec<&AnnotationFrame> = selected_indices
@@ -179,13 +195,15 @@ pub mod coco {
             .copied()
             .map(|index| &records[index])
             .collect();
-        selected_records.par_iter().try_for_each(|record| {
-            if let Some(frame_bgr) = record.frame_bgr.as_ref() {
-                let frame_filename = format!("frame_{:06}.png", record.frame_index);
-                write_bgr_png(&images_dir.join(frame_filename), frame_bgr)?;
-            }
-            Ok::<(), anyhow::Error>(())
-        })?;
+        if !options.coco_bbox_only {
+            selected_records.par_iter().try_for_each(|record| {
+                if let Some(frame_bgr) = record.frame_bgr.as_ref() {
+                    let frame_filename = format!("frame_{:06}.png", record.frame_index);
+                    write_bgr_png(&images_dir.join(frame_filename), frame_bgr)?;
+                }
+                Ok::<(), anyhow::Error>(())
+            })?;
+        }
 
         let mut annotation_id = 1usize;
         for (image_offset, record) in selected_records.iter().enumerate() {

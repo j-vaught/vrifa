@@ -28,6 +28,17 @@ pub fn resolve_roi_margins(
 }
 
 pub fn build_roi_mask(shape: (usize, usize), margins: RoiMargins) -> Array2<u8> {
+    build_roi_mask_with_override(shape, margins, None)
+}
+
+pub fn build_roi_mask_with_override(
+    shape: (usize, usize),
+    margins: RoiMargins,
+    prebuilt: Option<&Array2<u8>>,
+) -> Array2<u8> {
+    if let Some(mask) = prebuilt {
+        return mask.clone();
+    }
     let (height, width) = shape;
     let top = (margins.top * height as f32) as usize;
     let mut bottom = height.saturating_sub((margins.bottom * height as f32) as usize);

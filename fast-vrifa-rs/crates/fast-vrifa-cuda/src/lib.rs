@@ -599,6 +599,22 @@ impl ImageBackend for CudaBackend {
         })
     }
 
+    fn upload_mask_u8(&self, mask: &Array2<u8>) -> Result<Self::DeviceMaskU8> {
+        let inner = self.inner()?;
+        let (height, width) = mask.dim();
+        let values = mask
+            .as_slice_memory_order()
+            .ok_or_else(|| anyhow!("ROI mask must be contiguous"))?;
+        Ok(CudaMaskU8 {
+            data: inner
+                .compute_stream
+                .clone_htod(values)
+                .context("uploading ROI mask to CUDA")?,
+            width,
+            height,
+        })
+    }
+
     fn download_mask_u8(&self, mask: &Self::DeviceMaskU8) -> Result<Array2<u8>> {
         let inner = self.inner()?;
         let values = inner
