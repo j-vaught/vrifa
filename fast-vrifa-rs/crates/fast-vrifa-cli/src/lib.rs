@@ -300,10 +300,6 @@ fn can_use_cuda_batched_peak_fast_path(config: &Config) -> bool {
         && matches!(config.ref_mode, ReferenceMode::First)
         && config.contrast_threshold.is_none()
         && config.contrast_percentile.is_none()
-        && config.annotation_formats.is_empty()
-        && !config.write_mask_pngs
-        && !config.write_overlay_pngs
-        && !config.write_heatmap_pngs
 }
 
 #[cfg(feature = "cuda")]
@@ -338,6 +334,31 @@ fn run_cuda_batched_peak_pipeline(
     let device_roi_mask = backend.build_roi_mask((metadata.height, metadata.width), roi_margins)?;
     let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
+
+    let mask_dir = config.output_dir.join("masks");
+    let overlay_dir = config.output_dir.join("overlays");
+    let heatmap_dir = config.output_dir.join("heatmap");
+    if config.write_mask_pngs {
+        fs::create_dir_all(&mask_dir)?;
+    }
+    if config.write_overlay_pngs {
+        fs::create_dir_all(&overlay_dir)?;
+    }
+    if config.write_heatmap_pngs {
+        fs::create_dir_all(&heatmap_dir)?;
+    }
+    let mut mask_png_writer = config
+        .write_mask_pngs
+        .then(|| AsyncPngWriter::open_with_workers(false, MASK_PNG_WORKERS, MASK_PNG_QUEUE))
+        .transpose()?;
+    let mut overlay_png_writer = config
+        .write_overlay_pngs
+        .then(|| AsyncPngWriter::open_with_workers(true, COLOR_PNG_WORKERS, COLOR_PNG_QUEUE))
+        .transpose()?;
+    let mut heatmap_png_writer = config
+        .write_heatmap_pngs
+        .then(|| AsyncPngWriter::open_with_workers(true, COLOR_PNG_WORKERS, COLOR_PNG_QUEUE))
+        .transpose()?;
 
     let video_dir = config.output_dir.join("videos");
     let raw_stream_dir = config.output_dir.join(".streams");
@@ -374,8 +395,35 @@ fn run_cuda_batched_peak_pipeline(
         }
     }
 
-    let need_host_mask = config.write_mask_video || config.write_overlay_video;
-    let need_host_delta_norm = config.write_heatmap_video;
+    let stream_coco_images = metadata
+        .total_frames
+        .map(|frames| frames > 300)
+        .unwrap_or(true)
+        && config.annotation_mode == "all"
+        && config.annotation_formats.len() == 1
+        && config.annotation_formats[0] == "coco";
+    let coco_images_dir = config
+        .output_dir
+        .join("formatCOCO")
+        .join("images")
+        .join("default");
+    let mut coco_image_writer = if stream_coco_images {
+        fs::create_dir_all(&coco_images_dir)?;
+        Some(AsyncPngWriter::open_with_workers(
+            true,
+            COCO_PNG_WORKERS,
+            COCO_PNG_QUEUE,
+        )?)
+    } else {
+        None
+    };
+
+    let need_host_mask = config.write_mask_pngs
+        || config.write_overlay_pngs
+        || config.write_mask_video
+        || config.write_overlay_video
+        || !config.annotation_formats.is_empty();
+    let need_host_delta_norm = config.write_heatmap_pngs || config.write_heatmap_video;
     let batch_options = CudaBatchDetectorOptions {
         channel_weight: config.channel_weights[0],
         blur_kernel: config.blur_kernel,
@@ -396,6 +444,7 @@ fn run_cuda_batched_peak_pipeline(
     let mut processed = 0usize;
     let mut processing_time_accum = 0.0f64;
     let run_start = Instant::now();
+    let mut processed_records = Vec::new();
     let (decode_tx, decode_rx) = sync_channel::<(usize, Array3<u8>)>(CUDA_BATCH_SIZE.max(2));
     let video_path = config.video_path.clone();
     let frame_step = config.frame_step;
@@ -412,7 +461,7 @@ fn run_cuda_batched_peak_pipeline(
         Ok(())
     });
 
-    while let Ok((_frame_index, frame_bgr)) = decode_rx.recv() {
+    while let Ok((frame_index, frame_bgr)) = decode_rx.recv() {
         let compute_start = Instant::now();
         let device_bgr = backend.upload_frame_bgr(&frame_bgr)?;
         let device_lab = backend.convert_bgr_to_lab(&device_bgr)?;
@@ -456,11 +505,86 @@ fn run_cuda_batched_peak_pipeline(
                 .ok_or_else(|| anyhow!("CUDA streamed path requires device locking"))?;
         }
 
+        let host_mask = need_host_mask.then(|| backend.download_mask_u8(&mask)).transpose()?;
+        let host_delta_norm = need_host_delta_norm
+            .then(|| backend.download_mask_u8(&delta_norm))
+            .transpose()?;
+        let mask = host_mask.map(Arc::new);
+        let delta_norm = host_delta_norm.map(Arc::new);
+        let overlay = if config.write_overlay_pngs {
+            Some(Arc::new(create_overlay(
+                &frame_bgr,
+                mask.as_ref()
+                    .ok_or_else(|| anyhow!("overlay generation requires a host mask"))?,
+            )?))
+        } else {
+            None
+        };
+        let heatmap = if config.write_heatmap_pngs {
+            Some(Arc::new(apply_turbo_colormap(
+                delta_norm
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("heatmap generation requires host delta_norm"))?,
+            )?))
+        } else {
+            None
+        };
+
+        if !config.annotation_formats.is_empty() {
+            let mask = mask
+                .as_ref()
+                .ok_or_else(|| anyhow!("annotation export requires a host mask"))?;
+            let boxes = extract_bounding_boxes(
+                mask,
+                config.annotation_segmentation_tolerance,
+                config.annotation_segmentation_max_edge_length,
+            )?;
+            let frame_bgr = if let Some(writer) = coco_image_writer.as_mut() {
+                writer.write_bgr(
+                    coco_images_dir.join(format!("frame_{frame_index:06}.png")),
+                    frame_bgr.clone(),
+                )?;
+                None
+            } else {
+                Some(frame_bgr.clone())
+            };
+            processed_records.push(AnnotationFrame {
+                frame_index,
+                frame_bgr,
+                boxes,
+            });
+        }
+
+        let basename = format!("frame_{frame_index:06}.png");
+        if let Some(writer) = mask_png_writer.as_mut() {
+            writer.write_gray(
+                mask_dir.join(&basename),
+                (**mask
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("mask PNG writing requires a host mask"))?)
+                .clone(),
+            )?;
+        }
+        if let (Some(writer), Some(overlay)) = (overlay_png_writer.as_mut(), overlay.as_ref()) {
+            writer.write_bgr(overlay_dir.join(&basename), (**overlay).clone())?;
+        }
+        if let (Some(writer), Some(heatmap)) = (heatmap_png_writer.as_mut(), heatmap.as_ref()) {
+            writer.write_bgr(heatmap_dir.join(&basename), (**heatmap).clone())?;
+        }
         if let Some(writer) = mask_writer.as_mut() {
-            writer.write_gray(Arc::new(backend.download_mask_u8(&mask)?))?;
+            writer.write_gray(
+                mask.as_ref()
+                    .ok_or_else(|| anyhow!("mask video staging requires a host mask"))?
+                    .clone(),
+            )?;
         }
         if let Some(writer) = delta_norm_writer.as_mut() {
-            writer.write_gray(Arc::new(backend.download_mask_u8(&delta_norm)?))?;
+            writer.write_gray(
+                delta_norm
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("heatmap video staging requires host delta_norm"))?
+                    .clone(),
+            )?;
         }
 
         processed += 1;
@@ -480,6 +604,18 @@ fn run_cuda_batched_peak_pipeline(
     } else {
         None
     };
+    if let Some(writer) = coco_image_writer.take() {
+        writer.close()?;
+    }
+    if let Some(writer) = mask_png_writer.take() {
+        writer.close()?;
+    }
+    if let Some(writer) = overlay_png_writer.take() {
+        writer.close()?;
+    }
+    if let Some(writer) = heatmap_png_writer.take() {
+        writer.close()?;
+    }
 
     if options.ffmpeg_postprocess {
         fs::create_dir_all(&video_dir)?;
@@ -514,6 +650,23 @@ fn run_cuda_batched_peak_pipeline(
                 )?;
             }
         }
+    }
+
+    if !config.annotation_formats.is_empty() {
+        let selection = vrifa_core::sampling::choose_annotation_indices(
+            processed_records.len(),
+            &config.annotation_mode,
+            config.annotation_count,
+            config.annotation_stride,
+        );
+        vrifa_annotations::export_annotation_outputs(
+            &config.output_dir,
+            &processed_records,
+            &selection,
+            metadata.width,
+            metadata.height,
+            &config.annotation_formats,
+        )?;
     }
 
     let avg_compute_time = if processed > 0 {
