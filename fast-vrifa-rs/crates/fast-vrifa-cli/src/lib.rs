@@ -4,7 +4,7 @@ use clap::Parser;
 use fast_vrifa_core::{CpuBackend, ImageBackend, PeakImageBackend};
 use indexmap::IndexMap;
 use ndarray::{s, Array2, Array3};
-use opencv::core::{self, Mat, Point, Scalar, Size};
+use opencv::core::{self, Point, Scalar, Size};
 use opencv::imgproc;
 use opencv::prelude::*;
 use opencv::videoio;
@@ -16,7 +16,9 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
+use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
+use std::thread;
 use std::time::Instant;
 use vrifa_annotations::AnnotationFrame;
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
@@ -311,7 +313,7 @@ fn run_cuda_batched_peak_pipeline(
     options: &FastCliOptions,
 ) -> Result<()> {
     fs::create_dir_all(&config.output_dir)?;
-    let mut capture =
+    let capture =
         videoio::VideoCapture::from_file_def(&config.video_path.to_string_lossy())
             .with_context(|| format!("opening video {}", config.video_path.display()))?;
     if !capture.is_opened()? {
@@ -394,81 +396,79 @@ fn run_cuda_batched_peak_pipeline(
     let mut processed = 0usize;
     let mut processing_time_accum = 0.0f64;
     let run_start = Instant::now();
-    let mut batch_indices: Vec<usize> = Vec::with_capacity(CUDA_BATCH_SIZE);
-    let frame_bytes = metadata
-        .width
-        .checked_mul(metadata.height)
-        .and_then(|pixels| pixels.checked_mul(3))
-        .ok_or_else(|| anyhow!("CUDA batch frame byte size overflow"))?;
-    let mut batch_bytes: Vec<u8> = Vec::with_capacity(frame_bytes * CUDA_BATCH_SIZE);
-
-    let mut process_batch =
-        |batch_indices: &mut Vec<usize>, batch_bytes: &mut Vec<u8>| -> Result<()> {
-        if batch_indices.is_empty() {
-            return Ok(());
-        }
-        let compute_start = Instant::now();
-        let frame_count = batch_indices.len();
-        let outputs = backend.process_peak_detector_bgr_bytes_batch(
-            batch_bytes,
-            frame_count,
-            metadata.width,
-            metadata.height,
-            &device_roi_mask,
-            &mut detector_state,
-            &batch_options,
-        )?;
-        for (_frame_index, output) in batch_indices.drain(..).zip(outputs.into_iter()) {
-            if let Some(writer) = mask_writer.as_mut() {
-                writer.write_gray(Arc::new(
-                    output
-                        .mask
-                        .ok_or_else(|| anyhow!("mask video staging requires a host mask"))?,
-                ))?;
+    let (decode_tx, decode_rx) = sync_channel::<(usize, Array3<u8>)>(CUDA_BATCH_SIZE.max(2));
+    let video_path = config.video_path.clone();
+    let frame_step = config.frame_step;
+    let decode_handle = thread::spawn(move || -> Result<()> {
+        let mut reader = VideoReader::open(&video_path)?;
+        while let Some((frame_index, frame_bgr)) = reader.read_next()? {
+            if frame_index % frame_step != 0 {
+                continue;
             }
-            if let Some(writer) = delta_norm_writer.as_mut() {
-                writer.write_gray(Arc::new(
-                    output
-                        .delta_norm
-                        .ok_or_else(|| anyhow!("heatmap video staging requires host delta_norm"))?,
-                ))?;
-            }
-            processed += 1;
+            decode_tx
+                .send((frame_index, frame_bgr))
+                .map_err(|err| anyhow!("decode queue stopped: {err}"))?;
         }
-        batch_bytes.clear();
-        processing_time_accum += compute_start.elapsed().as_secs_f64();
         Ok(())
-    };
+    });
 
-    let mut next_index = 1usize;
-    loop {
-        let mut mat = Mat::default();
-        if !capture.read(&mut mat)? || mat.empty() {
-            break;
-        }
-        let frame_index = next_index;
-        next_index += 1;
-        if frame_index % config.frame_step != 0 {
-            continue;
-        }
-        let mat = if mat.is_continuous() {
-            mat
-        } else {
-            mat.try_clone()?
-        };
-        let bytes = mat.data_bytes()?;
-        anyhow::ensure!(
-            bytes.len() == frame_bytes,
-            "decoded frame byte mismatch: expected {frame_bytes}, got {}",
-            bytes.len()
+    while let Ok((_frame_index, frame_bgr)) = decode_rx.recv() {
+        let compute_start = Instant::now();
+        let device_bgr = backend.upload_frame_bgr(&frame_bgr)?;
+        let device_lab = backend.convert_bgr_to_lab(&device_bgr)?;
+        detector_state.peak = Some(
+            backend.update_peak_brightness_device(&device_lab, detector_state.peak.as_ref())?,
         );
-        batch_indices.push(frame_index);
-        batch_bytes.extend_from_slice(bytes);
-        if batch_indices.len() == CUDA_BATCH_SIZE {
-            process_batch(&mut batch_indices, &mut batch_bytes)?;
+        let delta = backend.compute_delta_darken_only_device(
+            &device_lab,
+            detector_state
+                .peak
+                .as_ref()
+                .ok_or_else(|| anyhow!("CUDA peak state was not initialized"))?,
+            &device_roi_mask,
+            batch_options.channel_weight,
+        )?;
+        let delta_norm = backend
+            .blur_and_normalize_delta(&delta, batch_options.blur_kernel, batch_options.blur_enabled)?
+            .ok_or_else(|| anyhow!("CUDA streamed path requires device blur+normalize"))?;
+        let mut mask = backend
+            .threshold_and_morph_mask_auto(
+                &delta_norm,
+                batch_options.threshold_offset,
+                batch_options.morph_shape,
+                batch_options.morph_kernel,
+                batch_options.morph_close_iterations,
+                batch_options.morph_open_iterations,
+            )?
+            .ok_or_else(|| anyhow!("CUDA streamed path requires device threshold+morph"))?;
+        if batch_options.min_area > 0 {
+            mask = backend
+                .filter_min_area_mask(&mask, batch_options.min_area)?
+                .ok_or_else(|| anyhow!("CUDA streamed path requires device min-area filtering"))?;
         }
+        if batch_options.lock_frames > 0 {
+            let state_lock = detector_state
+                .lock
+                .as_mut()
+                .ok_or_else(|| anyhow!("CUDA streamed lock state was not initialized"))?;
+            mask = backend
+                .apply_locking_device(&mask, batch_options.lock_frames, state_lock)?
+                .ok_or_else(|| anyhow!("CUDA streamed path requires device locking"))?;
+        }
+
+        if let Some(writer) = mask_writer.as_mut() {
+            writer.write_gray(Arc::new(backend.download_mask_u8(&mask)?))?;
+        }
+        if let Some(writer) = delta_norm_writer.as_mut() {
+            writer.write_gray(Arc::new(backend.download_mask_u8(&delta_norm)?))?;
+        }
+
+        processed += 1;
+        processing_time_accum += compute_start.elapsed().as_secs_f64();
     }
-    process_batch(&mut batch_indices, &mut batch_bytes)?;
+    decode_handle
+        .join()
+        .map_err(|_| anyhow!("decode thread panicked"))??;
 
     let mask_artifact = if let Some(writer) = mask_writer.take() {
         Some(writer.close()?)
