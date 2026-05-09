@@ -498,7 +498,8 @@ pub fn run_config(config: Config) -> Result<()> {
             )?);
         }
     }
-    let stream_coco_images = config.annotation_mode == "all"
+    let stream_coco_images = metadata.total_frames.map(|frames| frames > 300).unwrap_or(true)
+        && config.annotation_mode == "all"
         && config.annotation_formats.len() == 1
         && config.annotation_formats[0] == "coco";
     let coco_images_dir = config

@@ -1,8 +1,11 @@
 use anyhow::{Context, Result};
+use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+use image::{ExtendedColorType, ImageEncoder};
 use ndarray::Array3;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::fs::{self, File};
+use std::io::BufWriter;
 use std::io::Write;
 use std::path::Path;
 use vrifa_core::AnnotationBox;
@@ -45,17 +48,19 @@ fn ensure_dir(path: &Path) -> Result<()> {
 fn write_bgr_png(path: &Path, frame: &Array3<u8>) -> Result<()> {
     let (height, width, channels) = frame.dim();
     anyhow::ensure!(channels == 3, "annotation image must be BGR");
-    let mut img = image::RgbImage::new(width as u32, height as u32);
-    for y in 0..height {
-        for x in 0..width {
-            img.put_pixel(
-                x as u32,
-                y as u32,
-                image::Rgb([frame[(y, x, 2)], frame[(y, x, 1)], frame[(y, x, 0)]]),
-            );
-        }
+    let bgr = frame
+        .as_slice_memory_order()
+        .ok_or_else(|| anyhow::anyhow!("annotation image must be contiguous"))?;
+    let mut rgb = vec![0u8; height * width * 3];
+    for (rgb_pixel, bgr_pixel) in rgb.chunks_exact_mut(3).zip(bgr.chunks_exact(3)) {
+        rgb_pixel[0] = bgr_pixel[2];
+        rgb_pixel[1] = bgr_pixel[1];
+        rgb_pixel[2] = bgr_pixel[0];
     }
-    img.save(path)
+    let file = File::create(path).with_context(|| format!("creating {}", path.display()))?;
+    let writer = BufWriter::new(file);
+    PngEncoder::new_with_quality(writer, CompressionType::Fast, FilterType::NoFilter)
+        .write_image(&rgb, width as u32, height as u32, ExtendedColorType::Rgb8)
         .with_context(|| format!("writing {}", path.display()))?;
     Ok(())
 }
