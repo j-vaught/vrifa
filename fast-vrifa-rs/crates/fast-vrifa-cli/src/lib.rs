@@ -42,6 +42,13 @@ use fast_vrifa_wgpu::WgpuBackend;
 pub use vrifa_cli::Config;
 use vrifa_cli::ReferenceMode;
 
+const MASK_PNG_WORKERS: usize = 2;
+const MASK_PNG_QUEUE: usize = 32;
+const COLOR_PNG_WORKERS: usize = 2;
+const COLOR_PNG_QUEUE: usize = 16;
+const COCO_PNG_WORKERS: usize = 12;
+const COCO_PNG_QUEUE: usize = 32;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendMode {
     Delegate,
@@ -350,15 +357,15 @@ where
     }
     let mut mask_png_writer = config
         .write_mask_pngs
-        .then(|| AsyncPngWriter::open(false))
+        .then(|| AsyncPngWriter::open_with_workers(false, MASK_PNG_WORKERS, MASK_PNG_QUEUE))
         .transpose()?;
     let mut overlay_png_writer = config
         .write_overlay_pngs
-        .then(|| AsyncPngWriter::open(true))
+        .then(|| AsyncPngWriter::open_with_workers(true, COLOR_PNG_WORKERS, COLOR_PNG_QUEUE))
         .transpose()?;
     let mut heatmap_png_writer = config
         .write_heatmap_pngs
-        .then(|| AsyncPngWriter::open(true))
+        .then(|| AsyncPngWriter::open_with_workers(true, COLOR_PNG_WORKERS, COLOR_PNG_QUEUE))
         .transpose()?;
 
     let video_dir = config.output_dir.join("videos");
@@ -409,7 +416,11 @@ where
         .join("default");
     let mut coco_image_writer = if stream_coco_images {
         fs::create_dir_all(&coco_images_dir)?;
-        Some(AsyncPngWriter::open_with_workers(true, 8, 64)?)
+        Some(AsyncPngWriter::open_with_workers(
+            true,
+            COCO_PNG_WORKERS,
+            COCO_PNG_QUEUE,
+        )?)
     } else {
         None
     };
