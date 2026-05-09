@@ -6,6 +6,8 @@ use cudarc::{
     },
     nvrtc::compile_ptx,
 };
+#[cfg(target_os = "linux")]
+use cudarc::driver::{DevicePtr, DevicePtrMut};
 use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
 use ndarray::{Array2, Array3};
 use opencv::core::CV_32F;
