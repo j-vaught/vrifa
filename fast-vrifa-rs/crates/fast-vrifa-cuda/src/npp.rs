@@ -122,8 +122,8 @@ mod imp {
                 .with_context(|| format!("loading {}", core_path.display()))?;
             let image = unsafe { Library::new(&image_path) }
                 .with_context(|| format!("loading {}", image_path.display()))?;
-            unsafe {
-                Ok(Self {
+            let library = unsafe {
+                Self {
                     npp_set_stream: *core.get(b"nppSetStream\0")?,
                     npp_get_stream_context: *core.get(b"nppGetStreamContext\0")?,
                     label_buffer_size: *image.get(b"nppiLabelMarkersUFGetBufferSize_32u_C1R\0")?,
@@ -136,9 +136,9 @@ mod imp {
                     info_list: *image.get(b"nppiCompressedMarkerLabelsUFInfo_32u_C1R_Ctx\0")?,
                     _core: core,
                     _image: image,
-                })
-            }
-            .context("loading NPP symbols")
+                }
+            };
+            Ok(library).context("loading NPP symbols")
         }
 
         pub fn set_stream(&self, stream: CUstream) -> Result<()> {
@@ -169,7 +169,7 @@ mod imp {
             bases.push(PathBuf::from(cuda_path).join("lib64"));
         }
         if let Ok(home) = env::var("HOME") {
-            bases.push(PathBuf::from(home).join("cuda-12.4/lib64"));
+            bases.push(PathBuf::from(home.clone()).join("cuda-12.4/lib64"));
             bases.push(PathBuf::from(home).join("cuda/lib64"));
         }
         bases.push(PathBuf::from("/usr/local/cuda/lib64"));

@@ -822,7 +822,8 @@ impl PeakImageBackend for CudaBackend {
             let mut launch = inner.stream.launch_builder(&inner.filter_components);
             launch.arg(&mask.data);
             launch.arg(&labels);
-            launch.arg(&(info_ptr as *const npp::NppiCompressedMarkerLabelsInfo));
+            let info_ptr_u64 = info_ptr;
+            launch.arg(&info_ptr_u64);
             launch.arg(&mut filtered);
             launch.arg(&min_area_u32);
             launch.arg(&pixel_count_i32);

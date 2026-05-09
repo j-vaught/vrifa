@@ -273,7 +273,7 @@ struct NppiCompressedMarkerLabelsInfoCuda {
 extern "C" __global__ void filter_labeled_components_u8(
     const unsigned char* source_mask,
     const unsigned int* labels,
-    const NppiCompressedMarkerLabelsInfoCuda* info_list,
+    unsigned long long info_list_ptr,
     unsigned char* output,
     unsigned int min_area,
     int pixel_count
@@ -291,6 +291,8 @@ extern "C" __global__ void filter_labeled_components_u8(
         output[index] = 0u;
         return;
     }
+    const NppiCompressedMarkerLabelsInfoCuda* info_list =
+        reinterpret_cast<const NppiCompressedMarkerLabelsInfoCuda*>(info_list_ptr);
     const NppiCompressedMarkerLabelsInfoCuda info = info_list[label - 1u];
     output[index] = info.nMarkerLabelPixelCount >= min_area ? 255u : 0u;
 }
