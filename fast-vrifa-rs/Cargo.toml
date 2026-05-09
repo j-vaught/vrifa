@@ -26,6 +26,7 @@ numpy = "0.28"
 opencv = { version = "0.98.2", default-features = false, features = ["clang-runtime"] }
 pollster = "0.3"
 pyo3 = { version = "0.28", features = ["extension-module"] }
+rayon = "1"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 wgpu = "0.20"

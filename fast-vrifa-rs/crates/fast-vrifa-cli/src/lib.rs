@@ -8,6 +8,7 @@ use opencv::core::{self, Point, Scalar, Size};
 use opencv::imgproc;
 use opencv::prelude::*;
 use opencv::videoio;
+use rayon::join;
 use serde_yaml::Value;
 use std::collections::VecDeque;
 use std::env;
@@ -511,46 +512,61 @@ fn run_cuda_batched_peak_pipeline(
             .transpose()?;
         let mask = host_mask.map(Arc::new);
         let delta_norm = host_delta_norm.map(Arc::new);
-        let overlay = if config.write_overlay_pngs {
-            Some(Arc::new(create_overlay(
-                &frame_bgr,
-                mask.as_ref()
-                    .ok_or_else(|| anyhow!("overlay generation requires a host mask"))?,
-            )?))
-        } else {
-            None
-        };
-        let heatmap = if config.write_heatmap_pngs {
-            Some(Arc::new(apply_turbo_colormap(
-                delta_norm
+        let needs_annotations = !config.annotation_formats.is_empty();
+        let stream_coco_image = coco_image_writer.is_some();
+        let ((overlay, heatmap), annotation_payload) = join(
+            || {
+                join(
+                    || -> Result<Option<Arc<Array3<u8>>>> {
+                        if !config.write_overlay_pngs {
+                            return Ok(None);
+                        }
+                        Ok(Some(Arc::new(create_overlay(
+                            &frame_bgr,
+                            mask.as_ref()
+                                .ok_or_else(|| anyhow!("overlay generation requires a host mask"))?,
+                        )?)))
+                    },
+                    || -> Result<Option<Arc<Array3<u8>>>> {
+                        if !config.write_heatmap_pngs {
+                            return Ok(None);
+                        }
+                        Ok(Some(Arc::new(apply_turbo_colormap(
+                            delta_norm
+                                .as_ref()
+                                .ok_or_else(|| anyhow!("heatmap generation requires host delta_norm"))?,
+                        )?)))
+                    },
+                )
+            },
+            || -> Result<Option<(Vec<vrifa_core::contours::AnnotationBox>, Option<Array3<u8>>)>> {
+                if !needs_annotations {
+                    return Ok(None);
+                }
+                let mask = mask
                     .as_ref()
-                    .ok_or_else(|| anyhow!("heatmap generation requires host delta_norm"))?,
-            )?))
-        } else {
-            None
-        };
-
-        if !config.annotation_formats.is_empty() {
-            let mask = mask
-                .as_ref()
-                .ok_or_else(|| anyhow!("annotation export requires a host mask"))?;
-            let boxes = extract_bounding_boxes(
-                mask,
-                config.annotation_segmentation_tolerance,
-                config.annotation_segmentation_max_edge_length,
-            )?;
-            let frame_bgr = if let Some(writer) = coco_image_writer.as_mut() {
+                    .ok_or_else(|| anyhow!("annotation export requires a host mask"))?;
+                let boxes = extract_bounding_boxes(
+                    mask,
+                    config.annotation_segmentation_tolerance,
+                    config.annotation_segmentation_max_edge_length,
+                )?;
+                let frame_copy = (!stream_coco_image).then(|| frame_bgr.clone());
+                Ok(Some((boxes, frame_copy)))
+            },
+        );
+        let overlay = overlay?;
+        let heatmap = heatmap?;
+        if let Some((boxes, frame_copy)) = annotation_payload? {
+            if let Some(writer) = coco_image_writer.as_mut() {
                 writer.write_bgr(
                     coco_images_dir.join(format!("frame_{frame_index:06}.png")),
                     frame_bgr.clone(),
                 )?;
-                None
-            } else {
-                Some(frame_bgr.clone())
-            };
+            }
             processed_records.push(AnnotationFrame {
                 frame_index,
-                frame_bgr,
+                frame_bgr: frame_copy,
                 boxes,
             });
         }

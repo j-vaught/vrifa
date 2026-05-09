@@ -28,6 +28,7 @@ indexmap.workspace = true
 memmap2.workspace = true
 ndarray.workspace = true
 opencv = { workspace = true, features = ["imgproc"] }
+rayon.workspace = true
 serde_yaml.workspace = true
 vrifa-annotations.workspace = true
 vrifa-cli.workspace = true
