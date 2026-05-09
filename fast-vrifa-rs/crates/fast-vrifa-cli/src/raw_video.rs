@@ -249,19 +249,17 @@ impl RawVideoSinkState {
             .ok_or_else(|| anyhow!("final raw stream length overflow"))?;
         match self.sink {
             RawVideoSink::Mapped { file, map } => {
-                map.flush().context("flushing raw stream map")?;
                 drop(map);
                 file.set_len(actual_len as u64)
                     .context("truncating raw stream to written length")?;
-                file.sync_data().context("syncing raw stream file")?;
             }
             RawVideoSink::Buffered { mut writer } => {
                 writer.flush().context("flushing raw stream file")?;
-                writer
-                    .into_inner()
-                    .map_err(|err| anyhow!("finalizing raw stream file: {err}"))?
-                    .sync_data()
-                    .context("syncing raw stream file")?;
+                drop(
+                    writer
+                        .into_inner()
+                        .map_err(|err| anyhow!("finalizing raw stream file: {err}"))?,
+                );
             }
         }
         Ok(frames_written)
