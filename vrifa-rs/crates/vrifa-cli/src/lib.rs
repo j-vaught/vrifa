@@ -498,6 +498,20 @@ pub fn run_config(config: Config) -> Result<()> {
             )?);
         }
     }
+    let stream_coco_images = config.annotation_mode == "all"
+        && config.annotation_formats.len() == 1
+        && config.annotation_formats[0] == "coco";
+    let coco_images_dir = config
+        .output_dir
+        .join("formatCOCO")
+        .join("images")
+        .join("default");
+    let mut coco_image_writer = if stream_coco_images {
+        fs::create_dir_all(&coco_images_dir)?;
+        Some(AsyncPngWriter::open_with_workers(true, 8, 64)?)
+    } else {
+        None
+    };
 
     reader.seek_zero()?;
     let mut processed = 0usize;
@@ -602,6 +616,15 @@ pub fn run_config(config: Config) -> Result<()> {
                     config.annotation_segmentation_tolerance,
                     config.annotation_segmentation_max_edge_length,
                 )?;
+                let frame_bgr = if let Some(writer) = coco_image_writer.as_mut() {
+                    writer.write_bgr(
+                        coco_images_dir.join(format!("frame_{frame_index:06}.png")),
+                        frame_bgr,
+                    )?;
+                    None
+                } else {
+                    Some(frame_bgr)
+                };
                 processed_records.push(AnnotationFrame {
                     frame_index,
                     frame_bgr,
@@ -676,6 +699,9 @@ pub fn run_config(config: Config) -> Result<()> {
         writer.close()?;
     }
     if let Some(writer) = heat_writer.take() {
+        writer.close()?;
+    }
+    if let Some(writer) = coco_image_writer.take() {
         writer.close()?;
     }
     if let Some(writer) = mask_png_writer.take() {

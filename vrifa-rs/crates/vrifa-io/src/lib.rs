@@ -5,8 +5,8 @@ use opencv::imgcodecs;
 use opencv::prelude::*;
 use opencv::videoio;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{sync_channel, SyncSender};
-use std::sync::Arc;
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use vrifa_core::cvutil;
 
@@ -114,7 +114,7 @@ pub struct AsyncVideoWriter {
 
 pub struct AsyncPngWriter {
     sender: SyncSender<PngFrame>,
-    handle: JoinHandle<Result<()>>,
+    handles: Vec<JoinHandle<Result<()>>>,
     is_color: bool,
 }
 
@@ -174,19 +174,23 @@ impl AsyncVideoWriter {
 
 impl AsyncPngWriter {
     pub fn open(is_color: bool) -> Result<Self> {
-        let (sender, receiver) = sync_channel::<PngFrame>(8);
-        let handle = thread::spawn(move || -> Result<()> {
-            for frame in receiver {
-                match frame {
-                    PngFrame::Bgr { path, frame } => write_bgr_png_impl(&path, &frame)?,
-                    PngFrame::Gray { path, frame } => write_gray_png_impl(&path, &frame)?,
-                }
-            }
-            Ok(())
-        });
+        Self::open_with_workers(is_color, 1, 8)
+    }
+
+    pub fn open_with_workers(
+        is_color: bool,
+        worker_count: usize,
+        queue_capacity: usize,
+    ) -> Result<Self> {
+        let (sender, receiver) = sync_channel::<PngFrame>(queue_capacity.max(1));
+        let receiver = Arc::new(Mutex::new(receiver));
+        let mut handles = Vec::with_capacity(worker_count.max(1));
+        for _ in 0..worker_count.max(1) {
+            handles.push(spawn_png_worker(Arc::clone(&receiver)));
+        }
         Ok(Self {
             sender,
-            handle,
+            handles,
             is_color,
         })
     }
@@ -217,10 +221,34 @@ impl AsyncPngWriter {
 
     pub fn close(self) -> Result<()> {
         drop(self.sender);
-        self.handle
-            .join()
-            .map_err(|_| anyhow!("png writer thread panicked"))?
+        for handle in self.handles {
+            handle
+                .join()
+                .map_err(|_| anyhow!("png writer thread panicked"))??;
+        }
+        Ok(())
     }
+}
+
+fn spawn_png_worker(receiver: Arc<Mutex<Receiver<PngFrame>>>) -> JoinHandle<Result<()>> {
+    thread::spawn(move || -> Result<()> {
+        loop {
+            let frame = {
+                let receiver = receiver
+                    .lock()
+                    .map_err(|_| anyhow!("png writer queue poisoned"))?;
+                match receiver.recv() {
+                    Ok(frame) => frame,
+                    Err(_) => break,
+                }
+            };
+            match frame {
+                PngFrame::Bgr { path, frame } => write_bgr_png_impl(&path, &frame)?,
+                PngFrame::Gray { path, frame } => write_gray_png_impl(&path, &frame)?,
+            }
+        }
+        Ok(())
+    })
 }
 
 impl VideoWriter {

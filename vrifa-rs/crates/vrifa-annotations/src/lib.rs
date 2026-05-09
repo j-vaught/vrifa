@@ -10,7 +10,7 @@ use vrifa_core::AnnotationBox;
 #[derive(Clone, Debug)]
 pub struct AnnotationFrame {
     pub frame_index: usize,
-    pub frame_bgr: Array3<u8>,
+    pub frame_bgr: Option<Array3<u8>>,
     pub boxes: Vec<AnnotationBox>,
 }
 
@@ -175,8 +175,11 @@ pub mod coco {
             .map(|index| &records[index])
             .collect();
         selected_records.par_iter().try_for_each(|record| {
-            let frame_filename = format!("frame_{:06}.png", record.frame_index);
-            write_bgr_png(&images_dir.join(frame_filename), &record.frame_bgr)
+            if let Some(frame_bgr) = record.frame_bgr.as_ref() {
+                let frame_filename = format!("frame_{:06}.png", record.frame_index);
+                write_bgr_png(&images_dir.join(frame_filename), frame_bgr)?;
+            }
+            Ok::<(), anyhow::Error>(())
         })?;
 
         let mut annotation_id = 1usize;
@@ -245,7 +248,9 @@ pub mod yolov5 {
         for record_index in selected_indices.iter().copied() {
             let record = &records[record_index];
             let frame_filename = format!("frame_{:06}.png", record.frame_index);
-            write_bgr_png(&images_dir.join(&frame_filename), &record.frame_bgr)?;
+            if let Some(frame_bgr) = record.frame_bgr.as_ref() {
+                write_bgr_png(&images_dir.join(&frame_filename), frame_bgr)?;
+            }
             train_list.push(format!("data/images/train/{frame_filename}"));
 
             let mut label_file =
@@ -309,7 +314,9 @@ pub mod darknet {
         for record_index in selected_indices.iter().copied() {
             let record = &records[record_index];
             let frame_filename = format!("frame_{:06}.png", record.frame_index);
-            write_bgr_png(&obj_train_data.join(&frame_filename), &record.frame_bgr)?;
+            if let Some(frame_bgr) = record.frame_bgr.as_ref() {
+                write_bgr_png(&obj_train_data.join(&frame_filename), frame_bgr)?;
+            }
             train_list.push(format!("data/obj_train_data/{frame_filename}"));
 
             let mut label_file =
