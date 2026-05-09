@@ -14,11 +14,12 @@ use opencv::core::CV_32F;
 use opencv::imgproc;
 use opencv::prelude::*;
 use std::any::Any;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_core::morphology::MorphShape;
 
@@ -86,6 +87,8 @@ struct CudaBackendInner {
     lock_mask: CudaFunction,
     lab_lut: CudaSlice<u32>,
     npp: Option<Arc<npp::NppLibrary>>,
+    gaussian_kernels: Mutex<HashMap<usize, CudaSlice<f32>>>,
+    morph_kernels: Mutex<HashMap<(i32, usize), CudaSlice<u8>>>,
 }
 
 #[derive(Clone, Default)]
@@ -225,6 +228,8 @@ impl CudaBackendInner {
             lock_mask,
             lab_lut,
             npp,
+            gaussian_kernels: Mutex::new(HashMap::new()),
+            morph_kernels: Mutex::new(HashMap::new()),
         })
     }
 }
@@ -527,11 +532,7 @@ impl PeakImageBackend for CudaBackend {
         let (source_width, source_height) = (delta.width, delta.height);
         let source = if blur_enabled {
             let kernel = canonical_blur_kernel_size(blur_kernel);
-            let weights = gaussian_kernel_weights(kernel)?;
-            let weights_buffer = inner
-                .compute_stream
-                .clone_htod(&weights)
-                .context("uploading CUDA gaussian weights")?;
+            let weights_buffer = cached_gaussian_kernel(inner, kernel)?;
             let mut output = inner
                 .compute_stream
                 .alloc_zeros::<f32>(pixel_count)
@@ -639,11 +640,7 @@ impl PeakImageBackend for CudaBackend {
         }
 
         let kernel_size = canonical_morph_kernel_size(morph_kernel);
-        let kernel_mask = structuring_element_mask(morph_shape, kernel_size)?;
-        let kernel_buffer = inner
-            .compute_stream
-            .clone_htod(&kernel_mask)
-            .context("uploading CUDA morphology kernel mask")?;
+        let kernel_buffer = cached_morph_kernel(inner, morph_shape, kernel_size)?;
         let width_i32 = delta_norm.width as i32;
         let height_i32 = delta_norm.height as i32;
         let kernel_i32 = kernel_size as i32;
@@ -787,11 +784,7 @@ impl PeakImageBackend for CudaBackend {
         }
 
         let kernel_size = canonical_morph_kernel_size(morph_kernel);
-        let kernel_mask = structuring_element_mask(morph_shape, kernel_size)?;
-        let kernel_buffer = inner
-            .compute_stream
-            .clone_htod(&kernel_mask)
-            .context("uploading CUDA morphology kernel mask")?;
+        let kernel_buffer = cached_morph_kernel(inner, morph_shape, kernel_size)?;
         let width_i32 = delta_norm.width as i32;
         let height_i32 = delta_norm.height as i32;
         let kernel_i32 = kernel_size as i32;
@@ -1144,6 +1137,30 @@ fn gaussian_kernel_weights(kernel_size: usize) -> Result<Vec<f32>> {
         .collect())
 }
 
+fn cached_gaussian_kernel(inner: &CudaBackendInner, kernel_size: usize) -> Result<CudaSlice<f32>> {
+    let kernel_size = canonical_blur_kernel_size(kernel_size);
+    if let Some(buffer) = inner
+        .gaussian_kernels
+        .lock()
+        .map_err(|_| anyhow!("locking Gaussian kernel cache"))?
+        .get(&kernel_size)
+        .cloned()
+    {
+        return Ok(buffer);
+    }
+    let weights = gaussian_kernel_weights(kernel_size)?;
+    let buffer = inner
+        .compute_stream
+        .clone_htod(&weights)
+        .context("uploading CUDA gaussian weights")?;
+    inner
+        .gaussian_kernels
+        .lock()
+        .map_err(|_| anyhow!("locking Gaussian kernel cache"))?
+        .insert(kernel_size, buffer.clone());
+    Ok(buffer)
+}
+
 fn structuring_element_mask(shape: MorphShape, kernel_size: usize) -> Result<Vec<u8>> {
     let kernel_size = canonical_morph_kernel_size(kernel_size);
     let kernel = imgproc::get_structuring_element_def(
@@ -1157,6 +1174,35 @@ fn structuring_element_mask(shape: MorphShape, kernel_size: usize) -> Result<Vec
         .iter()
         .map(|value| u8::from(*value > 0))
         .collect())
+}
+
+fn cached_morph_kernel(
+    inner: &CudaBackendInner,
+    shape: MorphShape,
+    kernel_size: usize,
+) -> Result<CudaSlice<u8>> {
+    let kernel_size = canonical_morph_kernel_size(kernel_size);
+    let key = (morph_shape_code(shape), kernel_size);
+    if let Some(buffer) = inner
+        .morph_kernels
+        .lock()
+        .map_err(|_| anyhow!("locking morphology kernel cache"))?
+        .get(&key)
+        .cloned()
+    {
+        return Ok(buffer);
+    }
+    let kernel_mask = structuring_element_mask(shape, kernel_size)?;
+    let buffer = inner
+        .compute_stream
+        .clone_htod(&kernel_mask)
+        .context("uploading CUDA morphology kernel mask")?;
+    inner
+        .morph_kernels
+        .lock()
+        .map_err(|_| anyhow!("locking morphology kernel cache"))?
+        .insert(key, buffer.clone());
+    Ok(buffer)
 }
 
 fn morph_shape_code(shape: MorphShape) -> i32 {
