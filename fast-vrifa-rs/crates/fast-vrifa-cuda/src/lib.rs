@@ -2,8 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use bytemuck::cast_slice;
 use cudarc::{
     driver::{
-        CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut,
-        LaunchConfig, PushKernelArg,
+        CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, LaunchConfig, PushKernelArg,
     },
     nvrtc::compile_ptx,
 };
@@ -67,6 +66,7 @@ struct CudaBackendInner {
     threshold_binary: CudaFunction,
     dilate_binary: CudaFunction,
     erode_binary: CudaFunction,
+    count_components: CudaFunction,
     filter_components: CudaFunction,
     lab_lut: CudaSlice<u32>,
     npp: Option<Arc<npp::NppLibrary>>,
@@ -159,6 +159,9 @@ impl CudaBackendInner {
         let erode_binary = module
             .load_function("erode_binary_u8")
             .context("loading CUDA erosion kernel")?;
+        let count_components = module
+            .load_function("count_labeled_components_u32")
+            .context("loading CUDA component-count kernel")?;
         let filter_components = module
             .load_function("filter_labeled_components_u8")
             .context("loading CUDA component-filter kernel")?;
@@ -181,6 +184,7 @@ impl CudaBackendInner {
             threshold_binary,
             dilate_binary,
             erode_binary,
+            count_components,
             filter_components,
             lab_lut,
             npp,
@@ -784,54 +788,28 @@ impl PeakImageBackend for CudaBackend {
                 }));
             }
 
-            let mut info_list_size = 0u32;
-            npp::status(
-                unsafe { (npp.info_list_size)(new_number as u32, &mut info_list_size as *mut _) },
-                "nppiCompressedMarkerLabelsUFGetInfoListSize_32u_C1R",
-            )?;
-            let mut info_buffer = inner
+            let mut label_counts = inner
                 .stream
-                .alloc_zeros::<u8>(info_list_size.max(1) as usize)
-                .context("allocating CUDA marker-info buffer")?;
-            let info_ptr_u64 = {
-                let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
-                let (info_ptr, _info_record) = info_buffer.device_ptr_mut(&inner.stream);
-                npp::status(
-                    unsafe {
-                        (npp.info_list)(
-                            labels_ptr as *mut u32,
-                            (mask.width * std::mem::size_of::<u32>()) as i32,
-                            roi,
-                            new_number as u32,
-                            info_ptr as *mut npp::NppiCompressedMarkerLabelsInfo,
-                            std::ptr::null_mut(),
-                            0,
-                            std::ptr::null_mut(),
-                            0,
-                            std::ptr::null_mut(),
-                            std::ptr::null_mut(),
-                            std::ptr::null_mut(),
-                            std::ptr::null_mut(),
-                            std::ptr::null_mut(),
-                            stream_ctx,
-                        )
-                    },
-                    "nppiCompressedMarkerLabelsUFInfo_32u_C1R_Ctx",
-                )?;
-                info_ptr as u64
-            };
+                .alloc_zeros::<u32>(new_number as usize + 1)
+                .context("allocating CUDA component-count buffer")?;
+
+            let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+            let pixel_count_i32 = pixel_count as i32;
+            let mut count_launch = inner.stream.launch_builder(&inner.count_components);
+            count_launch.arg(&labels);
+            count_launch.arg(&mut label_counts);
+            count_launch.arg(&pixel_count_i32);
+            unsafe { count_launch.launch(cfg) }.context("launching CUDA component-count kernel")?;
 
             let mut filtered = inner
                 .stream
                 .alloc_zeros::<u8>(pixel_count)
                 .context("allocating CUDA filtered mask")?;
-            let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
-            let pixel_count_i32 = pixel_count as i32;
             let min_area_u32 = min_area as u32;
             let mut launch = inner.stream.launch_builder(&inner.filter_components);
             launch.arg(&mask.data);
             launch.arg(&labels);
-            launch.arg(&info_ptr_u64);
+            launch.arg(&label_counts);
             launch.arg(&mut filtered);
             launch.arg(&min_area_u32);
             launch.arg(&pixel_count_i32);
