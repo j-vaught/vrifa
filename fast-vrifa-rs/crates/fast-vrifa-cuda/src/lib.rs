@@ -8,6 +8,9 @@ use cudarc::{
 };
 use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
 use ndarray::{Array2, Array3};
+use opencv::core::CV_32F;
+use opencv::imgproc;
+use opencv::prelude::*;
 use std::any::Any;
 use std::env;
 use std::fs;
@@ -54,6 +57,9 @@ struct CudaBackendInner {
     peak: CudaFunction,
     roi: CudaFunction,
     delta: CudaFunction,
+    blur_norm: CudaFunction,
+    reduce_minmax: CudaFunction,
+    normalize_u8: CudaFunction,
     lab_lut: CudaSlice<u32>,
 }
 
@@ -126,6 +132,15 @@ impl CudaBackendInner {
         let delta = module
             .load_function("compute_delta_darken_only")
             .context("loading CUDA delta kernel")?;
+        let blur_norm = module
+            .load_function("gaussian_blur_f32")
+            .context("loading CUDA blur kernel")?;
+        let reduce_minmax = module
+            .load_function("reduce_minmax_nonnegative")
+            .context("loading CUDA min/max kernel")?;
+        let normalize_u8 = module
+            .load_function("normalize_minmax_u8")
+            .context("loading CUDA normalize kernel")?;
         let host_lut = load_or_build_lab_lut()?;
         let lab_lut = stream
             .clone_htod(&host_lut)
@@ -138,6 +153,9 @@ impl CudaBackendInner {
             peak,
             roi,
             delta,
+            blur_norm,
+            reduce_minmax,
+            normalize_u8,
             lab_lut,
         })
     }
@@ -298,7 +316,12 @@ impl ImageBackend for CudaBackend {
             width: frame_lab.width,
             height: frame_lab.height,
         };
-        self.compute_delta_darken_only_device(frame_lab, &reference_buffer, roi_mask, channel_weight)
+        self.compute_delta_darken_only_device(
+            frame_lab,
+            &reference_buffer,
+            roi_mask,
+            channel_weight,
+        )
     }
 
     fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>> {
@@ -419,6 +442,95 @@ impl PeakImageBackend for CudaBackend {
             height: frame_lab.height,
         })
     }
+
+    fn blur_and_normalize_delta(
+        &self,
+        delta: &Self::DevicePlaneF32,
+        blur_kernel: usize,
+        blur_enabled: bool,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let inner = self.inner()?;
+        let pixel_count = delta.width * delta.height;
+        let (source_width, source_height) = (delta.width, delta.height);
+        let source = if blur_enabled {
+            let kernel = canonical_blur_kernel_size(blur_kernel);
+            let weights = gaussian_kernel_weights(kernel)?;
+            let weights_buffer = inner
+                .stream
+                .clone_htod(&weights)
+                .context("uploading CUDA gaussian weights")?;
+            let mut output = inner
+                .stream
+                .alloc_zeros::<f32>(pixel_count)
+                .context("allocating CUDA blurred delta plane")?;
+            let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+            let width_i32 = source_width as i32;
+            let height_i32 = source_height as i32;
+            let kernel_i32 = kernel as i32;
+            let pixel_count_i32 = pixel_count as i32;
+            let mut launch = inner.stream.launch_builder(&inner.blur_norm);
+            launch.arg(&delta.data);
+            launch.arg(&weights_buffer);
+            launch.arg(&mut output);
+            launch.arg(&width_i32);
+            launch.arg(&height_i32);
+            launch.arg(&kernel_i32);
+            launch.arg(&pixel_count_i32);
+            unsafe { launch.launch(cfg) }.context("launching CUDA gaussian blur kernel")?;
+            output
+        } else {
+            inner
+                .stream
+                .clone_dtod(&delta.data.as_view())
+                .context("copying CUDA delta plane for normalization")?
+        };
+
+        let mut min_buffer = inner
+            .stream
+            .clone_htod(&[f32::INFINITY.to_bits()])
+            .context("allocating CUDA min accumulator")?;
+        let mut max_buffer = inner
+            .stream
+            .clone_htod(&[0u32])
+            .context("allocating CUDA max accumulator")?;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let pixel_count_i32 = pixel_count as i32;
+        let mut reduce = inner.stream.launch_builder(&inner.reduce_minmax);
+        reduce.arg(&source);
+        reduce.arg(&mut min_buffer);
+        reduce.arg(&mut max_buffer);
+        reduce.arg(&pixel_count_i32);
+        unsafe { reduce.launch(cfg) }.context("launching CUDA delta min/max kernel")?;
+
+        let min_bits = inner
+            .stream
+            .clone_dtoh(&min_buffer)
+            .context("downloading CUDA delta min accumulator")?;
+        let max_bits = inner
+            .stream
+            .clone_dtoh(&max_buffer)
+            .context("downloading CUDA delta max accumulator")?;
+        let min_value = f32::from_bits(min_bits[0]);
+        let max_value = f32::from_bits(max_bits[0]);
+
+        let mut output = inner
+            .stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA normalized delta plane")?;
+        let mut normalize = inner.stream.launch_builder(&inner.normalize_u8);
+        normalize.arg(&source);
+        normalize.arg(&mut output);
+        normalize.arg(&min_value);
+        normalize.arg(&max_value);
+        normalize.arg(&pixel_count_i32);
+        unsafe { normalize.launch(cfg) }.context("launching CUDA normalize kernel")?;
+
+        Ok(Some(CudaMaskU8 {
+            data: output,
+            width: source_width,
+            height: source_height,
+        }))
+    }
 }
 
 fn cuda_device_ordinal() -> Result<usize> {
@@ -468,6 +580,26 @@ fn roi_bounds(shape: (usize, usize), margins: RoiMargins) -> (usize, usize, usiz
         right = width.min(left + 1);
     }
     (top, bottom, left, right)
+}
+
+fn canonical_blur_kernel_size(blur_kernel: usize) -> usize {
+    let mut kernel = blur_kernel;
+    if kernel % 2 == 0 {
+        kernel += 1;
+    }
+    kernel.max(1)
+}
+
+fn gaussian_kernel_weights(kernel_size: usize) -> Result<Vec<f32>> {
+    let kernel_size = canonical_blur_kernel_size(kernel_size);
+    let kernel = imgproc::get_gaussian_kernel(kernel_size as i32, 0.0, CV_32F)
+        .context("building Gaussian kernel for CUDA blur")?;
+    Ok(kernel
+        .data_typed::<f32>()
+        .context("reading Gaussian kernel coefficients")?
+        .iter()
+        .copied()
+        .collect())
 }
 
 fn lab_lut_cache_path() -> PathBuf {

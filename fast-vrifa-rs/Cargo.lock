@@ -674,6 +674,7 @@ dependencies = [
  "fast-vrifa-core",
  "image",
  "ndarray",
+ "opencv",
  "vrifa-core",
 ]
 
