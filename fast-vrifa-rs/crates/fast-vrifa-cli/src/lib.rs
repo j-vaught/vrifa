@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{SecondsFormat, Utc};
 use clap::Parser;
-use fast_vrifa_core::{CpuBackend, ImageBackend};
+use fast_vrifa_core::{CpuBackend, ImageBackend, PeakImageBackend};
 use indexmap::IndexMap;
 use ndarray::{s, Array3};
 use serde_yaml::Value;
@@ -228,7 +228,7 @@ fn run_cuda_backend(config: Config) -> Result<()> {
 
 fn run_hybrid_pipeline<B>(config: Config, backend: &B) -> Result<()>
 where
-    B: ImageBackend,
+    B: PeakImageBackend,
 {
     fs::create_dir_all(&config.output_dir)?;
     let mut reader = VideoReader::open(&config.video_path)?;
@@ -236,8 +236,8 @@ where
     let Some((_, first_frame_bgr)) = reader.read_next()? else {
         bail!("failed to read reference frame");
     };
-    let first_frame_converted =
-        convert_frame_with_backend(backend, &first_frame_bgr, config.colorspace)?.host;
+    let first_frame = convert_frame_with_backend(backend, &first_frame_bgr, config.colorspace)?;
+    let first_frame_converted = first_frame.host.clone();
 
     let absolute_index = match config.ref_mode {
         ReferenceMode::Absolute(index) => Some(index),
@@ -289,8 +289,18 @@ where
     let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
-    let mut peak_brightness_map = if config.peak_reference {
+    let device_delta_eligible = config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
+    let mut peak_brightness_map = if config.peak_reference && !device_delta_eligible {
         Some(first_frame_converted.slice(s![.., .., 0]).to_owned())
+    } else {
+        None
+    };
+    let mut peak_brightness_device = if config.peak_reference && device_delta_eligible {
+        first_frame
+            .device_lab
+            .as_ref()
+            .map(|frame| backend.extract_l_plane(frame))
+            .transpose()?
     } else {
         None
     };
@@ -436,29 +446,43 @@ where
         if frame_index % config.frame_step == 0 {
             let compute_start = Instant::now();
             if config.peak_reference {
-                peak_brightness_map = Some(update_peak_brightness(
-                    frame_converted,
-                    peak_brightness_map.as_ref(),
-                )?);
+                if device_delta_eligible {
+                    let device_lab = current
+                        .device_lab
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("device peak path requires a device CIELAB frame"))?;
+                    peak_brightness_device = Some(backend.update_peak_brightness_device(
+                        device_lab,
+                        peak_brightness_device.as_ref(),
+                    )?);
+                } else {
+                    peak_brightness_map = Some(update_peak_brightness(
+                        frame_converted,
+                        peak_brightness_map.as_ref(),
+                    )?);
+                }
             }
 
-            let reference_plane = if config.peak_reference {
-                peak_brightness_map
-                    .as_ref()
-                    .cloned()
-                    .ok_or_else(|| anyhow!("peak reference was enabled without a peak map"))?
-            } else {
-                reference_for_frame.slice(s![.., .., 0]).to_owned()
-            };
-
             let delta = if let Some(device_lab) = current.device_lab.as_ref() {
-                if config.darken_only && matches!(config.colorspace, ColorSpace::Cielab) {
-                    let device_delta = backend.compute_delta_darken_only(
-                        device_lab,
-                        &reference_plane,
-                        &device_roi_mask,
-                        config.channel_weights[0],
-                    )?;
+                if device_delta_eligible {
+                    let device_delta = if config.peak_reference {
+                        backend.compute_delta_darken_only_device(
+                            device_lab,
+                            peak_brightness_device.as_ref().ok_or_else(|| {
+                                anyhow!("peak reference was enabled without a device peak map")
+                            })?,
+                            &device_roi_mask,
+                            config.channel_weights[0],
+                        )?
+                    } else {
+                        let reference_plane = reference_for_frame.slice(s![.., .., 0]).to_owned();
+                        backend.compute_delta_darken_only(
+                            device_lab,
+                            &reference_plane,
+                            &device_roi_mask,
+                            config.channel_weights[0],
+                        )?
+                    };
                     backend.download_plane_f32(&device_delta)?
                 } else {
                     compute_delta(

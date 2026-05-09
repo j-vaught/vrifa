@@ -1,7 +1,8 @@
-use crate::{BackendKind, BackendStatus, ImageBackend};
+use crate::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend};
 use anyhow::{Context, Result};
 use ndarray::{Array2, Array3};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
+use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::roi::{build_roi_mask, RoiMargins};
 
 #[derive(Clone, Debug)]
@@ -111,6 +112,37 @@ impl ImageBackend for CpuBackend {
 
     fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>> {
         Ok(plane.data.clone())
+    }
+}
+
+impl PeakImageBackend for CpuBackend {
+    fn extract_l_plane(&self, frame_lab: &Self::DeviceFrameLab) -> Result<Self::DevicePlaneF32> {
+        Ok(CpuPlaneF32 {
+            data: frame_lab.data.slice(ndarray::s![.., .., 0]).to_owned(),
+        })
+    }
+
+    fn update_peak_brightness_device(
+        &self,
+        frame_lab: &Self::DeviceFrameLab,
+        previous_peak: Option<&Self::DevicePlaneF32>,
+    ) -> Result<Self::DevicePlaneF32> {
+        Ok(CpuPlaneF32 {
+            data: update_peak_brightness(
+                &frame_lab.data,
+                previous_peak.map(|plane| &plane.data),
+            )?,
+        })
+    }
+
+    fn compute_delta_darken_only_device(
+        &self,
+        frame_lab: &Self::DeviceFrameLab,
+        reference_plane: &Self::DevicePlaneF32,
+        roi_mask: &Self::DeviceMaskU8,
+        channel_weight: f32,
+    ) -> Result<Self::DevicePlaneF32> {
+        self.compute_delta_darken_only(frame_lab, &reference_plane.data, roi_mask, channel_weight)
     }
 }
 

@@ -6,7 +6,7 @@ use cudarc::{
     },
     nvrtc::compile_ptx,
 };
-use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, RoiMargins};
+use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
 use ndarray::{Array2, Array3};
 use std::any::Any;
 use std::env;
@@ -50,6 +50,8 @@ struct CudaBackendInner {
     stream: Arc<CudaStream>,
     _module: Arc<CudaModule>,
     colorspace: CudaFunction,
+    extract_l: CudaFunction,
+    peak: CudaFunction,
     roi: CudaFunction,
     delta: CudaFunction,
     lab_lut: CudaSlice<u32>,
@@ -112,6 +114,12 @@ impl CudaBackendInner {
         let colorspace = module
             .load_function("bgr_to_lab_lut")
             .context("loading CUDA colorspace kernel")?;
+        let extract_l = module
+            .load_function("extract_l_plane")
+            .context("loading CUDA L-plane kernel")?;
+        let peak = module
+            .load_function("update_peak_brightness")
+            .context("loading CUDA peak kernel")?;
         let roi = module
             .load_function("build_roi_mask")
             .context("loading CUDA ROI kernel")?;
@@ -126,6 +134,8 @@ impl CudaBackendInner {
             stream,
             _module: module,
             colorspace,
+            extract_l,
+            peak,
             roi,
             delta,
             lab_lut,
@@ -275,33 +285,18 @@ impl ImageBackend for CudaBackend {
             "ROI mask shape does not match frame"
         );
 
-        let pixel_count = frame_lab.width * frame_lab.height;
         let reference = reference_plane
             .as_slice_memory_order()
             .ok_or_else(|| anyhow!("reference plane must be contiguous"))?;
-        let reference_buffer = inner
-            .stream
-            .clone_htod(reference)
-            .context("uploading reference plane to CUDA")?;
-        let mut output = inner
-            .stream
-            .alloc_zeros::<f32>(pixel_count)
-            .context("allocating CUDA delta plane")?;
-        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
-        let pixel_count_i32 = pixel_count as i32;
-        let mut launch = inner.stream.launch_builder(&inner.delta);
-        launch.arg(&frame_lab.data);
-        launch.arg(&reference_buffer);
-        launch.arg(&roi_mask.data);
-        launch.arg(&mut output);
-        launch.arg(&channel_weight);
-        launch.arg(&pixel_count_i32);
-        unsafe { launch.launch(cfg) }.context("launching CUDA delta kernel")?;
-        Ok(CudaPlaneF32 {
-            data: output,
+        let reference_buffer = CudaPlaneF32 {
+            data: inner
+                .stream
+                .clone_htod(reference)
+                .context("uploading reference plane to CUDA")?,
             width: frame_lab.width,
             height: frame_lab.height,
-        })
+        };
+        self.compute_delta_darken_only_device(frame_lab, &reference_buffer, roi_mask, channel_weight)
     }
 
     fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>> {
@@ -312,6 +307,106 @@ impl ImageBackend for CudaBackend {
             .context("downloading CUDA delta plane")?;
         Array2::from_shape_vec((plane.height, plane.width), values)
             .context("reshaping downloaded delta plane")
+    }
+}
+
+impl PeakImageBackend for CudaBackend {
+    fn extract_l_plane(&self, frame_lab: &Self::DeviceFrameLab) -> Result<Self::DevicePlaneF32> {
+        let inner = self.inner()?;
+        let pixel_count = frame_lab.width * frame_lab.height;
+        let mut output = inner
+            .stream
+            .alloc_zeros::<f32>(pixel_count)
+            .context("allocating CUDA L plane")?;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let pixel_count_i32 = pixel_count as i32;
+        let mut launch = inner.stream.launch_builder(&inner.extract_l);
+        launch.arg(&frame_lab.data);
+        launch.arg(&mut output);
+        launch.arg(&pixel_count_i32);
+        unsafe { launch.launch(cfg) }.context("launching CUDA L-plane kernel")?;
+        Ok(CudaPlaneF32 {
+            data: output,
+            width: frame_lab.width,
+            height: frame_lab.height,
+        })
+    }
+
+    fn update_peak_brightness_device(
+        &self,
+        frame_lab: &Self::DeviceFrameLab,
+        previous_peak: Option<&Self::DevicePlaneF32>,
+    ) -> Result<Self::DevicePlaneF32> {
+        let inner = self.inner()?;
+        let pixel_count = frame_lab.width * frame_lab.height;
+        let previous_buffer = if let Some(previous_peak) = previous_peak {
+            anyhow::ensure!(
+                (previous_peak.height, previous_peak.width) == (frame_lab.height, frame_lab.width),
+                "previous peak shape does not match frame"
+            );
+            previous_peak.data.clone()
+        } else {
+            inner
+                .stream
+                .alloc_zeros::<f32>(pixel_count)
+                .context("allocating initial CUDA peak plane")?
+        };
+        let mut output = inner
+            .stream
+            .alloc_zeros::<f32>(pixel_count)
+            .context("allocating CUDA peak plane")?;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let pixel_count_i32 = pixel_count as i32;
+        let mut launch = inner.stream.launch_builder(&inner.peak);
+        launch.arg(&frame_lab.data);
+        launch.arg(&previous_buffer);
+        launch.arg(&mut output);
+        launch.arg(&pixel_count_i32);
+        unsafe { launch.launch(cfg) }.context("launching CUDA peak kernel")?;
+        Ok(CudaPlaneF32 {
+            data: output,
+            width: frame_lab.width,
+            height: frame_lab.height,
+        })
+    }
+
+    fn compute_delta_darken_only_device(
+        &self,
+        frame_lab: &Self::DeviceFrameLab,
+        reference_plane: &Self::DevicePlaneF32,
+        roi_mask: &Self::DeviceMaskU8,
+        channel_weight: f32,
+    ) -> Result<Self::DevicePlaneF32> {
+        let inner = self.inner()?;
+        anyhow::ensure!(
+            (reference_plane.height, reference_plane.width) == (frame_lab.height, frame_lab.width),
+            "reference plane shape does not match frame"
+        );
+        anyhow::ensure!(
+            (roi_mask.height, roi_mask.width) == (frame_lab.height, frame_lab.width),
+            "ROI mask shape does not match frame"
+        );
+
+        let pixel_count = frame_lab.width * frame_lab.height;
+        let mut output = inner
+            .stream
+            .alloc_zeros::<f32>(pixel_count)
+            .context("allocating CUDA delta plane")?;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let pixel_count_i32 = pixel_count as i32;
+        let mut launch = inner.stream.launch_builder(&inner.delta);
+        launch.arg(&frame_lab.data);
+        launch.arg(&reference_plane.data);
+        launch.arg(&roi_mask.data);
+        launch.arg(&mut output);
+        launch.arg(&channel_weight);
+        launch.arg(&pixel_count_i32);
+        unsafe { launch.launch(cfg) }.context("launching CUDA delta kernel")?;
+        Ok(CudaPlaneF32 {
+            data: output,
+            width: frame_lab.width,
+            height: frame_lab.height,
+        })
     }
 }
 

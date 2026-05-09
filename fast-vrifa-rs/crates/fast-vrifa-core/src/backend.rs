@@ -52,3 +52,19 @@ pub trait ImageBackend: Send + Sync {
     ) -> Result<Self::DevicePlaneF32>;
     fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>>;
 }
+
+pub trait PeakImageBackend: ImageBackend {
+    fn extract_l_plane(&self, frame_lab: &Self::DeviceFrameLab) -> Result<Self::DevicePlaneF32>;
+    fn update_peak_brightness_device(
+        &self,
+        frame_lab: &Self::DeviceFrameLab,
+        previous_peak: Option<&Self::DevicePlaneF32>,
+    ) -> Result<Self::DevicePlaneF32>;
+    fn compute_delta_darken_only_device(
+        &self,
+        frame_lab: &Self::DeviceFrameLab,
+        reference_plane: &Self::DevicePlaneF32,
+        roi_mask: &Self::DeviceMaskU8,
+        channel_weight: f32,
+    ) -> Result<Self::DevicePlaneF32>;
+}

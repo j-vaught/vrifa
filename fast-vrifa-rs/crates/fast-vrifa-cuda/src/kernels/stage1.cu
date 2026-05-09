@@ -31,6 +31,33 @@ extern "C" __global__ void build_roi_mask(
         (y >= top && y < bottom && x >= left && x < right) ? 1u : 0u;
 }
 
+extern "C" __global__ void extract_l_plane(
+    const unsigned int* frame_lab,
+    float* output,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    output[index] = static_cast<float>(frame_lab[index] & 0xffu);
+}
+
+extern "C" __global__ void update_peak_brightness(
+    const unsigned int* frame_lab,
+    const float* previous_peak,
+    float* output,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    float current_l = static_cast<float>(frame_lab[index] & 0xffu);
+    float previous = previous_peak[index];
+    output[index] = current_l > previous ? current_l : previous;
+}
+
 extern "C" __global__ void compute_delta_darken_only(
     const unsigned int* frame_lab,
     const float* reference_plane,
