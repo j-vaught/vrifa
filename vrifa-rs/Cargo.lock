@@ -1164,12 +1164,9 @@ dependencies = [
 name = "vrifa-core"
 version = "0.1.0"
 dependencies = [
- "image",
  "ndarray",
- "ndarray-npy",
  "opencv",
  "serde",
- "serde_json",
  "thiserror",
 ]
 

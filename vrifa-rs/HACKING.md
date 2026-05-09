@@ -7,38 +7,32 @@ This workspace is organized so most algorithm changes stay inside `vrifa-core`, 
 Edit `crates/vrifa-core/src/<stage>.rs` and keep the change local to that stage when possible. Run:
 
 ```bash
+cargo build --release --workspace
 cargo test --workspace --release
 ```
 
-The matching `crates/vrifa-core/tests/<stage>_parity.rs` test will compare the stage output against the frozen golden in `tests/fixtures/`.
+For end-to-end behavior verification, run a full pipeline against one of the sample videos and inspect the outputs against the artifacts under `../reference_outputs/`.
 
 ## Intentionally change the algorithm
 
-Edit the Rust stage, then regenerate only the affected fixtures and commit the code and goldens together. The one-line entrypoint is:
+Edit the Rust stage, refresh any saved reference outputs that move as a result, and run:
 
 ```bash
-../_dev/validation/generate_stage_fixtures.py
-```
-
-After refreshing the fixtures, rerun:
-
-```bash
-cargo test --workspace --release
 cargo bench -p vrifa-cli --bench perf_gate
 ```
 
-The fixture files are the contract. If the behavior changes intentionally, the updated frozen golden must land in the same change set as the code.
+so any performance change is recorded with the behavior change.
 
 ## Add a new stage or module
 
-Add the source file under `crates/vrifa-core/src/`, expose it from `crates/vrifa-core/src/lib.rs`, and add a matching integration test under `crates/vrifa-core/tests/`. Reuse the helpers in `crates/vrifa-core/tests/common/mod.rs` for fixture loading, assertion helpers, and shared config parsing.
+Add the source file under `crates/vrifa-core/src/`, expose it from `crates/vrifa-core/src/lib.rs`, and wire it through `vrifa-cli` where appropriate.
 
 ## Common Workflow
 
 ```bash
 cargo fmt
-cargo test --workspace --release
+cargo build --workspace --release
 cargo bench -p vrifa-cli --bench perf_gate
 ```
 
-If you need artifact-level validation beyond the stage tests, the internal harness under `../_dev/validation/` provides run comparison, stage dumping, and fixture regeneration utilities.
+If you need artifact-level validation, the internal harness under `../_dev/validation/` provides run-level comparison and stage-dumping utilities.

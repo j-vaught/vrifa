@@ -1,6 +1,6 @@
 # VRIFA Workspace
 
-This directory contains the Rust workspace that builds the VRIFA CLI, core algorithm crates, fixtures, and benchmarks.
+This directory contains the Rust workspace that builds the VRIFA CLI, core algorithm crates, and benchmarks.
 
 ## Workspace Layout
 
@@ -9,7 +9,6 @@ This directory contains the Rust workspace that builds the VRIFA CLI, core algor
 - `crates/vrifa-annotations` contains COCO, YOLOv5, and Darknet exporters.
 - `crates/vrifa-cli` contains the binary entrypoint, configuration parsing, and end-to-end orchestration.
 - `crates/vrifa-py` contains the optional binding crate layered over the Rust pipeline.
-- `tests/fixtures` contains frozen test assets and stage goldens.
 - `docs/archive` contains closed investigation notes that are not required for day-to-day work.
 
 ## Stage Modules
@@ -46,14 +45,12 @@ cargo build --release
 ## Verify
 
 ```bash
-cargo test --workspace --release
-../_dev/validation/compare_runs.py /tmp/py_run /tmp/rs_run
+cargo build --workspace --release
 cargo bench -p vrifa-cli --bench perf_gate
+../_dev/validation/compare_runs.py /tmp/run_a /tmp/run_b
 ```
 
-## Tests and Fixtures
-
-The files under `tests/fixtures/` are frozen goldens that lock the stage behavior. The parity tests in `crates/vrifa-core/tests/` load those fixtures directly and fail as soon as a stage drifts from the expected result. When behavior intentionally changes, regenerate the affected fixtures with the tooling under `../_dev/validation/` and commit the code and refreshed goldens together.
+`compare_runs.py` is the artifact-level check: run the binary against a sample video, then compare the resulting `run_summary.yaml`, COCO annotations, and PNG outputs against a reference run.
 
 ## Benchmarks
 

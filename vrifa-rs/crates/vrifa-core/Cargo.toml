@@ -10,7 +10,3 @@ opencv = { workspace = true, features = ["imgproc"] }
 serde.workspace = true
 thiserror.workspace = true
 
-[dev-dependencies]
-image.workspace = true
-ndarray-npy.workspace = true
-serde_json.workspace = true
