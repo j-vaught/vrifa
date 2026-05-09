@@ -185,7 +185,6 @@ impl CudaBackend {
         state: &mut CudaBatchDetectorState,
         options: &CudaBatchDetectorOptions,
     ) -> Result<Vec<CudaBatchFrameOutput>> {
-        let inner = self.inner()?;
         if frames.is_empty() {
             return Ok(Vec::new());
         }
@@ -203,7 +202,58 @@ impl CudaBackend {
             );
         }
 
-        let batch_lab = self.upload_and_convert_batch(frames)?;
+        let frame_bytes = width
+            .checked_mul(height)
+            .and_then(|pixels| pixels.checked_mul(3))
+            .ok_or_else(|| anyhow!("CUDA batch frame byte size overflow"))?;
+        let mut host_bgr = Vec::with_capacity(frame_bytes * frames.len());
+        for frame in frames {
+            let bytes = frame
+                .as_slice_memory_order()
+                .ok_or_else(|| anyhow!("CUDA batch input frame must be contiguous"))?;
+            host_bgr.extend_from_slice(bytes);
+        }
+        self.process_peak_detector_bgr_bytes_batch(
+            &host_bgr,
+            frames.len(),
+            width,
+            height,
+            roi_mask,
+            state,
+            options,
+        )
+    }
+
+    pub fn process_peak_detector_bgr_bytes_batch(
+        &self,
+        host_bgr: &[u8],
+        frame_count: usize,
+        width: usize,
+        height: usize,
+        roi_mask: &CudaMaskU8,
+        state: &mut CudaBatchDetectorState,
+        options: &CudaBatchDetectorOptions,
+    ) -> Result<Vec<CudaBatchFrameOutput>> {
+        let inner = self.inner()?;
+        if frame_count == 0 {
+            return Ok(Vec::new());
+        }
+        anyhow::ensure!(
+            (roi_mask.height, roi_mask.width) == (height, width),
+            "ROI mask shape does not match batch frame shape"
+        );
+        let expected_bytes = width
+            .checked_mul(height)
+            .and_then(|pixels| pixels.checked_mul(3))
+            .and_then(|bytes_per_frame| bytes_per_frame.checked_mul(frame_count))
+            .ok_or_else(|| anyhow!("CUDA batch byte count overflow"))?;
+        anyhow::ensure!(
+            host_bgr.len() == expected_bytes,
+            "CUDA batch byte length mismatch: expected {expected_bytes}, got {}",
+            host_bgr.len()
+        );
+
+        let batch_lab = self.upload_and_convert_batch_bytes(host_bgr, frame_count, width, height)?;
         let frame_pixels = width * height;
         let mut outputs = Vec::with_capacity(batch_lab.frames);
         for batch_index in 0..batch_lab.frames {
@@ -281,7 +331,6 @@ impl CudaBackend {
     }
 
     fn upload_and_convert_batch(&self, frames: &[Array3<u8>]) -> Result<CudaLabBatch> {
-        let inner = self.inner()?;
         let height = frames[0].dim().0;
         let width = frames[0].dim().1;
         let frame_bytes = width
@@ -295,14 +344,24 @@ impl CudaBackend {
                 .ok_or_else(|| anyhow!("CUDA batch input frame must be contiguous"))?;
             host_bgr.extend_from_slice(bytes);
         }
+        self.upload_and_convert_batch_bytes(&host_bgr, frames.len(), width, height)
+    }
 
+    fn upload_and_convert_batch_bytes(
+        &self,
+        host_bgr: &[u8],
+        frame_count: usize,
+        width: usize,
+        height: usize,
+    ) -> Result<CudaLabBatch> {
+        let inner = self.inner()?;
         let device_bgr = inner
             .upload_stream
-            .clone_htod(&host_bgr)
+            .clone_htod(host_bgr)
             .context("uploading CUDA BGR batch")?;
         let pixel_count = width
             .checked_mul(height)
-            .and_then(|pixels| pixels.checked_mul(frames.len()))
+            .and_then(|pixels| pixels.checked_mul(frame_count))
             .ok_or_else(|| anyhow!("CUDA batch pixel count overflow"))?;
         let mut output = inner
             .compute_stream
@@ -318,7 +377,7 @@ impl CudaBackend {
         unsafe { launch.launch(cfg) }.context("launching CUDA batch colorspace kernel")?;
         Ok(CudaLabBatch {
             data: output,
-            frames: frames.len(),
+            frames: frame_count,
         })
     }
 }

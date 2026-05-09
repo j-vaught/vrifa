@@ -4,9 +4,10 @@ use clap::Parser;
 use fast_vrifa_core::{CpuBackend, ImageBackend, PeakImageBackend};
 use indexmap::IndexMap;
 use ndarray::{s, Array2, Array3};
-use opencv::core::{self, Point, Scalar, Size};
+use opencv::core::{self, Mat, Point, Scalar, Size};
 use opencv::imgproc;
 use opencv::prelude::*;
+use opencv::videoio;
 use serde_yaml::Value;
 use std::collections::VecDeque;
 use std::env;
@@ -32,7 +33,7 @@ use vrifa_core::reference::{
 };
 use vrifa_core::roi::resolve_roi_margins;
 use vrifa_core::threshold;
-use vrifa_io::{AsyncPngWriter, VideoReader};
+use vrifa_io::{AsyncPngWriter, VideoMetadata, VideoReader};
 
 mod raw_video;
 use raw_video::{
@@ -310,8 +311,20 @@ fn run_cuda_batched_peak_pipeline(
     options: &FastCliOptions,
 ) -> Result<()> {
     fs::create_dir_all(&config.output_dir)?;
-    let mut reader = VideoReader::open(&config.video_path)?;
-    let metadata = reader.metadata();
+    let mut capture =
+        videoio::VideoCapture::from_file_def(&config.video_path.to_string_lossy())
+            .with_context(|| format!("opening video {}", config.video_path.display()))?;
+    if !capture.is_opened()? {
+        bail!("unable to open video: {}", config.video_path.display());
+    }
+    let total_frames = capture.get(videoio::CAP_PROP_FRAME_COUNT)? as usize;
+    let fps = capture.get(videoio::CAP_PROP_FPS)?;
+    let metadata = VideoMetadata {
+        total_frames: (total_frames > 0).then_some(total_frames),
+        fps: if fps > 0.0 { fps } else { 30.0 },
+        width: capture.get(videoio::CAP_PROP_FRAME_WIDTH)? as usize,
+        height: capture.get(videoio::CAP_PROP_FRAME_HEIGHT)? as usize,
+    };
 
     let roi_margins = resolve_roi_margins(
         config.roi_margin,
@@ -382,27 +395,34 @@ fn run_cuda_batched_peak_pipeline(
     let mut processing_time_accum = 0.0f64;
     let run_start = Instant::now();
     let mut batch_indices: Vec<usize> = Vec::with_capacity(CUDA_BATCH_SIZE);
-    let mut batch_frames: Vec<Array3<u8>> = Vec::with_capacity(CUDA_BATCH_SIZE);
+    let frame_bytes = metadata
+        .width
+        .checked_mul(metadata.height)
+        .and_then(|pixels| pixels.checked_mul(3))
+        .ok_or_else(|| anyhow!("CUDA batch frame byte size overflow"))?;
+    let mut batch_bytes: Vec<u8> = Vec::with_capacity(frame_bytes * CUDA_BATCH_SIZE);
 
-    let mut process_batch = |batch_indices: &mut Vec<usize>,
-                             batch_frames: &mut Vec<Array3<u8>>|
-     -> Result<()> {
-        if batch_frames.is_empty() {
+    let mut process_batch =
+        |batch_indices: &mut Vec<usize>, batch_bytes: &mut Vec<u8>| -> Result<()> {
+        if batch_indices.is_empty() {
             return Ok(());
         }
         let compute_start = Instant::now();
-        let outputs =
-            backend.process_peak_detector_batch(batch_frames, &device_roi_mask, &mut detector_state, &batch_options)?;
-        for ((frame_index, _frame_bgr), output) in batch_indices
-            .drain(..)
-            .zip(batch_frames.drain(..))
-            .zip(outputs.into_iter())
-        {
+        let frame_count = batch_indices.len();
+        let outputs = backend.process_peak_detector_bgr_bytes_batch(
+            batch_bytes,
+            frame_count,
+            metadata.width,
+            metadata.height,
+            &device_roi_mask,
+            &mut detector_state,
+            &batch_options,
+        )?;
+        for (_frame_index, output) in batch_indices.drain(..).zip(outputs.into_iter()) {
             if let Some(writer) = mask_writer.as_mut() {
                 writer.write_gray(Arc::new(
                     output
                         .mask
-                        .clone()
                         .ok_or_else(|| anyhow!("mask video staging requires a host mask"))?,
                 ))?;
             }
@@ -410,28 +430,45 @@ fn run_cuda_batched_peak_pipeline(
                 writer.write_gray(Arc::new(
                     output
                         .delta_norm
-                        .clone()
                         .ok_or_else(|| anyhow!("heatmap video staging requires host delta_norm"))?,
                 ))?;
             }
-            let _ = frame_index;
             processed += 1;
         }
+        batch_bytes.clear();
         processing_time_accum += compute_start.elapsed().as_secs_f64();
         Ok(())
     };
 
-    while let Some((frame_index, frame_bgr)) = reader.read_next()? {
+    let mut next_index = 1usize;
+    loop {
+        let mut mat = Mat::default();
+        if !capture.read(&mut mat)? || mat.empty() {
+            break;
+        }
+        let frame_index = next_index;
+        next_index += 1;
         if frame_index % config.frame_step != 0 {
             continue;
         }
+        let mat = if mat.is_continuous() {
+            mat
+        } else {
+            mat.try_clone()?
+        };
+        let bytes = mat.data_bytes()?;
+        anyhow::ensure!(
+            bytes.len() == frame_bytes,
+            "decoded frame byte mismatch: expected {frame_bytes}, got {}",
+            bytes.len()
+        );
         batch_indices.push(frame_index);
-        batch_frames.push(frame_bgr);
-        if batch_frames.len() == CUDA_BATCH_SIZE {
-            process_batch(&mut batch_indices, &mut batch_frames)?;
+        batch_bytes.extend_from_slice(bytes);
+        if batch_indices.len() == CUDA_BATCH_SIZE {
+            process_batch(&mut batch_indices, &mut batch_bytes)?;
         }
     }
-    process_batch(&mut batch_indices, &mut batch_frames)?;
+    process_batch(&mut batch_indices, &mut batch_bytes)?;
 
     let mask_artifact = if let Some(writer) = mask_writer.take() {
         Some(writer.close()?)
