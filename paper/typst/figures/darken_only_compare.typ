@@ -9,7 +9,7 @@
 #import "@preview/cetz:0.4.0"
 
 #set page(width: auto, height: auto, margin: 6pt, fill: white)
-#set text(font: ("Helvetica", "Arial"), size: 9pt)
+#set text(font: ("TeX Gyre Termes", "Times New Roman", "Times"), size: 9pt)
 
 #let garnet = rgb("#73000A")
 #let b70    = rgb("#5C5C5C")
