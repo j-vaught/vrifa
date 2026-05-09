@@ -63,9 +63,9 @@
          stroke: 0.7pt + st.color)
 
     content((x0 + cell-w / 2, y0 - 0.3),
-            text(weight: 700, size: 10pt, fill: st.color)[#st.label])
+            text(weight: 700, size: 10pt, fill: black)[#st.label])
     content((x0 + cell-w / 2, y0 - 0.62),
-            text(size: 7.5pt, fill: b70, font: "Menlo")[#st.code])
+            text(size: 7.5pt, fill: black, font: "Menlo")[#st.code])
   }
 
   // Connect stages left-to-right within rows, then row-to-row.
