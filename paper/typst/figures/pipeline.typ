@@ -68,28 +68,29 @@
   for i in range(stages.len() - 1) {
     let col = calc.rem(i, cols)
     let row = int(i / cols)
-    let next-col = calc.rem(i + 1, cols)
     let next-row = int((i + 1) / cols)
 
     let x0 = col * (cell-w + gap) + cell-w
     let y0 = -row * (cell-h + gap + 0.7) - cell-h / 2
-    let x1 = next-col * (cell-w + gap)
-    let y1 = -next-row * (cell-h + gap + 0.7) - cell-h / 2
 
     if next-row == row {
-      line((x0, y0), (x0 + gap, y0), stroke: 0.7pt + b70, mark: (end: ">"))
+      // Within-row arrow: short horizontal hop into the next cell.
+      line((x0, y0), (x0 + gap, y0),
+           stroke: 0.7pt + b70, mark: (end: ">"))
     } else {
-      // Wrap from end of row 0 down to start of row 1.
-      let mid-x = x0 + 0.4
-      let above-y = y0
-      let below-y = y1
-      line((x0, above-y), (mid-x, above-y), stroke: 0.7pt + b70)
-      line((mid-x, above-y), (mid-x, below-y), stroke: 0.7pt + b70)
-      line((mid-x, below-y), (x1 - cell-w * cols - gap * (cols - 1), below-y),
-           stroke: 0.7pt + b70)
-      // Simpler: draw the wrap as one line straight to the start of the next row.
-      let start-x = 0
-      line((mid-x, below-y), (start-x, below-y), stroke: 0.7pt + b70, mark: (end: ">"))
+      // Wrap arrow: end of row 0 -> right -> down -> left to start of row 1.
+      // Drawn as one polyline so the arrow head sits cleanly at the entry of cell 6.
+      let elbow-x = x0 + gap * 2
+      let entry-x = 0
+      let entry-y = -next-row * (cell-h + gap + 0.7) - cell-h / 2
+      line(
+        (x0, y0),
+        (elbow-x, y0),
+        (elbow-x, entry-y),
+        (entry-x, entry-y),
+        stroke: 0.7pt + b70,
+        mark: (end: ">"),
+      )
     }
   }
 
