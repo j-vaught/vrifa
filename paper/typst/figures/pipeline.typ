@@ -42,7 +42,8 @@
 
   let cell-w = 2.6
   let cell-h = 0.95
-  let gap = 0.12
+  let gap = 0.3
+  let row-pad = 0.85
   let cols = 6
   let rows = 2
 
@@ -50,7 +51,7 @@
     let col = calc.rem(i, cols)
     let row = int(i / cols)
     let x0 = col * (cell-w + gap)
-    let y0 = -row * (cell-h + gap + 0.7)
+    let y0 = -row * (cell-h + gap + row-pad)
     let x1 = x0 + cell-w
     let y1 = y0 - cell-h
 
@@ -71,23 +72,28 @@
     let next-row = int((i + 1) / cols)
 
     let x0 = col * (cell-w + gap) + cell-w
-    let y0 = -row * (cell-h + gap + 0.7) - cell-h / 2
+    let y0 = -row * (cell-h + gap + row-pad) - cell-h / 2
 
     if next-row == row {
       // Within-row arrow: short horizontal hop into the next cell.
       line((x0, y0), (x0 + gap, y0),
            stroke: 0.7pt + b70, mark: (end: ">"))
     } else {
-      // Wrap arrow: end of row 0 -> right -> down -> left to start of row 1.
-      // Drawn as one polyline so the arrow head sits cleanly at the entry of cell 6.
-      let elbow-x = x0 + gap * 2
-      let entry-x = 0
-      let entry-y = -next-row * (cell-h + gap + 0.7) - cell-h / 2
+      // Wrap arrow: routed around the cell layout so it does not cut
+      // through any row-1 cell. Six points, five segments:
+      //   right out of Threshold, down into the inter-row gap,
+      //   long left past the layout, down to row-1 mid, right into Morphology.
+      let elbow-out = 0.55
+      let elbow-back = 0.55
+      let intermediate-y = -cell-h - row-pad / 2
+      let entry-y = -next-row * (cell-h + gap + row-pad) - cell-h / 2
       line(
         (x0, y0),
-        (elbow-x, y0),
-        (elbow-x, entry-y),
-        (entry-x, entry-y),
+        (x0 + elbow-out, y0),
+        (x0 + elbow-out, intermediate-y),
+        (-elbow-back, intermediate-y),
+        (-elbow-back, entry-y),
+        (0, entry-y),
         stroke: 0.7pt + b70,
         mark: (end: ">"),
       )
@@ -95,7 +101,7 @@
   }
 
   // Family legend underneath.
-  let leg-y = -2 * (cell-h + gap + 0.7) + 0.2
+  let leg-y = -2 * (cell-h + gap + row-pad) + 0.2
   let leg-x = 0
   let families = (
     ("Ingest",   atlantic),
