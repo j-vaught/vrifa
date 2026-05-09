@@ -33,6 +33,7 @@ impl ImageBackend for CpuBackend {
     type DeviceFrameLab = CpuFrameLab;
     type DevicePlaneF32 = CpuPlaneF32;
     type DeviceMaskU8 = CpuMaskU8;
+    type DeviceLockState = ();
 
     fn kind(&self) -> BackendKind {
         BackendKind::Cpu
@@ -71,6 +72,10 @@ impl ImageBackend for CpuBackend {
         Ok(CpuMaskU8 {
             data: build_roi_mask(shape, margins),
         })
+    }
+
+    fn upload_mask_u8(&self, mask: &Array2<u8>) -> Result<Self::DeviceMaskU8> {
+        Ok(CpuMaskU8 { data: mask.clone() })
     }
 
     fn download_mask_u8(&self, mask: &Self::DeviceMaskU8) -> Result<Array2<u8>> {

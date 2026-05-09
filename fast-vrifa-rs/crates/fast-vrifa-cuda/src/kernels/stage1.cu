@@ -178,6 +178,100 @@ extern "C" __global__ void threshold_binary_u8(
     output[index] = static_cast<float>(input[index]) > threshold_value ? 255u : 0u;
 }
 
+extern "C" __global__ void threshold_binary_u8_device(
+    const unsigned char* input,
+    unsigned char* output,
+    const float* threshold_value,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    float threshold = threshold_value[0];
+    output[index] = static_cast<float>(input[index]) > threshold ? 255u : 0u;
+}
+
+extern "C" __global__ void histogram_u8(
+    const unsigned char* input,
+    unsigned int* histogram,
+    int pixel_count
+) {
+    __shared__ unsigned int local_histogram[256];
+    int tid = threadIdx.x;
+    if (tid < 256) {
+        local_histogram[tid] = 0u;
+    }
+    __syncthreads();
+
+    int index = blockIdx.x * blockDim.x + tid;
+    int stride = blockDim.x * gridDim.x;
+    while (index < pixel_count) {
+        atomicAdd(&local_histogram[input[index]], 1u);
+        index += stride;
+    }
+    __syncthreads();
+
+    if (tid < 256) {
+        atomicAdd(&histogram[tid], local_histogram[tid]);
+    }
+}
+
+extern "C" __global__ void otsu_threshold_from_histogram(
+    const unsigned int* histogram,
+    float* threshold_out,
+    float threshold_offset
+) {
+    if (blockIdx.x != 0 || threadIdx.x != 0) {
+        return;
+    }
+
+    unsigned int total = 0u;
+    double sum = 0.0;
+    for (int i = 0; i < 256; ++i) {
+        unsigned int count = histogram[i];
+        total += count;
+        sum += static_cast<double>(i) * static_cast<double>(count);
+    }
+
+    double sum_background = 0.0;
+    unsigned int weight_background = 0u;
+    double best_variance = -1.0;
+    int best_threshold = 0;
+
+    for (int i = 0; i < 256; ++i) {
+        unsigned int count = histogram[i];
+        weight_background += count;
+        if (weight_background == 0u) {
+            continue;
+        }
+        unsigned int weight_foreground = total - weight_background;
+        if (weight_foreground == 0u) {
+            break;
+        }
+        sum_background += static_cast<double>(i) * static_cast<double>(count);
+        double mean_background = sum_background / static_cast<double>(weight_background);
+        double mean_foreground =
+            (sum - sum_background) / static_cast<double>(weight_foreground);
+        double diff = mean_background - mean_foreground;
+        double between =
+            static_cast<double>(weight_background) *
+            static_cast<double>(weight_foreground) * diff * diff;
+        if (between > best_variance) {
+            best_variance = between;
+            best_threshold = i;
+        }
+    }
+
+    float threshold = static_cast<float>(best_threshold) + threshold_offset;
+    if (threshold < 0.0f) {
+        threshold = 0.0f;
+    } else if (threshold > 255.0f) {
+        threshold = 255.0f;
+    }
+    threshold_out[0] = threshold;
+}
+
 extern "C" __global__ void dilate_binary_u8(
     const unsigned char* input,
     const unsigned char* kernel_mask,
@@ -288,4 +382,29 @@ extern "C" __global__ void filter_labeled_components_u8(
         return;
     }
     output[index] = counts[label] >= min_area ? 255u : 0u;
+}
+
+extern "C" __global__ void apply_locking_u8(
+    const unsigned char* input_mask,
+    unsigned short* counter,
+    unsigned char* locked,
+    unsigned char* output_mask,
+    unsigned short lock_frames,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+
+    unsigned short current_counter = input_mask[index] > 0u
+        ? static_cast<unsigned short>(counter[index] == 65535u ? 65535u : counter[index] + 1u)
+        : 0u;
+    counter[index] = current_counter;
+    if (current_counter >= lock_frames) {
+        locked[index] = 255u;
+    }
+    unsigned char input_value = input_mask[index];
+    unsigned char locked_value = locked[index];
+    output_mask[index] = locked_value > input_value ? locked_value : input_value;
 }

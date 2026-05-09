@@ -1,24 +1,26 @@
 use anyhow::{anyhow, bail, Context, Result};
 use bytemuck::cast_slice;
-#[cfg(target_os = "linux")]
-use cudarc::driver::{DevicePtr, DevicePtrMut};
 use cudarc::{
     driver::{
-        CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, LaunchConfig, PushKernelArg,
+        CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, CudaView, DevicePtr,
+        LaunchConfig, PushKernelArg,
     },
     nvrtc::compile_ptx,
 };
+#[cfg(target_os = "linux")]
+use cudarc::driver::DevicePtrMut;
 use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
 use ndarray::{Array2, Array3};
 use opencv::core::CV_32F;
 use opencv::imgproc;
 use opencv::prelude::*;
 use std::any::Any;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_core::morphology::MorphShape;
 
@@ -54,8 +56,48 @@ pub struct CudaMaskU8 {
     height: usize,
 }
 
+#[derive(Clone)]
+pub struct CudaLockState {
+    counter: CudaSlice<u16>,
+    locked: CudaSlice<u8>,
+    width: usize,
+    height: usize,
+}
+
+struct CudaLabBatch {
+    data: CudaSlice<u32>,
+    frames: usize,
+}
+
+pub struct CudaBatchDetectorOptions {
+    pub channel_weight: f32,
+    pub blur_kernel: usize,
+    pub blur_enabled: bool,
+    pub threshold_offset: f32,
+    pub morph_shape: MorphShape,
+    pub morph_kernel: usize,
+    pub morph_close_iterations: usize,
+    pub morph_open_iterations: usize,
+    pub min_area: usize,
+    pub lock_frames: usize,
+    pub need_host_mask: bool,
+    pub need_host_delta_norm: bool,
+}
+
+pub struct CudaBatchDetectorState {
+    pub peak: Option<CudaPlaneF32>,
+    pub lock: Option<CudaLockState>,
+}
+
+pub struct CudaBatchFrameOutput {
+    pub mask: Option<Array2<u8>>,
+    pub delta_norm: Option<Array2<u8>>,
+}
+
 struct CudaBackendInner {
-    stream: Arc<CudaStream>,
+    _context: Arc<CudaContext>,
+    upload_stream: Arc<CudaStream>,
+    compute_stream: Arc<CudaStream>,
     _module: Arc<CudaModule>,
     colorspace: CudaFunction,
     extract_l: CudaFunction,
@@ -66,12 +108,18 @@ struct CudaBackendInner {
     reduce_minmax: CudaFunction,
     normalize_u8: CudaFunction,
     threshold_binary: CudaFunction,
+    threshold_binary_device: CudaFunction,
+    histogram_u8: CudaFunction,
+    otsu_threshold: CudaFunction,
     dilate_binary: CudaFunction,
     erode_binary: CudaFunction,
     count_components: CudaFunction,
     filter_components: CudaFunction,
+    lock_mask: CudaFunction,
     lab_lut: CudaSlice<u32>,
     npp: Option<Arc<npp::NppLibrary>>,
+    gaussian_kernels: Mutex<HashMap<usize, CudaSlice<f32>>>,
+    morph_kernels: Mutex<HashMap<(i32, usize), CudaSlice<u8>>>,
 }
 
 #[derive(Clone, Default)]
@@ -116,6 +164,222 @@ impl CudaBackend {
             )
         })
     }
+
+    pub fn create_batch_detector_state(
+        &self,
+        shape: (usize, usize),
+        lock_frames: usize,
+    ) -> Result<CudaBatchDetectorState> {
+        let lock = if lock_frames > 0 {
+            self.create_lock_state(shape)?
+        } else {
+            None
+        };
+        Ok(CudaBatchDetectorState { peak: None, lock })
+    }
+
+    pub fn process_peak_detector_batch(
+        &self,
+        frames: &[Array3<u8>],
+        roi_mask: &CudaMaskU8,
+        state: &mut CudaBatchDetectorState,
+        options: &CudaBatchDetectorOptions,
+    ) -> Result<Vec<CudaBatchFrameOutput>> {
+        if frames.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let height = frames[0].dim().0;
+        let width = frames[0].dim().1;
+        anyhow::ensure!(
+            (roi_mask.height, roi_mask.width) == (height, width),
+            "ROI mask shape does not match batch frame shape"
+        );
+        for frame in frames.iter().skip(1) {
+            anyhow::ensure!(
+                frame.dim() == (height, width, 3),
+                "all frames in a CUDA batch must have matching shape"
+            );
+        }
+
+        let frame_bytes = width
+            .checked_mul(height)
+            .and_then(|pixels| pixels.checked_mul(3))
+            .ok_or_else(|| anyhow!("CUDA batch frame byte size overflow"))?;
+        let mut host_bgr = Vec::with_capacity(frame_bytes * frames.len());
+        for frame in frames {
+            let bytes = frame
+                .as_slice_memory_order()
+                .ok_or_else(|| anyhow!("CUDA batch input frame must be contiguous"))?;
+            host_bgr.extend_from_slice(bytes);
+        }
+        self.process_peak_detector_bgr_bytes_batch(
+            &host_bgr,
+            frames.len(),
+            width,
+            height,
+            roi_mask,
+            state,
+            options,
+        )
+    }
+
+    pub fn process_peak_detector_bgr_bytes_batch(
+        &self,
+        host_bgr: &[u8],
+        frame_count: usize,
+        width: usize,
+        height: usize,
+        roi_mask: &CudaMaskU8,
+        state: &mut CudaBatchDetectorState,
+        options: &CudaBatchDetectorOptions,
+    ) -> Result<Vec<CudaBatchFrameOutput>> {
+        let inner = self.inner()?;
+        if frame_count == 0 {
+            return Ok(Vec::new());
+        }
+        anyhow::ensure!(
+            (roi_mask.height, roi_mask.width) == (height, width),
+            "ROI mask shape does not match batch frame shape"
+        );
+        let expected_bytes = width
+            .checked_mul(height)
+            .and_then(|pixels| pixels.checked_mul(3))
+            .and_then(|bytes_per_frame| bytes_per_frame.checked_mul(frame_count))
+            .ok_or_else(|| anyhow!("CUDA batch byte count overflow"))?;
+        anyhow::ensure!(
+            host_bgr.len() == expected_bytes,
+            "CUDA batch byte length mismatch: expected {expected_bytes}, got {}",
+            host_bgr.len()
+        );
+
+        let batch_lab = self.upload_and_convert_batch_bytes(host_bgr, frame_count, width, height)?;
+        let frame_pixels = width * height;
+        let mut outputs = Vec::with_capacity(batch_lab.frames);
+        for batch_index in 0..batch_lab.frames {
+            let offset = batch_index * frame_pixels;
+            let frame_lab = batch_lab
+                .data
+                .try_slice(offset..offset + frame_pixels)
+                .ok_or_else(|| anyhow!("creating CUDA batch LAB frame view"))?;
+            state.peak = Some(update_peak_from_lab_view(
+                inner,
+                &frame_lab,
+                state.peak.as_ref(),
+                width,
+                height,
+            )?);
+            let delta = compute_delta_from_lab_view(
+                inner,
+                &frame_lab,
+                state
+                    .peak
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("CUDA peak state was not initialized"))?,
+                roi_mask,
+                options.channel_weight,
+                width,
+                height,
+            )?;
+            let delta_norm = self
+                .blur_and_normalize_delta(&delta, options.blur_kernel, options.blur_enabled)?
+                .ok_or_else(|| anyhow!("CUDA batch path requires device blur+normalize"))?;
+            let mut mask = self
+                .threshold_and_morph_mask_auto(
+                    &delta_norm,
+                    options.threshold_offset,
+                    options.morph_shape,
+                    options.morph_kernel,
+                    options.morph_close_iterations,
+                    options.morph_open_iterations,
+                )?
+                .ok_or_else(|| anyhow!("CUDA batch path requires device threshold+morph"))?;
+            if options.min_area > 0 {
+                mask = self
+                    .filter_min_area_mask(&mask, options.min_area)?
+                    .ok_or_else(|| anyhow!("CUDA batch path requires device min-area filtering"))?;
+            }
+            if options.lock_frames > 0 {
+                let state_lock = state
+                    .lock
+                    .as_mut()
+                    .ok_or_else(|| anyhow!("CUDA batch lock state was not initialized"))?;
+                mask = self
+                    .apply_locking_device(&mask, options.lock_frames, state_lock)?
+                    .ok_or_else(|| anyhow!("CUDA batch path requires device locking"))?;
+            }
+            outputs.push(CudaBatchFrameOutput {
+                mask: if options.need_host_mask {
+                    Some(download_mask_ptr(inner, &mask.data, height, width, "downloading CUDA batch mask")?)
+                } else {
+                    None
+                },
+                delta_norm: if options.need_host_delta_norm {
+                    Some(download_mask_ptr(
+                        inner,
+                        &delta_norm.data,
+                        height,
+                        width,
+                        "downloading CUDA batch normalized delta",
+                    )?)
+                } else {
+                    None
+                },
+            });
+        }
+        Ok(outputs)
+    }
+
+    fn upload_and_convert_batch(&self, frames: &[Array3<u8>]) -> Result<CudaLabBatch> {
+        let height = frames[0].dim().0;
+        let width = frames[0].dim().1;
+        let frame_bytes = width
+            .checked_mul(height)
+            .and_then(|pixels| pixels.checked_mul(3))
+            .ok_or_else(|| anyhow!("CUDA batch frame byte size overflow"))?;
+        let mut host_bgr = Vec::with_capacity(frame_bytes * frames.len());
+        for frame in frames {
+            let bytes = frame
+                .as_slice_memory_order()
+                .ok_or_else(|| anyhow!("CUDA batch input frame must be contiguous"))?;
+            host_bgr.extend_from_slice(bytes);
+        }
+        self.upload_and_convert_batch_bytes(&host_bgr, frames.len(), width, height)
+    }
+
+    fn upload_and_convert_batch_bytes(
+        &self,
+        host_bgr: &[u8],
+        frame_count: usize,
+        width: usize,
+        height: usize,
+    ) -> Result<CudaLabBatch> {
+        let inner = self.inner()?;
+        let device_bgr = inner
+            .upload_stream
+            .clone_htod(host_bgr)
+            .context("uploading CUDA BGR batch")?;
+        let pixel_count = width
+            .checked_mul(height)
+            .and_then(|pixels| pixels.checked_mul(frame_count))
+            .ok_or_else(|| anyhow!("CUDA batch pixel count overflow"))?;
+        let mut output = inner
+            .compute_stream
+            .alloc_zeros::<u32>(pixel_count)
+            .context("allocating CUDA CIELAB batch")?;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let pixel_count_i32 = pixel_count as i32;
+        let mut launch = inner.compute_stream.launch_builder(&inner.colorspace);
+        launch.arg(&device_bgr);
+        launch.arg(&inner.lab_lut);
+        launch.arg(&mut output);
+        launch.arg(&pixel_count_i32);
+        unsafe { launch.launch(cfg) }.context("launching CUDA batch colorspace kernel")?;
+        Ok(CudaLabBatch {
+            data: output,
+            frames: frame_count,
+        })
+    }
 }
 
 impl CudaBackendInner {
@@ -123,7 +387,10 @@ impl CudaBackendInner {
         let ordinal = cuda_device_ordinal()?;
         let context = CudaContext::new(ordinal)
             .with_context(|| format!("initializing CUDA context on device {ordinal}"))?;
-        let stream = context.default_stream();
+        let compute_stream = context.default_stream();
+        let upload_stream = context
+            .new_stream()
+            .context("creating CUDA upload stream")?;
         let ptx = compile_ptx(KERNELS).context("compiling fast-vrifa CUDA kernels with NVRTC")?;
         let module = context
             .load_module(ptx)
@@ -155,6 +422,15 @@ impl CudaBackendInner {
         let threshold_binary = module
             .load_function("threshold_binary_u8")
             .context("loading CUDA threshold kernel")?;
+        let threshold_binary_device = module
+            .load_function("threshold_binary_u8_device")
+            .context("loading CUDA device-threshold kernel")?;
+        let histogram_u8 = module
+            .load_function("histogram_u8")
+            .context("loading CUDA histogram kernel")?;
+        let otsu_threshold = module
+            .load_function("otsu_threshold_from_histogram")
+            .context("loading CUDA Otsu kernel")?;
         let dilate_binary = module
             .load_function("dilate_binary_u8")
             .context("loading CUDA dilation kernel")?;
@@ -167,13 +443,18 @@ impl CudaBackendInner {
         let filter_components = module
             .load_function("filter_labeled_components_u8")
             .context("loading CUDA component-filter kernel")?;
+        let lock_mask = module
+            .load_function("apply_locking_u8")
+            .context("loading CUDA lock-state kernel")?;
         let host_lut = load_or_build_lab_lut()?;
-        let lab_lut = stream
+        let lab_lut = compute_stream
             .clone_htod(&host_lut)
             .context("uploading BGR->CIELAB lookup table to CUDA")?;
         let npp = npp::NppLibrary::load().ok();
         Ok(Self {
-            stream,
+            _context: context,
+            upload_stream,
+            compute_stream,
             _module: module,
             colorspace,
             extract_l,
@@ -184,12 +465,18 @@ impl CudaBackendInner {
             reduce_minmax,
             normalize_u8,
             threshold_binary,
+            threshold_binary_device,
+            histogram_u8,
+            otsu_threshold,
             dilate_binary,
             erode_binary,
             count_components,
             filter_components,
+            lock_mask,
             lab_lut,
             npp,
+            gaussian_kernels: Mutex::new(HashMap::new()),
+            morph_kernels: Mutex::new(HashMap::new()),
         })
     }
 }
@@ -205,6 +492,7 @@ impl ImageBackend for CudaBackend {
     type DeviceFrameLab = CudaFrameLab;
     type DevicePlaneF32 = CudaPlaneF32;
     type DeviceMaskU8 = CudaMaskU8;
+    type DeviceLockState = CudaLockState;
 
     fn kind(&self) -> BackendKind {
         BackendKind::Cuda
@@ -234,7 +522,7 @@ impl ImageBackend for CudaBackend {
             .as_slice_memory_order()
             .ok_or_else(|| anyhow!("BGR frame must be contiguous"))?;
         let data = inner
-            .stream
+            .upload_stream
             .clone_htod(packed)
             .context("uploading BGR frame to CUDA")?;
         Ok(CudaFrameBgr {
@@ -248,12 +536,12 @@ impl ImageBackend for CudaBackend {
         let inner = self.inner()?;
         let pixel_count = frame_bgr.width * frame_bgr.height;
         let mut output = inner
-            .stream
+            .compute_stream
             .alloc_zeros::<u32>(pixel_count)
             .context("allocating CUDA CIELAB frame")?;
         let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
         let pixel_count_i32 = pixel_count as i32;
-        let mut launch = inner.stream.launch_builder(&inner.colorspace);
+        let mut launch = inner.compute_stream.launch_builder(&inner.colorspace);
         launch.arg(&frame_bgr.data);
         launch.arg(&inner.lab_lut);
         launch.arg(&mut output);
@@ -269,7 +557,7 @@ impl ImageBackend for CudaBackend {
     fn download_frame_f32(&self, frame_lab: &Self::DeviceFrameLab) -> Result<Array3<f32>> {
         let inner = self.inner()?;
         let packed = inner
-            .stream
+            .compute_stream
             .clone_dtoh(&frame_lab.data)
             .context("downloading CUDA CIELAB frame")?;
         unpack_lab_pixels(&packed, frame_lab.height, frame_lab.width)
@@ -285,7 +573,7 @@ impl ImageBackend for CudaBackend {
         let (top, bottom, left, right) = roi_bounds(shape, margins);
         let pixel_count = width * height;
         let mut output = inner
-            .stream
+            .compute_stream
             .alloc_zeros::<u8>(pixel_count)
             .context("allocating CUDA ROI mask")?;
         let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
@@ -295,7 +583,7 @@ impl ImageBackend for CudaBackend {
         let bottom_i32 = bottom as i32;
         let left_i32 = left as i32;
         let right_i32 = right as i32;
-        let mut launch = inner.stream.launch_builder(&inner.roi);
+        let mut launch = inner.compute_stream.launch_builder(&inner.roi);
         launch.arg(&mut output);
         launch.arg(&width_i32);
         launch.arg(&height_i32);
@@ -311,10 +599,26 @@ impl ImageBackend for CudaBackend {
         })
     }
 
+    fn upload_mask_u8(&self, mask: &Array2<u8>) -> Result<Self::DeviceMaskU8> {
+        let inner = self.inner()?;
+        let (height, width) = mask.dim();
+        let values = mask
+            .as_slice_memory_order()
+            .ok_or_else(|| anyhow!("ROI mask must be contiguous"))?;
+        Ok(CudaMaskU8 {
+            data: inner
+                .compute_stream
+                .clone_htod(values)
+                .context("uploading ROI mask to CUDA")?,
+            width,
+            height,
+        })
+    }
+
     fn download_mask_u8(&self, mask: &Self::DeviceMaskU8) -> Result<Array2<u8>> {
         let inner = self.inner()?;
         let values = inner
-            .stream
+            .compute_stream
             .clone_dtoh(&mask.data)
             .context("downloading CUDA ROI mask")?;
         Array2::from_shape_vec((mask.height, mask.width), values)
@@ -328,7 +632,7 @@ impl ImageBackend for CudaBackend {
             .ok_or_else(|| anyhow!("reference plane must be contiguous"))?;
         Ok(CudaPlaneF32 {
             data: inner
-                .stream
+                .compute_stream
                 .clone_htod(values)
                 .context("uploading reference plane to CUDA")?,
             width: plane.dim().1,
@@ -364,7 +668,7 @@ impl ImageBackend for CudaBackend {
     fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>> {
         let inner = self.inner()?;
         let values = inner
-            .stream
+            .compute_stream
             .clone_dtoh(&plane.data)
             .context("downloading CUDA delta plane")?;
         Array2::from_shape_vec((plane.height, plane.width), values)
@@ -377,12 +681,12 @@ impl PeakImageBackend for CudaBackend {
         let inner = self.inner()?;
         let pixel_count = frame_lab.width * frame_lab.height;
         let mut output = inner
-            .stream
+            .compute_stream
             .alloc_zeros::<f32>(pixel_count)
             .context("allocating CUDA L plane")?;
         let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
         let pixel_count_i32 = pixel_count as i32;
-        let mut launch = inner.stream.launch_builder(&inner.extract_l);
+        let mut launch = inner.compute_stream.launch_builder(&inner.extract_l);
         launch.arg(&frame_lab.data);
         launch.arg(&mut output);
         launch.arg(&pixel_count_i32);
@@ -404,7 +708,7 @@ impl PeakImageBackend for CudaBackend {
         let zero_buffer = if previous_peak.is_none() {
             Some(
                 inner
-                    .stream
+                    .compute_stream
                     .alloc_zeros::<f32>(pixel_count)
                     .context("allocating initial CUDA peak plane")?,
             )
@@ -419,12 +723,12 @@ impl PeakImageBackend for CudaBackend {
         }
         let previous_view = previous_peak.map(|peak| peak.data.as_view());
         let mut output = inner
-            .stream
+            .compute_stream
             .alloc_zeros::<f32>(pixel_count)
             .context("allocating CUDA peak plane")?;
         let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
         let pixel_count_i32 = pixel_count as i32;
-        let mut launch = inner.stream.launch_builder(&inner.peak);
+        let mut launch = inner.compute_stream.launch_builder(&inner.peak);
         launch.arg(&frame_lab.data);
         if let Some(previous_view) = previous_view.as_ref() {
             launch.arg(previous_view);
@@ -460,12 +764,12 @@ impl PeakImageBackend for CudaBackend {
 
         let pixel_count = frame_lab.width * frame_lab.height;
         let mut output = inner
-            .stream
+            .compute_stream
             .alloc_zeros::<f32>(pixel_count)
             .context("allocating CUDA delta plane")?;
         let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
         let pixel_count_i32 = pixel_count as i32;
-        let mut launch = inner.stream.launch_builder(&inner.delta);
+        let mut launch = inner.compute_stream.launch_builder(&inner.delta);
         launch.arg(&frame_lab.data);
         launch.arg(&reference_plane.data);
         launch.arg(&roi_mask.data);
@@ -491,13 +795,9 @@ impl PeakImageBackend for CudaBackend {
         let (source_width, source_height) = (delta.width, delta.height);
         let source = if blur_enabled {
             let kernel = canonical_blur_kernel_size(blur_kernel);
-            let weights = gaussian_kernel_weights(kernel)?;
-            let weights_buffer = inner
-                .stream
-                .clone_htod(&weights)
-                .context("uploading CUDA gaussian weights")?;
+            let weights_buffer = cached_gaussian_kernel(inner, kernel)?;
             let mut output = inner
-                .stream
+                .compute_stream
                 .alloc_zeros::<f32>(pixel_count)
                 .context("allocating CUDA blurred delta plane")?;
             let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
@@ -505,7 +805,7 @@ impl PeakImageBackend for CudaBackend {
             let height_i32 = source_height as i32;
             let kernel_i32 = kernel as i32;
             let pixel_count_i32 = pixel_count as i32;
-            let mut launch = inner.stream.launch_builder(&inner.blur_norm);
+            let mut launch = inner.compute_stream.launch_builder(&inner.blur_norm);
             launch.arg(&delta.data);
             launch.arg(&weights_buffer);
             launch.arg(&mut output);
@@ -517,22 +817,22 @@ impl PeakImageBackend for CudaBackend {
             output
         } else {
             inner
-                .stream
+                .compute_stream
                 .clone_dtod(&delta.data.as_view())
                 .context("copying CUDA delta plane for normalization")?
         };
 
         let mut min_buffer = inner
-            .stream
+            .compute_stream
             .clone_htod(&[f32::INFINITY.to_bits()])
             .context("allocating CUDA min accumulator")?;
         let mut max_buffer = inner
-            .stream
+            .compute_stream
             .clone_htod(&[0u32])
             .context("allocating CUDA max accumulator")?;
         let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
         let pixel_count_i32 = pixel_count as i32;
-        let mut reduce = inner.stream.launch_builder(&inner.reduce_minmax);
+        let mut reduce = inner.compute_stream.launch_builder(&inner.reduce_minmax);
         reduce.arg(&source);
         reduce.arg(&mut min_buffer);
         reduce.arg(&mut max_buffer);
@@ -540,21 +840,21 @@ impl PeakImageBackend for CudaBackend {
         unsafe { reduce.launch(cfg) }.context("launching CUDA delta min/max kernel")?;
 
         let min_bits = inner
-            .stream
+            .compute_stream
             .clone_dtoh(&min_buffer)
             .context("downloading CUDA delta min accumulator")?;
         let max_bits = inner
-            .stream
+            .compute_stream
             .clone_dtoh(&max_buffer)
             .context("downloading CUDA delta max accumulator")?;
         let min_value = f32::from_bits(min_bits[0]);
         let max_value = f32::from_bits(max_bits[0]);
 
         let mut output = inner
-            .stream
+            .compute_stream
             .alloc_zeros::<u8>(pixel_count)
             .context("allocating CUDA normalized delta plane")?;
-        let mut normalize = inner.stream.launch_builder(&inner.normalize_u8);
+        let mut normalize = inner.compute_stream.launch_builder(&inner.normalize_u8);
         normalize.arg(&source);
         normalize.arg(&mut output);
         normalize.arg(&min_value);
@@ -584,10 +884,10 @@ impl PeakImageBackend for CudaBackend {
         let pixel_count_i32 = pixel_count as i32;
 
         let mut current = inner
-            .stream
+            .compute_stream
             .alloc_zeros::<u8>(pixel_count)
             .context("allocating CUDA threshold output")?;
-        let mut threshold = inner.stream.launch_builder(&inner.threshold_binary);
+        let mut threshold = inner.compute_stream.launch_builder(&inner.threshold_binary);
         threshold.arg(&delta_norm.data);
         threshold.arg(&mut current);
         threshold.arg(&threshold_value);
@@ -603,16 +903,156 @@ impl PeakImageBackend for CudaBackend {
         }
 
         let kernel_size = canonical_morph_kernel_size(morph_kernel);
-        let kernel_mask = structuring_element_mask(morph_shape, kernel_size)?;
-        let kernel_buffer = inner
-            .stream
-            .clone_htod(&kernel_mask)
-            .context("uploading CUDA morphology kernel mask")?;
+        let kernel_buffer = cached_morph_kernel(inner, morph_shape, kernel_size)?;
         let width_i32 = delta_norm.width as i32;
         let height_i32 = delta_norm.height as i32;
         let kernel_i32 = kernel_size as i32;
         let mut scratch = inner
-            .stream
+            .compute_stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA morphology scratch buffer")?;
+
+        for _ in 0..morph_close_iterations {
+            launch_binary_morph(
+                inner,
+                &inner.dilate_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "dilation",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+            launch_binary_morph(
+                inner,
+                &inner.erode_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "erosion",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+        }
+        for _ in 0..morph_open_iterations {
+            launch_binary_morph(
+                inner,
+                &inner.erode_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "erosion",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+            launch_binary_morph(
+                inner,
+                &inner.dilate_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "dilation",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+        }
+
+        Ok(Some(CudaMaskU8 {
+            data: current,
+            width: delta_norm.width,
+            height: delta_norm.height,
+        }))
+    }
+
+    fn threshold_and_morph_mask_auto(
+        &self,
+        delta_norm: &Self::DeviceMaskU8,
+        threshold_offset: f32,
+        morph_shape: MorphShape,
+        morph_kernel: usize,
+        morph_close_iterations: usize,
+        morph_open_iterations: usize,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let inner = self.inner()?;
+        let pixel_count = delta_norm.width * delta_norm.height;
+        let histogram_cfg = LaunchConfig {
+            grid_dim: ((pixel_count as u32).div_ceil(256), 1, 1),
+            block_dim: (256, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        let pixel_count_i32 = pixel_count as i32;
+        let mut histogram = inner
+            .compute_stream
+            .alloc_zeros::<u32>(256)
+            .context("allocating CUDA Otsu histogram")?;
+        let mut histogram_launch = inner.compute_stream.launch_builder(&inner.histogram_u8);
+        histogram_launch.arg(&delta_norm.data);
+        histogram_launch.arg(&mut histogram);
+        histogram_launch.arg(&pixel_count_i32);
+        unsafe { histogram_launch.launch(histogram_cfg) }
+            .context("launching CUDA histogram kernel")?;
+
+        let mut threshold = inner
+            .compute_stream
+            .alloc_zeros::<f32>(1)
+            .context("allocating CUDA Otsu threshold")?;
+        let otsu_cfg = LaunchConfig {
+            grid_dim: (1, 1, 1),
+            block_dim: (1, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        let mut otsu_launch = inner.compute_stream.launch_builder(&inner.otsu_threshold);
+        otsu_launch.arg(&histogram);
+        otsu_launch.arg(&mut threshold);
+        otsu_launch.arg(&threshold_offset);
+        unsafe { otsu_launch.launch(otsu_cfg) }.context("launching CUDA Otsu kernel")?;
+
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let mut current = inner
+            .compute_stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA threshold output")?;
+        let mut threshold_launch = inner
+            .compute_stream
+            .launch_builder(&inner.threshold_binary_device);
+        threshold_launch.arg(&delta_norm.data);
+        threshold_launch.arg(&mut current);
+        threshold_launch.arg(&threshold);
+        threshold_launch.arg(&pixel_count_i32);
+        unsafe { threshold_launch.launch(cfg) }
+            .context("launching CUDA device-threshold kernel")?;
+
+        if morph_close_iterations == 0 && morph_open_iterations == 0 {
+            return Ok(Some(CudaMaskU8 {
+                data: current,
+                width: delta_norm.width,
+                height: delta_norm.height,
+            }));
+        }
+
+        let kernel_size = canonical_morph_kernel_size(morph_kernel);
+        let kernel_buffer = cached_morph_kernel(inner, morph_shape, kernel_size)?;
+        let width_i32 = delta_norm.width as i32;
+        let height_i32 = delta_norm.height as i32;
+        let kernel_i32 = kernel_size as i32;
+        let mut scratch = inner
+            .compute_stream
             .alloc_zeros::<u8>(pixel_count)
             .context("allocating CUDA morphology scratch buffer")?;
 
@@ -705,7 +1145,7 @@ impl PeakImageBackend for CudaBackend {
                 return Ok(None);
             };
 
-            npp.set_stream(inner.stream.cu_stream())
+            npp.set_stream(inner.compute_stream.cu_stream())
                 .context("binding NPP to the CUDA stream")?;
             let stream_ctx = npp.stream_context().context("reading NPP stream context")?;
             let roi = npp::NppiSize {
@@ -715,7 +1155,7 @@ impl PeakImageBackend for CudaBackend {
             let pixel_count = mask.width * mask.height;
             let labels_len = pixel_count;
             let mut labels = inner
-                .stream
+                .compute_stream
                 .alloc_zeros::<u32>(labels_len)
                 .context("allocating CUDA label buffer")?;
 
@@ -725,15 +1165,15 @@ impl PeakImageBackend for CudaBackend {
                 "nppiLabelMarkersUFGetBufferSize_32u_C1R",
             )?;
             let mut label_buffer = inner
-                .stream
+                .compute_stream
                 .alloc_zeros::<u8>(label_buffer_size.max(0) as usize)
                 .context("allocating CUDA label scratch buffer")?;
 
             {
-                let (src_ptr, _src_record) = mask.data.device_ptr(&inner.stream);
-                let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
+                let (src_ptr, _src_record) = mask.data.device_ptr(&inner.compute_stream);
+                let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.compute_stream);
                 let (label_buffer_ptr, _label_buffer_record) =
-                    label_buffer.device_ptr_mut(&inner.stream);
+                    label_buffer.device_ptr_mut(&inner.compute_stream);
                 npp::status(
                     unsafe {
                         (npp.label_markers)(
@@ -760,14 +1200,14 @@ impl PeakImageBackend for CudaBackend {
                 "nppiCompressMarkerLabelsGetBufferSize_32u_C1R",
             )?;
             let mut compress_buffer = inner
-                .stream
+                .compute_stream
                 .alloc_zeros::<u8>(compress_buffer_size.max(0) as usize)
                 .context("allocating CUDA label-compress scratch buffer")?;
             let mut new_number = 0i32;
             {
-                let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
+                let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.compute_stream);
                 let (compress_buffer_ptr, _compress_record) =
-                    compress_buffer.device_ptr_mut(&inner.stream);
+                    compress_buffer.device_ptr_mut(&inner.compute_stream);
                 npp::status(
                     unsafe {
                         (npp.compress_markers)(
@@ -786,7 +1226,7 @@ impl PeakImageBackend for CudaBackend {
             if new_number <= 0 {
                 return Ok(Some(CudaMaskU8 {
                     data: inner
-                        .stream
+                        .compute_stream
                         .alloc_zeros::<u8>(pixel_count)
                         .context("allocating empty filtered mask")?,
                     width: mask.width,
@@ -795,24 +1235,26 @@ impl PeakImageBackend for CudaBackend {
             }
 
             let mut label_counts = inner
-                .stream
+                .compute_stream
                 .alloc_zeros::<u32>(new_number as usize + 1)
                 .context("allocating CUDA component-count buffer")?;
 
             let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
             let pixel_count_i32 = pixel_count as i32;
-            let mut count_launch = inner.stream.launch_builder(&inner.count_components);
+            let mut count_launch = inner.compute_stream.launch_builder(&inner.count_components);
             count_launch.arg(&labels);
             count_launch.arg(&mut label_counts);
             count_launch.arg(&pixel_count_i32);
             unsafe { count_launch.launch(cfg) }.context("launching CUDA component-count kernel")?;
 
             let mut filtered = inner
-                .stream
+                .compute_stream
                 .alloc_zeros::<u8>(pixel_count)
                 .context("allocating CUDA filtered mask")?;
             let min_area_u32 = min_area as u32;
-            let mut launch = inner.stream.launch_builder(&inner.filter_components);
+            let mut launch = inner
+                .compute_stream
+                .launch_builder(&inner.filter_components);
             launch.arg(&mask.data);
             launch.arg(&labels);
             launch.arg(&label_counts);
@@ -827,6 +1269,60 @@ impl PeakImageBackend for CudaBackend {
                 height: mask.height,
             }))
         }
+    }
+
+    fn create_lock_state(&self, shape: (usize, usize)) -> Result<Option<Self::DeviceLockState>> {
+        let inner = self.inner()?;
+        let pixel_count = shape.0 * shape.1;
+        Ok(Some(CudaLockState {
+            counter: inner
+                .compute_stream
+                .alloc_zeros::<u16>(pixel_count)
+                .context("allocating CUDA lock counter")?,
+            locked: inner
+                .compute_stream
+                .alloc_zeros::<u8>(pixel_count)
+                .context("allocating CUDA locked mask")?,
+            width: shape.1,
+            height: shape.0,
+        }))
+    }
+
+    fn apply_locking_device(
+        &self,
+        mask: &Self::DeviceMaskU8,
+        lock_frames: usize,
+        state: &mut Self::DeviceLockState,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let inner = self.inner()?;
+        anyhow::ensure!(
+            (state.height, state.width) == (mask.height, mask.width),
+            "device lock state shape does not match mask"
+        );
+        if lock_frames == 0 {
+            return Ok(Some(mask.clone()));
+        }
+        let pixel_count = mask.width * mask.height;
+        let pixel_count_i32 = pixel_count as i32;
+        let lock_frames_u16 = lock_frames.min(u16::MAX as usize) as u16;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let mut output = inner
+            .compute_stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA lock output mask")?;
+        let mut launch = inner.compute_stream.launch_builder(&inner.lock_mask);
+        launch.arg(&mask.data);
+        launch.arg(&mut state.counter);
+        launch.arg(&mut state.locked);
+        launch.arg(&mut output);
+        launch.arg(&lock_frames_u16);
+        launch.arg(&pixel_count_i32);
+        unsafe { launch.launch(cfg) }.context("launching CUDA lock kernel")?;
+        Ok(Some(CudaMaskU8 {
+            data: output,
+            width: mask.width,
+            height: mask.height,
+        }))
     }
 }
 
@@ -904,6 +1400,128 @@ fn gaussian_kernel_weights(kernel_size: usize) -> Result<Vec<f32>> {
         .collect())
 }
 
+fn update_peak_from_lab_view(
+    inner: &CudaBackendInner,
+    frame_lab: &CudaView<'_, u32>,
+    previous_peak: Option<&CudaPlaneF32>,
+    width: usize,
+    height: usize,
+) -> Result<CudaPlaneF32> {
+    let pixel_count = width * height;
+    let zero_buffer = if previous_peak.is_none() {
+        Some(
+            inner
+                .compute_stream
+                .alloc_zeros::<f32>(pixel_count)
+                .context("allocating initial CUDA peak plane")?,
+        )
+    } else {
+        None
+    };
+    if let Some(previous_peak) = previous_peak {
+        anyhow::ensure!(
+            (previous_peak.height, previous_peak.width) == (height, width),
+            "previous peak shape does not match frame"
+        );
+    }
+    let previous_view = previous_peak.map(|peak| peak.data.as_view());
+    let mut output = inner
+        .compute_stream
+        .alloc_zeros::<f32>(pixel_count)
+        .context("allocating CUDA peak plane")?;
+    let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+    let pixel_count_i32 = pixel_count as i32;
+    let mut launch = inner.compute_stream.launch_builder(&inner.peak);
+    launch.arg(frame_lab);
+    if let Some(previous_view) = previous_view.as_ref() {
+        launch.arg(previous_view);
+    } else if let Some(zero_buffer) = zero_buffer.as_ref() {
+        launch.arg(zero_buffer);
+    }
+    launch.arg(&mut output);
+    launch.arg(&pixel_count_i32);
+    unsafe { launch.launch(cfg) }.context("launching CUDA peak kernel")?;
+    Ok(CudaPlaneF32 {
+        data: output,
+        width,
+        height,
+    })
+}
+
+fn compute_delta_from_lab_view(
+    inner: &CudaBackendInner,
+    frame_lab: &CudaView<'_, u32>,
+    reference_plane: &CudaPlaneF32,
+    roi_mask: &CudaMaskU8,
+    channel_weight: f32,
+    width: usize,
+    height: usize,
+) -> Result<CudaPlaneF32> {
+    anyhow::ensure!(
+        (reference_plane.height, reference_plane.width) == (height, width),
+        "reference plane shape does not match frame"
+    );
+    anyhow::ensure!(
+        (roi_mask.height, roi_mask.width) == (height, width),
+        "ROI mask shape does not match frame"
+    );
+    let pixel_count = width * height;
+    let mut output = inner
+        .compute_stream
+        .alloc_zeros::<f32>(pixel_count)
+        .context("allocating CUDA delta plane")?;
+    let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+    let pixel_count_i32 = pixel_count as i32;
+    let mut launch = inner.compute_stream.launch_builder(&inner.delta);
+    launch.arg(frame_lab);
+    launch.arg(&reference_plane.data);
+    launch.arg(&roi_mask.data);
+    launch.arg(&mut output);
+    launch.arg(&channel_weight);
+    launch.arg(&pixel_count_i32);
+    unsafe { launch.launch(cfg) }.context("launching CUDA delta kernel")?;
+    Ok(CudaPlaneF32 {
+        data: output,
+        width,
+        height,
+    })
+}
+
+fn download_mask_ptr<Src>(inner: &CudaBackendInner, src: &Src, height: usize, width: usize, context: &str) -> Result<Array2<u8>>
+where
+    Src: DevicePtr<u8>,
+{
+    let values = inner
+        .compute_stream
+        .clone_dtoh(src)
+        .with_context(|| context.to_string())?;
+    Array2::from_shape_vec((height, width), values).context("reshaping downloaded CUDA mask")
+}
+
+fn cached_gaussian_kernel(inner: &CudaBackendInner, kernel_size: usize) -> Result<CudaSlice<f32>> {
+    let kernel_size = canonical_blur_kernel_size(kernel_size);
+    if let Some(buffer) = inner
+        .gaussian_kernels
+        .lock()
+        .map_err(|_| anyhow!("locking Gaussian kernel cache"))?
+        .get(&kernel_size)
+        .cloned()
+    {
+        return Ok(buffer);
+    }
+    let weights = gaussian_kernel_weights(kernel_size)?;
+    let buffer = inner
+        .compute_stream
+        .clone_htod(&weights)
+        .context("uploading CUDA gaussian weights")?;
+    inner
+        .gaussian_kernels
+        .lock()
+        .map_err(|_| anyhow!("locking Gaussian kernel cache"))?
+        .insert(kernel_size, buffer.clone());
+    Ok(buffer)
+}
+
 fn structuring_element_mask(shape: MorphShape, kernel_size: usize) -> Result<Vec<u8>> {
     let kernel_size = canonical_morph_kernel_size(kernel_size);
     let kernel = imgproc::get_structuring_element_def(
@@ -917,6 +1535,35 @@ fn structuring_element_mask(shape: MorphShape, kernel_size: usize) -> Result<Vec
         .iter()
         .map(|value| u8::from(*value > 0))
         .collect())
+}
+
+fn cached_morph_kernel(
+    inner: &CudaBackendInner,
+    shape: MorphShape,
+    kernel_size: usize,
+) -> Result<CudaSlice<u8>> {
+    let kernel_size = canonical_morph_kernel_size(kernel_size);
+    let key = (morph_shape_code(shape), kernel_size);
+    if let Some(buffer) = inner
+        .morph_kernels
+        .lock()
+        .map_err(|_| anyhow!("locking morphology kernel cache"))?
+        .get(&key)
+        .cloned()
+    {
+        return Ok(buffer);
+    }
+    let kernel_mask = structuring_element_mask(shape, kernel_size)?;
+    let buffer = inner
+        .compute_stream
+        .clone_htod(&kernel_mask)
+        .context("uploading CUDA morphology kernel mask")?;
+    inner
+        .morph_kernels
+        .lock()
+        .map_err(|_| anyhow!("locking morphology kernel cache"))?
+        .insert(key, buffer.clone());
+    Ok(buffer)
 }
 
 fn morph_shape_code(shape: MorphShape) -> i32 {
@@ -940,7 +1587,7 @@ fn launch_binary_morph(
     cfg: LaunchConfig,
     label: &str,
 ) -> Result<()> {
-    let mut launch = inner.stream.launch_builder(kernel);
+    let mut launch = inner.compute_stream.launch_builder(kernel);
     launch.arg(input);
     launch.arg(kernel_mask);
     launch.arg(output);

@@ -284,6 +284,7 @@ impl ImageBackend for WgpuBackend {
     type DeviceFrameLab = WgpuFrameLab;
     type DevicePlaneF32 = WgpuPlaneF32;
     type DeviceMaskU8 = WgpuMaskU8;
+    type DeviceLockState = ();
 
     fn kind(&self) -> BackendKind {
         BackendKind::Wgpu
@@ -423,6 +424,29 @@ impl ImageBackend for WgpuBackend {
         );
         Ok(WgpuMaskU8 {
             buffer: output,
+            width,
+            height,
+        })
+    }
+
+    fn upload_mask_u8(&self, mask: &Array2<u8>) -> Result<Self::DeviceMaskU8> {
+        let (height, width) = mask.dim();
+        let values = mask
+            .as_slice_memory_order()
+            .ok_or_else(|| anyhow!("ROI mask must be contiguous"))?
+            .iter()
+            .map(|value| u32::from(*value > 0))
+            .collect::<Vec<_>>();
+        Ok(WgpuMaskU8 {
+            buffer: self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("fast-vrifa-roi-mask-upload"),
+                    contents: bytemuck::cast_slice(&values),
+                    usage: wgpu::BufferUsages::STORAGE
+                        | wgpu::BufferUsages::COPY_SRC
+                        | wgpu::BufferUsages::COPY_DST,
+                }),
             width,
             height,
         })
