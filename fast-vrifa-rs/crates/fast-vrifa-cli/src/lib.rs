@@ -34,7 +34,6 @@ use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::reference::{
     compute_dynamic_factor, select_dynamic_reference_index, DynamicReferenceParams,
 };
-use vrifa_core::roi::resolve_roi_margins;
 use vrifa_core::threshold;
 use vrifa_io::{AsyncPngWriter, VideoMetadata, VideoReader};
 
@@ -325,15 +324,8 @@ fn run_cuda_batched_peak_pipeline(
         height: capture.get(videoio::CAP_PROP_FRAME_HEIGHT)? as usize,
     };
 
-    let roi_margins = resolve_roi_margins(
-        config.roi_margin,
-        config.roi_margin_top,
-        config.roi_margin_bottom,
-        config.roi_margin_left,
-        config.roi_margin_right,
-    );
-    let device_roi_mask = backend.build_roi_mask((metadata.height, metadata.width), roi_margins)?;
-    let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
+    let roi_mask = vrifa_cli::resolve_configured_roi_mask(&config, (metadata.height, metadata.width))?;
+    let device_roi_mask = backend.upload_mask_u8(&roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
 
     let mask_dir = config.output_dir.join("masks");
@@ -800,18 +792,11 @@ where
     let mut dynamic_first_lag: Option<usize> = None;
     let mut dynamic_last_lag: Option<usize> = None;
 
-    let roi_margins = resolve_roi_margins(
-        config.roi_margin,
-        config.roi_margin_top,
-        config.roi_margin_bottom,
-        config.roi_margin_left,
-        config.roi_margin_right,
-    );
-    let device_roi_mask = backend.build_roi_mask(
+    let roi_mask = vrifa_cli::resolve_configured_roi_mask(
+        &config,
         (first_frame_converted.dim().0, first_frame_converted.dim().1),
-        roi_margins,
     )?;
-    let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
+    let device_roi_mask = backend.upload_mask_u8(&roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let mut peak_brightness_map = if config.peak_reference && !device_delta_eligible {

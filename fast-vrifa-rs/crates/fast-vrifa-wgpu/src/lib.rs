@@ -429,6 +429,29 @@ impl ImageBackend for WgpuBackend {
         })
     }
 
+    fn upload_mask_u8(&self, mask: &Array2<u8>) -> Result<Self::DeviceMaskU8> {
+        let (height, width) = mask.dim();
+        let values = mask
+            .as_slice_memory_order()
+            .ok_or_else(|| anyhow!("ROI mask must be contiguous"))?
+            .iter()
+            .map(|value| u32::from(*value > 0))
+            .collect::<Vec<_>>();
+        Ok(WgpuMaskU8 {
+            buffer: self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("fast-vrifa-roi-mask-upload"),
+                    contents: bytemuck::cast_slice(&values),
+                    usage: wgpu::BufferUsages::STORAGE
+                        | wgpu::BufferUsages::COPY_SRC
+                        | wgpu::BufferUsages::COPY_DST,
+                }),
+            width,
+            height,
+        })
+    }
+
     fn download_mask_u8(&self, mask: &Self::DeviceMaskU8) -> Result<Array2<u8>> {
         let pixel_count = mask.width * mask.height;
         let bytes = self.readback_bytes(&mask.buffer, byte_len_for_u32(pixel_count))?;

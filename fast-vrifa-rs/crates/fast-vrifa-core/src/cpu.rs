@@ -74,6 +74,10 @@ impl ImageBackend for CpuBackend {
         })
     }
 
+    fn upload_mask_u8(&self, mask: &Array2<u8>) -> Result<Self::DeviceMaskU8> {
+        Ok(CpuMaskU8 { data: mask.clone() })
+    }
+
     fn download_mask_u8(&self, mask: &Self::DeviceMaskU8) -> Result<Array2<u8>> {
         Ok(mask.data.clone())
     }
