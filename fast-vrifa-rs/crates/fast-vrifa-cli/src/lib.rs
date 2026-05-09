@@ -32,10 +32,7 @@ use vrifa_core::reference::{
 };
 use vrifa_core::roi::resolve_roi_margins;
 use vrifa_core::threshold;
-use vrifa_io::{AsyncPngWriter, VideoReader};
-
-mod video_output;
-use video_output::VideoOutputWriter;
+use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
 
 #[cfg(feature = "cuda")]
 use fast_vrifa_cuda::CudaBackend;
@@ -378,7 +375,7 @@ where
     if config.write_mask_video || config.write_overlay_video || config.write_heatmap_video {
         fs::create_dir_all(&video_dir)?;
         if config.write_mask_video {
-            mask_writer = Some(VideoOutputWriter::open(
+            mask_writer = Some(AsyncVideoWriter::open(
                 video_dir.join("mask.mp4"),
                 metadata.fps,
                 metadata.width,
@@ -387,7 +384,7 @@ where
             )?);
         }
         if config.write_overlay_video {
-            overlay_writer = Some(VideoOutputWriter::open(
+            overlay_writer = Some(AsyncVideoWriter::open(
                 video_dir.join("overlay.mp4"),
                 metadata.fps,
                 metadata.width,
@@ -396,7 +393,7 @@ where
             )?);
         }
         if config.write_heatmap_video {
-            heat_writer = Some(VideoOutputWriter::open(
+            heat_writer = Some(AsyncVideoWriter::open(
                 video_dir.join("heatmap.mp4"),
                 metadata.fps,
                 metadata.width,
