@@ -19,7 +19,7 @@ use vrifa_core::morphology::MorphShape;
 use vrifa_core::overlay::create_overlay;
 use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
-use vrifa_core::roi::{build_roi_mask_with_override, resolve_roi_margins};
+use vrifa_core::roi::{build_roi_mask_with_override, clip_mask_to_roi, resolve_roi_margins};
 use vrifa_core::{detect_front, detect_front_debug, DetectFrontDebug, DetectFrontParams};
 use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
 
@@ -612,11 +612,15 @@ pub fn run_config(config: Config) -> Result<()> {
                     .as_ref()
                     .filter(|_| config.peak_reference),
             )?;
-            let mask = Arc::new(apply_locking(
+            let mut mask = apply_locking(
                 &mask_raw,
                 config.lock_frames,
                 lock_state.as_mut(),
-            )?);
+            )?;
+            if config.roi_mask.is_some() {
+                clip_mask_to_roi(&mut mask, &roi_mask);
+            }
+            let mask = Arc::new(mask);
             let overlay = Arc::new(create_overlay(&frame_bgr, &mask)?);
             let heatmap = Arc::new(heatmap);
 
@@ -946,7 +950,10 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
                     .as_ref()
                     .filter(|_| config.peak_reference),
             )?;
-            let mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
+            let mut mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
+            if config.roi_mask.is_some() {
+                clip_mask_to_roi(&mut mask, &roi_mask);
+            }
 
             if targets.contains(&frame_index) {
                 let overlay = create_overlay(&frame_bgr, &mask)?;

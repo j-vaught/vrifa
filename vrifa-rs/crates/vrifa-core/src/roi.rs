@@ -1,4 +1,4 @@
-use ndarray::Array2;
+use ndarray::{Array2, Zip};
 
 #[derive(Clone, Copy, Debug)]
 pub struct RoiMargins {
@@ -58,4 +58,17 @@ pub fn build_roi_mask_with_override(
             .fill(1);
     }
     mask
+}
+
+pub fn clip_mask_to_roi(mask: &mut Array2<u8>, roi_mask: &Array2<u8>) {
+    assert_eq!(
+        mask.dim(),
+        roi_mask.dim(),
+        "mask and ROI shape must match for clipping"
+    );
+    Zip::from(mask).and(roi_mask).for_each(|pixel, &roi| {
+        if roi == 0 {
+            *pixel = 0;
+        }
+    });
 }

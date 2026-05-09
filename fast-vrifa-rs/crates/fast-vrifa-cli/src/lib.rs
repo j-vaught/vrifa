@@ -33,6 +33,7 @@ use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::reference::{
     compute_dynamic_factor, select_dynamic_reference_index, DynamicReferenceParams,
 };
+use vrifa_core::roi::clip_mask_to_roi;
 use vrifa_core::threshold;
 use vrifa_io::{write_bgr_png, write_gray_png, VideoMetadata, VideoReader};
 
@@ -718,7 +719,12 @@ fn run_cuda_batched_peak_pipeline(
                 .ok_or_else(|| anyhow!("CUDA streamed path requires device locking"))?;
         }
 
-        let host_mask = need_host_mask.then(|| backend.download_mask_u8(&mask)).transpose()?;
+        let mut host_mask = need_host_mask.then(|| backend.download_mask_u8(&mask)).transpose()?;
+        if config.roi_mask.is_some() {
+            if let Some(mask) = host_mask.as_mut() {
+                clip_mask_to_roi(mask, &roi_mask);
+            }
+        }
         let host_delta_norm = need_host_delta_norm
             .then(|| backend.download_mask_u8(&delta_norm))
             .transpose()?;
@@ -1390,6 +1396,11 @@ where
                     lock_state.as_mut(),
                 )?);
                 host_delta_norm = Some(detect.delta_norm);
+            }
+            if config.roi_mask.is_some() {
+                if let Some(mask) = host_mask.as_mut() {
+                    clip_mask_to_roi(mask, &roi_mask);
+                }
             }
             let mask = host_mask.map(Arc::new);
             let delta_norm = host_delta_norm.map(Arc::new);
