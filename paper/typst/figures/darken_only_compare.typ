@@ -9,7 +9,7 @@
 #import "@preview/cetz:0.4.0"
 
 #set page(width: auto, height: auto, margin: 6pt, fill: white)
-#set text(font: ("Inter", "Helvetica"), size: 9pt)
+#set text(font: ("TeX Gyre Termes", "Times New Roman", "Times"), size: 9pt)
 
 #let garnet = rgb("#73000A")
 #let b70    = rgb("#5C5C5C")
@@ -28,12 +28,12 @@
 ]
 
 #grid(
-  columns: (1fr, 1fr, 1fr),
+  columns: (auto, auto, auto),
   column-gutter: 0.4cm,
   panel("raw",     "/assets/method/darken_raw.png",
     [input_1 frame 80]),
   panel("naive Δ", "/assets/method/darken_naive.png",
     [Euclidean over CIELAB]),
   panel("darken-only Δ", "/assets/method/darken_only.png",
-    [_L\*_-only, clipped to (G − F)⁺]),
+    [_L\*_-only, clipped]),
 )

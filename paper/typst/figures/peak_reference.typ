@@ -10,7 +10,7 @@
 #import "@preview/cetz:0.4.0"
 
 #set page(width: auto, height: auto, margin: 8pt, fill: white)
-#set text(font: ("Inter", "Helvetica"), size: 9pt)
+#set text(font: ("TeX Gyre Termes", "Times New Roman", "Times"), size: 9pt)
 
 #let garnet    = rgb("#73000A")
 #let atlantic  = rgb("#466A9F")
