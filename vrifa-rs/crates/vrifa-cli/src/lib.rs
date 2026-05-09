@@ -604,7 +604,7 @@ pub fn run_config(config: Config) -> Result<()> {
                 )?;
                 processed_records.push(AnnotationFrame {
                     frame_index,
-                    frame_bgr: frame_bgr.clone(),
+                    frame_bgr,
                     boxes,
                 });
             }
