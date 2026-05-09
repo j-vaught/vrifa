@@ -47,6 +47,7 @@ test_output/
 !reference_outputs/
 outputs_run*/formatCOCO/images/
 vrifa-rs/target/
+vrifa-stable-rs/target/
 
 # Jupyter
 .ipynb_checkpoints/

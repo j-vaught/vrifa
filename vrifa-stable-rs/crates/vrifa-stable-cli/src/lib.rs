@@ -422,6 +422,9 @@ struct MotionTraceRow {
     cumulative_dy: f32,
     per_frame_magnitude: f32,
     cumulative_magnitude: f32,
+    warp_dx: f32,
+    warp_dy: f32,
+    warp_error: f32,
     fit_applied: bool,
     warp_active: bool,
 }
@@ -429,11 +432,14 @@ struct MotionTraceRow {
 #[derive(Clone, Debug)]
 struct CameraStableState {
     prev_motion_frame: Option<Array3<f32>>,
+    prev_registration_mask: Option<Array2<u8>>,
     reference_token: Option<usize>,
     cumulative_dx: f32,
     cumulative_dy: f32,
     cached_warp: AffineWarp,
     warp_active: bool,
+    shift_event_active: bool,
+    shift_event_stable_frames: usize,
     motion_trace: Vec<MotionTraceRow>,
 }
 
@@ -441,22 +447,28 @@ impl CameraStableState {
     fn new() -> Self {
         Self {
             prev_motion_frame: None,
+            prev_registration_mask: None,
             reference_token: None,
             cumulative_dx: 0.0,
             cumulative_dy: 0.0,
             cached_warp: AffineWarp::identity(),
             warp_active: false,
+            shift_event_active: false,
+            shift_event_stable_frames: 0,
             motion_trace: Vec::new(),
         }
     }
 
     fn reset(&mut self, reference_token: usize) {
         self.prev_motion_frame = None;
+        self.prev_registration_mask = None;
         self.reference_token = Some(reference_token);
         self.cumulative_dx = 0.0;
         self.cumulative_dy = 0.0;
         self.cached_warp = AffineWarp::identity();
         self.warp_active = false;
+        self.shift_event_active = false;
+        self.shift_event_stable_frames = 0;
     }
 }
 
@@ -464,6 +476,29 @@ impl CameraStableState {
 struct CameraStableOutput {
     aligned_reference: Array3<f32>,
     peak_map: Option<Array2<f32>>,
+}
+
+fn build_registration_mask(prev_mask: Option<&Array2<u8>>) -> Option<Array2<u8>> {
+    const MIN_DRY_FRACTION: f32 = 0.05;
+
+    let prev_mask = prev_mask?;
+    let (height, width) = prev_mask.dim();
+    let total_pixels = height.saturating_mul(width);
+    if total_pixels == 0 {
+        return None;
+    }
+
+    let mut dry_pixels = 0usize;
+    let dry_mask = prev_mask.mapv(|value| {
+        if value == 0 {
+            dry_pixels += 1;
+            255
+        } else {
+            0
+        }
+    });
+    let dry_fraction = dry_pixels as f32 / total_pixels as f32;
+    (dry_fraction >= MIN_DRY_FRACTION).then_some(dry_mask)
 }
 
 pub fn run() -> Result<()> {
@@ -506,28 +541,41 @@ fn prepare_camera_stable(
     let mut fit_applied = false;
 
     if config.camera_stable {
+        let (height, width, _) = frame_converted.dim();
         if let Some(prev_frame) = state.prev_motion_frame.as_ref() {
             let motion = estimate_translation(frame_converted, prev_frame)?;
-            state.cumulative_dx += motion.dx;
-            state.cumulative_dy += motion.dy;
+            state.cumulative_dx -= motion.dx;
+            state.cumulative_dy -= motion.dy;
 
             let per_frame_magnitude = motion.dx.hypot(motion.dy);
             let cumulative_magnitude = state.cumulative_dx.hypot(state.cumulative_dy);
+            let (cached_warp_dx, cached_warp_dy) = if state.warp_active {
+                state.cached_warp.center_displacement(width, height)
+            } else {
+                (0.0, 0.0)
+            };
             let cached_translation_error = if state.warp_active {
-                let (cached_dx, cached_dy) = state.cached_warp.translation();
-                (state.cumulative_dx - cached_dx).hypot(state.cumulative_dy - cached_dy)
+                (state.cumulative_dx - cached_warp_dx).hypot(state.cumulative_dy - cached_warp_dy)
             } else {
                 f32::INFINITY
             };
-            let threshold_trigger = per_frame_magnitude > config.motion_per_frame_threshold
-                || cumulative_magnitude > config.cumulative_motion_threshold;
-            let needs_fit = threshold_trigger
-                && (!state.warp_active
-                    || cached_translation_error > config.motion_per_frame_threshold);
+            let per_frame_trigger = per_frame_magnitude > config.motion_per_frame_threshold;
+            if per_frame_trigger {
+                state.shift_event_active = true;
+                state.shift_event_stable_frames = 0;
+            }
+            let drift_trigger = state.warp_active
+                && cached_translation_error > config.cumulative_motion_threshold;
+            let needs_fit = state.shift_event_active || drift_trigger;
 
             if needs_fit {
+                let registration_mask =
+                    build_registration_mask(state.prev_registration_mask.as_ref());
                 let init_warp = if state.warp_active {
-                    state.cached_warp.clone()
+                    let residual_dx = state.cumulative_dx - cached_warp_dx;
+                    let residual_dy = state.cumulative_dy - cached_warp_dy;
+                    AffineWarp::from_translation(residual_dx, residual_dy)
+                        .compose(&state.cached_warp)
                 } else {
                     AffineWarp::from_translation(state.cumulative_dx, state.cumulative_dy)
                 };
@@ -536,9 +584,14 @@ fn prepare_camera_stable(
                     reference_for_frame,
                     &init_warp,
                     config.motion_model,
+                    registration_mask.as_ref(),
                 ) {
                     Ok(warp) => {
                         state.cached_warp = warp;
+                        let (fitted_dx, fitted_dy) =
+                            state.cached_warp.center_displacement(width, height);
+                        state.cumulative_dx = fitted_dx;
+                        state.cumulative_dy = fitted_dy;
                         state.warp_active = !state.cached_warp.is_identityish(0.25);
                         fit_applied = true;
                         if config.peak_reference {
@@ -546,8 +599,7 @@ fn prepare_camera_stable(
                                 PeakOnShift::Reset => None,
                                 PeakOnShift::Warp => peak_state
                                     .map(|peak| {
-                                        let inverse = state.cached_warp.invert()?;
-                                        apply_warp_plane(peak, &inverse)
+                                        apply_warp_plane(peak, &state.cached_warp)
                                     })
                                     .transpose()?,
                             };
@@ -561,6 +613,27 @@ fn prepare_camera_stable(
                 }
             }
 
+            let (warp_dx, warp_dy, warp_error) = if state.warp_active {
+                let (warp_dx, warp_dy) = state.cached_warp.center_displacement(width, height);
+                let warp_error =
+                    (state.cumulative_dx - warp_dx).hypot(state.cumulative_dy - warp_dy);
+                (warp_dx, warp_dy, warp_error)
+            } else {
+                (0.0, 0.0, 0.0)
+            };
+
+            if state.shift_event_active {
+                if per_frame_magnitude <= config.motion_per_frame_threshold {
+                    state.shift_event_stable_frames += 1;
+                    if state.shift_event_stable_frames >= 3 {
+                        state.shift_event_active = false;
+                        state.shift_event_stable_frames = 0;
+                    }
+                } else {
+                    state.shift_event_stable_frames = 0;
+                }
+            }
+
             state.motion_trace.push(MotionTraceRow {
                 frame_index,
                 dx: motion.dx,
@@ -570,6 +643,9 @@ fn prepare_camera_stable(
                 cumulative_dy: state.cumulative_dy,
                 per_frame_magnitude,
                 cumulative_magnitude,
+                warp_dx,
+                warp_dy,
+                warp_error,
                 fit_applied,
                 warp_active: state.warp_active,
             });
@@ -583,6 +659,9 @@ fn prepare_camera_stable(
                 cumulative_dy: 0.0,
                 per_frame_magnitude: 0.0,
                 cumulative_magnitude: 0.0,
+                warp_dx: 0.0,
+                warp_dy: 0.0,
+                warp_error: 0.0,
                 fit_applied: false,
                 warp_active: false,
             });
@@ -590,8 +669,7 @@ fn prepare_camera_stable(
     }
 
     let aligned_reference = if config.camera_stable && state.warp_active {
-        let inverse = state.cached_warp.invert()?;
-        apply_warp(reference_for_frame, &inverse)?
+        apply_warp(reference_for_frame, &state.cached_warp)?
     } else {
         reference_for_frame.clone()
     };
@@ -851,6 +929,7 @@ pub fn run_config(config: Config) -> Result<()> {
                 config.lock_frames,
                 lock_state.as_mut(),
             )?);
+            camera_stable_state.prev_registration_mask = Some((*mask).clone());
             let overlay = Arc::new(create_overlay(&frame_bgr, &mask)?);
             let heatmap = Arc::new(heatmap);
 
@@ -1036,6 +1115,8 @@ pub fn run_config(config: Config) -> Result<()> {
 #[derive(Debug)]
 struct StageDumpFrame {
     frame_converted: Array3<f32>,
+    reference_for_frame: Array3<f32>,
+    aligned_reference: Array3<f32>,
     detect: DetectFrontDebug,
     mask: ndarray::Array2<u8>,
     overlay: Array3<u8>,
@@ -1202,6 +1283,7 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
                 peak_brightness_map.as_ref(),
             )?;
             let mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
+            camera_stable_state.prev_registration_mask = Some(mask.clone());
 
             if targets.contains(&frame_index) {
                 let overlay = create_overlay(&frame_bgr, &mask)?;
@@ -1210,6 +1292,8 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
                     frame_index,
                     &StageDumpFrame {
                         frame_converted: frame_converted.clone(),
+                        reference_for_frame: reference_for_frame.clone(),
+                        aligned_reference: camera_stable.aligned_reference.clone(),
                         detect: detect.clone(),
                         mask,
                         overlay,
@@ -1279,6 +1363,14 @@ fn write_stage_dump_frame(
         &frame_dir.join("frame_converted.npy"),
         &dump.frame_converted,
     )?;
+    save_npy(
+        &frame_dir.join("reference_for_frame.npy"),
+        &dump.reference_for_frame,
+    )?;
+    save_npy(
+        &frame_dir.join("aligned_reference.npy"),
+        &dump.aligned_reference,
+    )?;
     save_npy(&frame_dir.join("delta.npy"), &dump.detect.delta)?;
     save_npy(&frame_dir.join("delta_blur.npy"), &dump.detect.delta_blur)?;
     save_npy(&frame_dir.join("delta_norm.npy"), &dump.detect.delta_norm)?;
@@ -1303,12 +1395,12 @@ fn write_motion_trace(path: &Path, rows: &[MotionTraceRow]) -> Result<()> {
     let mut file = File::create(path).with_context(|| format!("creating {}", path.display()))?;
     writeln!(
         file,
-        "frame,dx,dy,confidence,cumulative_dx,cumulative_dy,per_frame_magnitude,cumulative_magnitude,fit_applied,warp_active"
+        "frame,dx,dy,confidence,cumulative_dx,cumulative_dy,per_frame_magnitude,cumulative_magnitude,warp_dx,warp_dy,warp_error,fit_applied,warp_active"
     )?;
     for row in rows {
         writeln!(
             file,
-            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}",
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}",
             row.frame_index,
             row.dx,
             row.dy,
@@ -1317,6 +1409,9 @@ fn write_motion_trace(path: &Path, rows: &[MotionTraceRow]) -> Result<()> {
             row.cumulative_dy,
             row.per_frame_magnitude,
             row.cumulative_magnitude,
+            row.warp_dx,
+            row.warp_dy,
+            row.warp_error,
             row.fit_applied,
             row.warp_active,
         )?;

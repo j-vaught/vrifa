@@ -1,6 +1,7 @@
 use crate::cvutil;
 use crate::warp::AffineWarp;
 use crate::{Result, VrifaError};
+use ndarray::Array2;
 use ndarray::Array3;
 use opencv::core;
 use opencv::video;
@@ -42,6 +43,7 @@ pub fn fit_affine_warp(
     ref_lab: &Array3<f32>,
     init_matrix: &AffineWarp,
     motion_model: MotionModel,
+    registration_mask: Option<&Array2<u8>>,
 ) -> Result<AffineWarp> {
     if curr_lab.dim() != ref_lab.dim() {
         return Err(VrifaError::Shape(
@@ -62,14 +64,27 @@ pub fn fit_affine_warp(
         100,
         1e-4,
     )?;
-    video::find_transform_ecc(
-        &curr,
-        &reference,
-        &mut warp,
-        motion_model.opencv_code(),
-        criteria,
-        &core::no_array(),
-        5,
-    )?;
+    if let Some(mask) = registration_mask {
+        let mask = cvutil::array2_u8_to_mat(mask)?;
+        video::find_transform_ecc(
+            &reference,
+            &curr,
+            &mut warp,
+            motion_model.opencv_code(),
+            criteria,
+            &mask,
+            5,
+        )?;
+    } else {
+        video::find_transform_ecc(
+            &reference,
+            &curr,
+            &mut warp,
+            motion_model.opencv_code(),
+            criteria,
+            &core::no_array(),
+            5,
+        )?;
+    }
     AffineWarp::from_mat(&warp)
 }

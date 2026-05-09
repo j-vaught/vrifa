@@ -27,13 +27,16 @@ pub fn estimate_translation(
         ));
     }
 
+    let (height, width, _) = curr_lab.dim();
     let curr = downsample_l_channel(curr_lab)?;
     let prev = downsample_l_channel(prev_lab)?;
     let mut response = 0.0f64;
     let shift = imgproc::phase_correlate(&curr, &prev, &core::no_array(), &mut response)?;
+    let scale_x = width as f32 / MOTION_DOWNSAMPLE_SIZE as f32;
+    let scale_y = height as f32 / MOTION_DOWNSAMPLE_SIZE as f32;
     Ok(MotionEstimate {
-        dx: shift.x as f32,
-        dy: shift.y as f32,
+        dx: shift.x as f32 * scale_x,
+        dy: shift.y as f32 * scale_y,
         confidence: response as f32,
     })
 }
