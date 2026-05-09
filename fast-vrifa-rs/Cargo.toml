@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "crates/fast-vrifa-core",
+    "crates/fast-vrifa-cuda",
+    "crates/fast-vrifa-wgpu",
+    "crates/fast-vrifa-cli",
+    "crates/fast-vrifa-py",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/j-vaught/vrifa"
+
+[workspace.dependencies]
+anyhow = "1"
+ndarray = { version = "0.17", features = ["rayon", "serde"] }
+numpy = "0.28"
+pyo3 = { version = "0.28", features = ["extension-module"] }
+serde = { version = "1", features = ["derive"] }
+vrifa-cli = { path = "../vrifa-rs/crates/vrifa-cli" }
+vrifa-core = { path = "../vrifa-rs/crates/vrifa-core" }

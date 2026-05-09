@@ -1,0 +1,21 @@
+[package]
+name = "fast-vrifa-py"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "fast_vrifa_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow.workspace = true
+fast-vrifa-cli = { path = "../fast-vrifa-cli" }
+ndarray.workspace = true
+numpy.workspace = true
+pyo3.workspace = true
+vrifa-core.workspace = true
+
+[package.metadata.maturin]
+python-source = "../../python"
+module-name = "fast_vrifa.fast_vrifa_py"
