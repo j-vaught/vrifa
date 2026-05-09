@@ -250,30 +250,26 @@ extern "C" __global__ void erode_binary_u8(
     output[index] = result;
 }
 
-struct NppiPointCuda {
-    int x;
-    int y;
-};
-
-struct NppiRectCuda {
-    int x;
-    int y;
-    int width;
-    int height;
-};
-
-struct NppiCompressedMarkerLabelsInfoCuda {
-    unsigned int nMarkerLabelPixelCount;
-    unsigned int nContourPixelCount;
-    unsigned int nContourPixelsFound;
-    NppiPointCuda oContourFirstPixelLocation;
-    NppiRectCuda oMarkerLabelBoundingBox;
-};
+extern "C" __global__ void count_labeled_components_u32(
+    const unsigned int* labels,
+    unsigned int* counts,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    unsigned int label = labels[index];
+    if (label == 0u) {
+        return;
+    }
+    atomicAdd(&counts[label], 1u);
+}
 
 extern "C" __global__ void filter_labeled_components_u8(
     const unsigned char* source_mask,
     const unsigned int* labels,
-    unsigned long long info_list_ptr,
+    const unsigned int* counts,
     unsigned char* output,
     unsigned int min_area,
     int pixel_count
@@ -291,8 +287,5 @@ extern "C" __global__ void filter_labeled_components_u8(
         output[index] = 0u;
         return;
     }
-    const NppiCompressedMarkerLabelsInfoCuda* info_list =
-        reinterpret_cast<const NppiCompressedMarkerLabelsInfoCuda*>(info_list_ptr);
-    const NppiCompressedMarkerLabelsInfoCuda info = info_list[label - 1u];
-    output[index] = info.nMarkerLabelPixelCount >= min_area ? 255u : 0u;
+    output[index] = counts[label] >= min_area ? 255u : 0u;
 }
