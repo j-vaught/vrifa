@@ -1,80 +1,62 @@
 use anyhow::{anyhow, bail, Context, Result};
-#[cfg(feature = "wgpu")]
 use chrono::{SecondsFormat, Utc};
 use clap::Parser;
-#[cfg(feature = "wgpu")]
-use fast_vrifa_core::ImageBackend;
-#[cfg(feature = "wgpu")]
+use fast_vrifa_core::{CpuBackend, ImageBackend};
 use indexmap::IndexMap;
-#[cfg(feature = "wgpu")]
 use ndarray::{s, Array3};
-#[cfg(feature = "wgpu")]
 use serde_yaml::Value;
-#[cfg(feature = "wgpu")]
 use std::collections::VecDeque;
 use std::env;
 use std::ffi::{OsStr, OsString};
-#[cfg(feature = "wgpu")]
 use std::fs::{self, File};
-#[cfg(feature = "wgpu")]
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
-#[cfg(feature = "wgpu")]
 use std::sync::Arc;
-#[cfg(feature = "wgpu")]
 use std::time::Instant;
-#[cfg(feature = "wgpu")]
 use vrifa_annotations::AnnotationFrame;
-#[cfg(feature = "wgpu")]
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
-#[cfg(feature = "wgpu")]
 use vrifa_core::contours::extract_bounding_boxes;
-#[cfg(feature = "wgpu")]
 use vrifa_core::delta::compute_delta;
-#[cfg(feature = "wgpu")]
 use vrifa_core::heatmap::apply_turbo_colormap;
-#[cfg(feature = "wgpu")]
 use vrifa_core::lock::{apply_locking, LockState};
-#[cfg(feature = "wgpu")]
 use vrifa_core::morphology::{detect_mask_from_delta_debug, MorphologyParams};
-#[cfg(feature = "wgpu")]
 use vrifa_core::overlay::create_overlay;
-#[cfg(feature = "wgpu")]
 use vrifa_core::peak::update_peak_brightness;
-#[cfg(feature = "wgpu")]
 use vrifa_core::reference::{
     compute_dynamic_factor, select_dynamic_reference_index, DynamicReferenceParams,
 };
-#[cfg(feature = "wgpu")]
 use vrifa_core::roi::resolve_roi_margins;
-#[cfg(feature = "wgpu")]
 use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
 
+#[cfg(feature = "cuda")]
+use fast_vrifa_cuda::CudaBackend;
 #[cfg(feature = "wgpu")]
 use fast_vrifa_wgpu::WgpuBackend;
 
 pub use vrifa_cli::Config;
-#[cfg(feature = "wgpu")]
 use vrifa_cli::ReferenceMode;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum BackendMode {
+pub enum BackendMode {
     Delegate,
+    Cpu,
     Wgpu,
+    Cuda,
 }
 
 impl BackendMode {
-    fn parse(raw: &str) -> Result<Self> {
+    pub fn parse(raw: &str) -> Result<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
-            "delegate" | "cpu" => Ok(Self::Delegate),
+            "delegate" => Ok(Self::Delegate),
+            "cpu" => Ok(Self::Cpu),
             "wgpu" => Ok(Self::Wgpu),
+            "cuda" => Ok(Self::Cuda),
             other => bail!("--backend unsupported option '{other}'"),
         }
     }
 }
 
-#[cfg(feature = "wgpu")]
 struct ConvertedFrame<D> {
     device_lab: Option<D>,
     host: Array3<f32>,
@@ -92,14 +74,25 @@ pub fn run() -> Result<()> {
         .context("parsing fast-vrifa CLI arguments")?;
     let config = Config::try_from(cli_args)?;
 
-    match backend {
-        BackendMode::Delegate => run_config(config),
-        BackendMode::Wgpu => run_wgpu_backend(config),
-    }
+    run_with_backend(config, backend)
 }
 
 pub fn run_config(config: Config) -> Result<()> {
     vrifa_cli::run_binding_config(config).context("delegating bound config to reference vrifa")
+}
+
+pub fn run_with_backend_name(config: Config, backend: &str) -> Result<()> {
+    let backend = BackendMode::parse(backend)?;
+    run_with_backend(config, backend)
+}
+
+pub fn run_with_backend(config: Config, backend: BackendMode) -> Result<()> {
+    match backend {
+        BackendMode::Delegate => run_config(config),
+        BackendMode::Cpu => run_cpu_backend(config),
+        BackendMode::Wgpu => run_wgpu_backend(config),
+        BackendMode::Cuda => run_cuda_backend(config),
+    }
 }
 
 pub fn delegated_backend_label() -> &'static str {
@@ -194,6 +187,11 @@ fn contains_debug_dump_flags(args: &[OsString]) -> bool {
     })
 }
 
+fn run_cpu_backend(config: Config) -> Result<()> {
+    let backend = CpuBackend;
+    run_hybrid_pipeline(config, &backend)
+}
+
 fn run_wgpu_backend(config: Config) -> Result<()> {
     #[cfg(feature = "wgpu")]
     {
@@ -208,7 +206,23 @@ fn run_wgpu_backend(config: Config) -> Result<()> {
     }
 }
 
-#[cfg(feature = "wgpu")]
+fn run_cuda_backend(config: Config) -> Result<()> {
+    #[cfg(feature = "cuda")]
+    {
+        let backend = CudaBackend::default();
+        if !matches!(backend.status(), fast_vrifa_core::BackendStatus::Ready) {
+            bail!("--backend cuda is not implemented yet in this build");
+        }
+        return run_hybrid_pipeline(config, &backend);
+    }
+
+    #[cfg(not(feature = "cuda"))]
+    {
+        let _ = config;
+        bail!("--backend cuda requires building fast-vrifa with --features cuda");
+    }
+}
+
 fn run_hybrid_pipeline<B>(config: Config, backend: &B) -> Result<()>
 where
     B: ImageBackend,
@@ -663,7 +677,6 @@ where
     Ok(())
 }
 
-#[cfg(feature = "wgpu")]
 fn convert_frame_with_backend<B>(
     backend: &B,
     frame_bgr: &Array3<u8>,
@@ -688,7 +701,6 @@ where
     }
 }
 
-#[cfg(feature = "wgpu")]
 fn fetch_reference_converted<B>(
     index: usize,
     reader: Option<&mut VideoReader>,
@@ -723,7 +735,6 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-#[cfg(feature = "wgpu")]
 fn write_run_summary(
     config: &Config,
     total_frames: Option<usize>,
@@ -880,7 +891,6 @@ fn write_run_summary(
     Ok(())
 }
 
-#[cfg(feature = "wgpu")]
 fn reference_mode_name(mode: &ReferenceMode) -> &'static str {
     match mode {
         ReferenceMode::First => "first",
@@ -891,7 +901,6 @@ fn reference_mode_name(mode: &ReferenceMode) -> &'static str {
     }
 }
 
-#[cfg(feature = "wgpu")]
 fn reference_mode_offset(mode: &ReferenceMode) -> Option<usize> {
     match mode {
         ReferenceMode::Prev(value) | ReferenceMode::Absolute(value) => Some(*value),
@@ -899,7 +908,6 @@ fn reference_mode_offset(mode: &ReferenceMode) -> Option<usize> {
     }
 }
 
-#[cfg(feature = "wgpu")]
 fn yaml_f32(value: f32) -> f64 {
     ((value as f64) * 1_000_000.0).round() / 1_000_000.0
 }
@@ -935,5 +943,11 @@ mod tests {
         assert_eq!(backend, BackendMode::Wgpu);
         assert_eq!(stripped.len(), 3);
         assert_eq!(stripped[1], OsString::from("--video-path"));
+    }
+
+    #[test]
+    fn backend_parser_accepts_cpu_and_cuda() {
+        assert_eq!(BackendMode::parse("cpu").unwrap(), BackendMode::Cpu);
+        assert_eq!(BackendMode::parse("cuda").unwrap(), BackendMode::Cuda);
     }
 }

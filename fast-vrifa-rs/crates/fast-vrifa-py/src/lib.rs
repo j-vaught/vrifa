@@ -34,6 +34,8 @@ pub struct PyConfig {
     pub darken_only: bool,
     #[pyo3(get, set)]
     pub peak_reference: bool,
+    #[pyo3(get, set)]
+    pub backend: String,
 }
 
 #[pymethods]
@@ -66,6 +68,7 @@ impl PyConfig {
             lock_frames: 3,
             darken_only: true,
             peak_reference: true,
+            backend: "delegate".to_string(),
         }
     }
 }
@@ -101,7 +104,7 @@ impl PyConfig {
 
 #[pyfunction]
 fn run(config: &PyConfig) -> PyResult<()> {
-    fast_vrifa_cli::run_config(config.to_config()?)
+    fast_vrifa_cli::run_with_backend_name(config.to_config()?, &config.backend)
         .map_err(|err| PyRuntimeError::new_err(err.to_string()))
 }
 

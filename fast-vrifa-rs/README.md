@@ -61,6 +61,18 @@ Run the staged `wgpu` path:
   --annotation-formats coco
 ```
 
+Run the hybrid CPU backend without delegation:
+
+```bash
+./target/release/fast-vrifa \
+  --backend cpu \
+  --video-path ../data/input_2.mp4 \
+  --output-dir /tmp/fast_vrifa_cpu_backend \
+  --write-mask-pngs true \
+  --write-overlay-pngs true \
+  --write-heatmap-pngs true
+```
+
 If the CPU binary lives somewhere else, set `VRIFA_BIN=/path/to/vrifa` before running `fast-vrifa`.
 
 ## Verify
@@ -74,4 +86,4 @@ tests/parity/run_smoke.sh
 
 ## Current Status
 
-The default path still delegates to the locked CPU binary. With `--backend wgpu`, `fast-vrifa` now runs colorspace, ROI, and darken-only delta on Metal via `wgpu`, downloads the delta plane, and finishes the remaining stages on the CPU. No intentional divergences are documented for this increment.
+The default path still delegates to the locked CPU binary. `--backend cpu` runs the same hybrid orchestration locally through the backend trait, which makes the non-delegated path testable without Metal. `--backend wgpu` runs colorspace, ROI, and darken-only delta on Metal via `wgpu`, downloads the delta plane, and finishes the remaining stages on the CPU. No intentional divergences are documented for this increment.

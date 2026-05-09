@@ -12,7 +12,7 @@ Edit either `crates/fast-vrifa-cuda` or `crates/fast-vrifa-wgpu`. The `wgpu` cra
 
 ## Change the CLI
 
-Edit `crates/fast-vrifa-cli`. The default path still forwards to the locked CPU binary. The staged GPU path is behind `--backend wgpu`, and its job is to preserve the CPU output contract while moving more stages device-side one increment at a time.
+Edit `crates/fast-vrifa-cli`. The default path still forwards to the locked CPU binary. `--backend cpu` exercises the same hybrid pipeline locally through the trait, `--backend wgpu` moves the staged GPU work onto Metal, and later `--backend cuda` will slot into the same dispatch point.
 
 ## Change the binding
 
