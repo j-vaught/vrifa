@@ -339,18 +339,23 @@ impl PeakImageBackend for CudaBackend {
     ) -> Result<Self::DevicePlaneF32> {
         let inner = self.inner()?;
         let pixel_count = frame_lab.width * frame_lab.height;
-        let previous_buffer = if let Some(previous_peak) = previous_peak {
+        let zero_buffer = if previous_peak.is_none() {
+            Some(
+                inner
+                    .stream
+                    .alloc_zeros::<f32>(pixel_count)
+                    .context("allocating initial CUDA peak plane")?,
+            )
+        } else {
+            None
+        };
+        if let Some(previous_peak) = previous_peak {
             anyhow::ensure!(
                 (previous_peak.height, previous_peak.width) == (frame_lab.height, frame_lab.width),
                 "previous peak shape does not match frame"
             );
-            previous_peak.data.clone()
-        } else {
-            inner
-                .stream
-                .alloc_zeros::<f32>(pixel_count)
-                .context("allocating initial CUDA peak plane")?
-        };
+        }
+        let previous_view = previous_peak.map(|peak| peak.data.as_view());
         let mut output = inner
             .stream
             .alloc_zeros::<f32>(pixel_count)
@@ -359,7 +364,11 @@ impl PeakImageBackend for CudaBackend {
         let pixel_count_i32 = pixel_count as i32;
         let mut launch = inner.stream.launch_builder(&inner.peak);
         launch.arg(&frame_lab.data);
-        launch.arg(&previous_buffer);
+        if let Some(previous_view) = previous_view.as_ref() {
+            launch.arg(previous_view);
+        } else if let Some(zero_buffer) = zero_buffer.as_ref() {
+            launch.arg(zero_buffer);
+        }
         launch.arg(&mut output);
         launch.arg(&pixel_count_i32);
         unsafe { launch.launch(cfg) }.context("launching CUDA peak kernel")?;
