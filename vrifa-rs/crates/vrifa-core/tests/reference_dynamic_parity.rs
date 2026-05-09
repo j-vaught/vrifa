@@ -7,7 +7,7 @@ use vrifa_core::reference::{
 };
 
 #[test]
-fn dynamic_reference_factor_and_delta_t_match_python_fixture() {
+fn dynamic_reference_factor_and_delta_t_match_frozen_fixture() {
     let measurements = load_dynamic_measurements();
     let params = load_dynamic_params();
     let expected = load_dynamic_expected();

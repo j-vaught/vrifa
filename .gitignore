@@ -1,9 +1,8 @@
-# Python
+# Bytecode and packaging artifacts
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
 build/
 develop-eggs/
 dist/
@@ -45,6 +44,7 @@ private_assets/
 flow_front_outputs/
 test_output/
 *_outputs/
+!reference_outputs/
 outputs_run*/formatCOCO/images/
 vrifa-rs/target/
 

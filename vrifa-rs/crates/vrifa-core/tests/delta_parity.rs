@@ -7,7 +7,7 @@ use common::{
 use vrifa_core::delta::compute_delta;
 
 #[test]
-fn delta_matches_python_golden_for_input_2_frame_30() {
+fn delta_matches_frozen_golden_for_input_2_frame_30() {
     let config = load_fixture_config("input_2");
     let roi_mask = load_roi_mask("input_2");
     assert!(config.peak_reference, "input_2 fixtures expect peak-reference mode");

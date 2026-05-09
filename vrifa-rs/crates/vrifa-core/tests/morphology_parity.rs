@@ -7,7 +7,7 @@ use common::{
 use vrifa_core::morphology::detect_mask_from_delta_debug;
 
 #[test]
-fn morphology_matches_python_goldens_for_input_2() {
+fn morphology_matches_frozen_goldens_for_input_2() {
     let config = load_fixture_config("input_2");
     let roi_mask = load_roi_mask("input_2");
     let params = morphology_params(&config);

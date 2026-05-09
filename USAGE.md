@@ -1,5 +1,7 @@
 # VRIFA Usage Reference
 
+After `cargo build --release` from `vrifa-rs/`, the CLI binary is at `./target/release/vrifa`.
+
 ## Detection Modes
 
 VRIFA provides specialized detection modes optimized for VARTM process monitoring.
@@ -9,7 +11,7 @@ VRIFA provides specialized detection modes optimized for VARTM process monitorin
 Detects only pixels that have become darker than their reference, which corresponds to resin wetting the dry fabric. This ignores brightening artifacts from specular reflections, lighting changes, and camera auto-exposure adjustments.
 
 ```bash
-python vrifa.py --no-darken-only ...
+vrifa --no-darken-only ...
 ```
 
 ### Peak Brightness Reference (Default: Enabled)
@@ -17,71 +19,72 @@ python vrifa.py --no-darken-only ...
 Instead of comparing to a fixed reference frame, each pixel is compared to its historical maximum brightness. This handles scenarios where pixels start dark, brighten as lighting stabilizes, then darken again as resin fills in.
 
 The algorithm maintains a running maximum brightness map that updates each frame:
+
 ```
 peak_brightness[pixel] = max(peak_brightness[pixel], current_brightness[pixel])
 detection = peak_brightness[pixel] - current_brightness[pixel]
 ```
 
 ```bash
-python vrifa.py --no-peak-reference ...
+vrifa --no-peak-reference ...
 ```
 
 ### Threshold Offset (Default: -30)
 
-The Otsu threshold is adjusted by this offset value. Negative values increase sensitivity (detect more subtle changes), positive values decrease sensitivity.
+The Otsu threshold is adjusted by this offset value. Negative values increase sensitivity and positive values decrease sensitivity.
 
 ```bash
-python vrifa.py --threshold-offset -50   # More sensitive
-python vrifa.py --threshold-offset 0     # Less sensitive
+vrifa --threshold-offset -50   # More sensitive
+vrifa --threshold-offset 0     # Less sensitive
 ```
 
 ---
 
-## ML Annotation Export Formats
+## ML Annotation Formats
 
-VRIFA generates training datasets for deep learning models. COCO format is exported by default.
+VRIFA generates training datasets for downstream models. COCO format is exported by default.
 
 ### COCO Format (Default)
 
 ```bash
-python vrifa.py --annotation-formats coco --annotation-mode count --annotation-count 100
+vrifa --annotation-formats coco --annotation-mode count --annotation-count 100
 ```
 
-Categories: `dry` (id: 1), `wet` (id: 2). Includes segmentation polygons and bounding boxes. Compatible with COCO API, Detectron2, MMDetection.
+Categories: `dry` (id `1`) and `wet` (id `2`). Includes segmentation polygons and bounding boxes. Compatible with COCO API, Detectron2, and MMDetection.
 
 ### YOLOv5/v8 Format
 
 ```bash
-python vrifa.py --annotation-formats yolov5 --annotation-mode count --annotation-count 100
+vrifa --annotation-formats yolov5 --annotation-mode count --annotation-count 100
 ```
 
-Label format: `class_id x1 y1 x2 y2 ...` (normalized polygon). Compatible with Ultralytics YOLOv5-seg, YOLOv8-seg.
+Label format: `class_id x1 y1 x2 y2 ...` with normalized polygon vertices. Compatible with Ultralytics YOLOv5-seg and YOLOv8-seg.
 
 ### Darknet Format
 
 ```bash
-python vrifa.py --annotation-formats darknet --annotation-mode count --annotation-count 100
+vrifa --annotation-formats darknet --annotation-mode count --annotation-count 100
 ```
 
-Label format: `class_id cx cy w h` (normalized bounding box). Compatible with Darknet, YOLOv3/v4.
+Label format: `class_id cx cy w h` with normalized bounding boxes. Compatible with Darknet and classic YOLO training flows.
 
 ### Multiple Formats
 
 ```bash
-python vrifa.py --annotation-formats coco,yolov5,darknet
+vrifa --annotation-formats coco,yolov5,darknet
 ```
 
-### Disable Annotation Export
+### Disable Annotation Output
 
 ```bash
-python vrifa.py --annotation-formats ""
+vrifa --annotation-formats ""
 ```
 
 ---
 
 ## Configuration Reference
 
-### Input/Output
+### Input / Output
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -99,10 +102,10 @@ python vrifa.py --annotation-formats ""
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--darken-only` | Only detect darkening (resin wetting) | `true` |
+| `--darken-only` | Only detect darkening associated with wetting | `true` |
 | `--no-darken-only` | Detect any brightness change | - |
 | `--peak-reference` | Compare to peak brightness per pixel | `true` |
-| `--no-peak-reference` | Compare to fixed reference frame | - |
+| `--no-peak-reference` | Compare to the selected reference frame | - |
 | `--threshold-offset` | Offset added to Otsu threshold | `-30` |
 
 ### Frame Sampling
@@ -115,7 +118,7 @@ python vrifa.py --annotation-formats ""
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--roi-margin` | Fractional crop on all sides (0-0.49) | `0.15` |
+| `--roi-margin` | Fractional crop on all sides | `0.15` |
 | `--roi-margin-top` | Top margin override | - |
 | `--roi-margin-bottom` | Bottom margin override | - |
 | `--roi-margin-left` | Left margin override | - |
@@ -126,11 +129,11 @@ python vrifa.py --annotation-formats ""
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--colorspace` | `CIELAB`, `RGB`, `HSV`, `GRAYSCALE` | `CIELAB` |
-| `--channel-weights` | Per-channel multipliers (comma-separated) | `1,1,1` |
-| `--contrast-threshold` | Fixed threshold override (0-255) | - |
-| `--contrast-percentile` | Adaptive percentile threshold (0-100) | - |
+| `--channel-weights` | Per-channel multipliers | `1,1,1` |
+| `--contrast-threshold` | Fixed threshold override | - |
+| `--contrast-percentile` | Adaptive percentile threshold | - |
 | `--blur-kernel` | Gaussian kernel size (odd) | `9` |
-| `--skip-blur` | Skip Gaussian blur step | `false` |
+| `--skip-blur` | Skip Gaussian blur | `false` |
 
 ### Morphology
 
@@ -140,27 +143,27 @@ python vrifa.py --annotation-formats ""
 | `--morph-shape` | `ellipse`, `rect`, `cross` | `ellipse` |
 | `--morph-close-iterations` | Closing iterations | `1` |
 | `--morph-open-iterations` | Opening iterations | `1` |
-| `--min-area` | Minimum component area (px) | `400` |
+| `--min-area` | Minimum connected-component area in pixels | `400` |
 
 ### Reference Frame Strategy
 
 | Mode | Description |
 |------|-------------|
-| `--ref-mode first` | Compare to first frame (default) |
-| `--ref-mode running` | Exponential moving average |
-| `--ref-mode prev N` | Compare to N frames back |
-| `--ref-mode absolute N` | Compare to fixed frame index |
-| `--ref-mode dynamic` | Modeled lag based on flow progression |
+| `--ref-mode first` | Compare to the first frame |
+| `--ref-mode running` | Compare to an exponential moving average |
+| `--ref-mode prev N` | Compare to `N` frames back |
+| `--ref-mode absolute N` | Compare to a fixed frame index |
+| `--ref-mode dynamic` | Compare to a modeled lag based on progression |
 
-**Dynamic mode options:**
+Dynamic mode options:
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--dynamic-calibration-frames` | Frames for growth modeling | `10` |
-| `--dynamic-target-fraction` | Target ROI coverage (0-1) | `0.2` |
-| `--dynamic-lag-linear` | Use linear lag schedule | `false` |
-| `--dynamic-lag-linear-start` | Starting lag (frames) | `0` |
-| `--dynamic-lag-linear-max` | Maximum lag (frames) | `60` |
+| `--dynamic-calibration-frames` | Frames used to fit growth behavior | `10` |
+| `--dynamic-target-fraction` | Target ROI coverage fraction | `0.2` |
+| `--dynamic-lag-linear` | Use a linear lag schedule | `false` |
+| `--dynamic-lag-linear-start` | Starting lag in frames | `0` |
+| `--dynamic-lag-linear-max` | Maximum lag in frames | `60` |
 | `--dynamic-lag-scale` | Scale factor for lag | `1.0` |
 | `--dynamic-lag-log` | CSV file for lag logging | - |
 
@@ -168,47 +171,47 @@ python vrifa.py --annotation-formats ""
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--lock-frames` | Frames pixel must stay filled to persist | `3` |
+| `--lock-frames` | Frames a filled pixel must persist before lock-in | `3` |
 
-### Annotation Export
+### Annotation Output
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--annotation-formats` | `coco`, `yolov5`, `darknet` (comma-separated) | `coco` |
+| `--annotation-formats` | `coco`, `yolov5`, `darknet` | `coco` |
 | `--annotation-mode` | `all`, `count`, `stride` | `all` |
-| `--annotation-count` | Number of frames (with `count` mode) | - |
-| `--annotation-stride` | Frame interval (with `stride` mode) | `1` |
-| `--annotation-segmentation-tolerance` | Polygon simplification (px) | `0` |
-| `--annotation-segmentation-max-edge-length` | Max edge length (px) | `0` |
+| `--annotation-count` | Number of frames when using `count` mode | - |
+| `--annotation-stride` | Frame interval when using `stride` mode | `1` |
+| `--annotation-segmentation-tolerance` | Polygon simplification tolerance in pixels | `0` |
+| `--annotation-segmentation-max-edge-length` | Maximum densified edge length in pixels | `0` |
 
 ---
 
 ## Examples
 
-### Basic Processing (Recommended)
+### Basic Processing
 
 ```bash
-python vrifa.py \
+vrifa \
   --video-path input.mp4 \
   --output-dir outputs \
   --roi-margin 0 \
   --write-videos
 ```
 
-### High Sensitivity Detection
+### High-Sensitivity Detection
 
 ```bash
-python vrifa.py \
+vrifa \
   --video-path input.mp4 \
   --output-dir outputs \
   --threshold-offset -50 \
   --write-videos
 ```
 
-### Classic Mode (No New Features)
+### Minimal Artifact Set
 
 ```bash
-python vrifa.py \
+vrifa \
   --video-path input.mp4 \
   --output-dir outputs \
   --no-darken-only \
@@ -218,10 +221,10 @@ python vrifa.py \
   --write-videos
 ```
 
-### Generate ML Training Dataset
+### Generate a Training Dataset
 
 ```bash
-python vrifa.py \
+vrifa \
   --video-path input.mp4 \
   --output-dir dataset \
   --annotation-formats coco,yolov5,darknet \
@@ -232,7 +235,7 @@ python vrifa.py \
 ### Dynamic Reference with Linear Lag
 
 ```bash
-python vrifa.py \
+vrifa \
   --video-path input.mp4 \
   --ref-mode dynamic \
   --dynamic-lag-linear \
@@ -244,7 +247,7 @@ python vrifa.py \
 ### Custom ROI
 
 ```bash
-python vrifa.py \
+vrifa \
   --video-path input.mp4 \
   --roi-margin 0 \
   --roi-margin-left 0.1 \
@@ -252,10 +255,10 @@ python vrifa.py \
   --write-videos
 ```
 
-### Process Every 5th Frame
+### Process Every Fifth Frame
 
 ```bash
-python vrifa.py \
+vrifa \
   --video-path input.mp4 \
   --frame-step 5 \
   --write-videos
@@ -265,55 +268,79 @@ python vrifa.py \
 
 ## Algorithm Overview
 
-1. Frame extraction from input video at specified intervals
-2. ROI cropping to remove fixtures and edges
-3. Colorspace conversion (default: CIELAB for perceptual uniformity)
-4. Peak brightness tracking (if enabled): maintain per-pixel maximum brightness
-5. Reference frame computation based on selected strategy
-6. Difference calculation (darken-only, peak-reference, or absolute)
-7. Adaptive thresholding using Otsu's method with configurable offset
-8. Morphological operations (closing, opening) to clean mask
-9. Temporal consistency filtering to reduce transient noise
-10. Contour extraction for annotation polygon generation
-11. Output generation (masks, overlays, heatmaps, annotations)
+1. Extract or sample frames from the input video.
+2. Apply the configured region of interest.
+3. Convert the frame into the requested working colorspace.
+4. Update the peak-brightness map if that mode is enabled.
+5. Select the reference frame according to the chosen strategy.
+6. Compute the response image in darken-only or full-distance mode.
+7. Normalize and threshold the response map.
+8. Apply morphology and minimum-area filtering.
+9. Lock persistent detections through the temporal guard.
+10. Extract contours and annotation boxes.
+11. Write the requested videos, frame images, and annotations.
 
-### Why Darken-Only + Peak Reference?
+### Why Darken-Only Plus Peak Reference?
 
-In VARTM monitoring, dry fabric appears lighter (reflects more light) and wet fabric (resin-infused) appears darker (absorbs more light). Lighting variations and camera auto-exposure can cause temporary brightening. By tracking darkening relative to peak brightness, VRIFA robustly detects resin wetting while ignoring specular highlights, auto-exposure events, and shadow movements.
+In VARTM monitoring, dry fabric often appears lighter and wet fabric darkens as resin fills the weave. Camera auto-exposure, reflections, and glare can also brighten parts of the frame temporarily. Tracking darkening against the highest previously observed brightness makes the detector robust to those brightening events while staying sensitive to true wetting.
 
 ---
 
 ## Reproducibility
 
-Each run generates a `run_summary.yaml` file containing all parameters and timing information. Use this file to reproduce exact configurations or document experimental setups.
+Each run writes `run_summary.yaml` with the resolved configuration, timing information, ROI coverage, and output settings. Keep that file with exported artifacts if you need to reproduce or compare runs later.
 
 ---
 
 ## Troubleshooting
 
-### Detection is too sensitive (false positives)
+### Detection is too sensitive
+
 ```bash
-python vrifa.py --threshold-offset -10
-python vrifa.py --contrast-threshold 30
+vrifa --threshold-offset -10
+vrifa --contrast-threshold 30
 ```
 
-### Detection is not sensitive enough (missing flow front)
+### Detection is not sensitive enough
+
 ```bash
-python vrifa.py --threshold-offset -50
+vrifa --threshold-offset -50
 ```
 
-### Noisy/speckled detections
+### Detections are noisy or speckled
+
 ```bash
-python vrifa.py --morph-close-iterations 2 --morph-open-iterations 2
-python vrifa.py --min-area 1000
+vrifa --morph-close-iterations 2 --morph-open-iterations 2
+vrifa --min-area 1000
 ```
 
-### Flickering detections
+### Detections flicker
+
 ```bash
-python vrifa.py --lock-frames 5
+vrifa --lock-frames 5
 ```
 
-### Edge artifacts from fixtures
+### Edge fixtures leak into the mask
+
 ```bash
-python vrifa.py --roi-margin 0.2
+vrifa --roi-margin 0.2
 ```
+
+---
+
+## Verifying Your Changes
+
+For fast regression coverage, run:
+
+```bash
+cd vrifa-rs
+cargo test --workspace --release
+```
+
+For artifact-level validation against the frozen sample runs, use the internal harness in `_dev/`:
+
+```bash
+./_dev/validation/compare_runs.py /tmp/py_run /tmp/rs_run
+```
+
+The fixture generator and stage-dump tools that refresh validation assets also live under `_dev/validation/`.

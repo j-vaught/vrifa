@@ -1357,7 +1357,7 @@ fn yaml_f32(value: f32) -> f64 {
     ((value as f64) * 1_000_000.0).round() / 1_000_000.0
 }
 
-pub fn run_python_config(config: Config) -> Result<()> {
+pub fn run_binding_config(config: Config) -> Result<()> {
     run_config(config)
 }
 

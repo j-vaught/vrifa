@@ -5,7 +5,7 @@ use common::{assert_u8_exact, load_lock_frames, load_lock_sequence, load_locked_
 use vrifa_core::lock::{apply_locking, LockState};
 
 #[test]
-fn locking_matches_python_fixture_sequence() {
+fn locking_matches_frozen_fixture_sequence() {
     let sequence = load_lock_sequence();
     let expected = load_locked_mask();
     let lock_frames = load_lock_frames();
