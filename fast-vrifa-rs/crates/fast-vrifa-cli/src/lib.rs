@@ -25,7 +25,6 @@ use vrifa_core::delta::compute_delta;
 use vrifa_core::heatmap::apply_turbo_colormap;
 use vrifa_core::lock::{apply_locking, LockState};
 use vrifa_core::morphology::{MorphShape, MorphologyParams};
-use vrifa_core::overlay::create_overlay;
 use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::reference::{
     compute_dynamic_factor, select_dynamic_reference_index, DynamicReferenceParams,
@@ -665,7 +664,7 @@ where
             let write_overlay = config.write_overlay_pngs || config.write_overlay_video;
             let write_heatmap = config.write_heatmap_pngs || config.write_heatmap_video;
             let overlay = if write_overlay {
-                Some(Arc::new(create_overlay(&frame_bgr, &mask)?))
+                Some(Arc::new(create_overlay_fast(&frame_bgr, &mask)?))
             } else {
                 None
             };
@@ -1033,6 +1032,34 @@ fn morph_shape_code(shape: MorphShape) -> i32 {
         MorphShape::Rect => imgproc::MORPH_RECT,
         MorphShape::Cross => imgproc::MORPH_CROSS,
     }
+}
+
+fn create_overlay_fast(frame_bgr: &Array3<u8>, mask: &Array2<u8>) -> Result<Array3<u8>> {
+    let (height, width, channels) = frame_bgr.dim();
+    anyhow::ensure!(channels == 3, "overlay frame must be BGR with 3 channels");
+    anyhow::ensure!(
+        mask.dim() == (height, width),
+        "mask shape does not match frame"
+    );
+
+    let mask_mat = cvutil::array2_u8_to_mat(mask)?;
+    let kernel = imgproc::get_structuring_element_def(imgproc::MORPH_RECT, Size::new(5, 5))?;
+    let mut edges = opencv::core::Mat::default();
+    imgproc::morphology_ex(
+        &mask_mat,
+        &mut edges,
+        imgproc::MORPH_GRADIENT,
+        &kernel,
+        Point::new(-1, -1),
+        1,
+        core::BORDER_CONSTANT,
+        imgproc::morphology_default_border_value()?,
+    )?;
+
+    let frame_mat = cvutil::array3_u8_to_mat(frame_bgr)?;
+    let mut overlay = frame_mat.try_clone()?;
+    overlay.set_to(&Scalar::new(0.0, 0.0, 255.0, 0.0), &edges)?;
+    Ok(cvutil::mat_to_array3_u8(&overlay)?)
 }
 
 fn convert_frame_with_backend<B>(
