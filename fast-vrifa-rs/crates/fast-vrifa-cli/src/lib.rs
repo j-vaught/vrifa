@@ -480,6 +480,22 @@ where
     } else {
         None
     };
+    let supports_device_auto_threshold =
+        config.contrast_threshold.is_none() && config.contrast_percentile.is_none();
+    let mut device_lock_state = if config.lock_frames > 0 {
+        backend.create_lock_state(roi_mask.dim())?
+    } else {
+        None
+    };
+    let need_host_mask = config.write_mask_pngs
+        || config.write_overlay_pngs
+        || config.write_mask_video
+        || config.write_overlay_video
+        || !config.annotation_formats.is_empty()
+        || matches!(config.ref_mode, ReferenceMode::Dynamic)
+        || (config.lock_frames > 0 && device_lock_state.is_none());
+    let need_host_delta_norm =
+        config.write_heatmap_pngs || config.write_heatmap_video || !supports_device_auto_threshold;
 
     reader.seek_zero()?;
     let mut processed = 0usize;
@@ -610,7 +626,9 @@ where
                 }
             }
 
-            let detect = if let Some(device_lab) = current.device_lab.as_ref() {
+            let mut host_mask: Option<Array2<u8>> = None;
+            let mut host_delta_norm: Option<Array2<u8>> = None;
+            if let Some(device_lab) = current.device_lab.as_ref() {
                 if device_delta_eligible {
                     let device_delta = if config.peak_reference {
                         backend.compute_delta_darken_only_device(
@@ -652,46 +670,121 @@ where
                         morph_params.blur_kernel,
                         morph_params.blur_enabled,
                     )? {
-                        let delta_norm = backend.download_mask_u8(&device_delta_norm)?;
-                        let threshold_value = threshold::choose_threshold(
-                            &delta_norm,
-                            &roi_mask,
-                            morph_params.manual_threshold,
-                            morph_params.percentile_threshold,
-                            morph_params.threshold_offset,
-                        )?;
-                        let mask = if let Some(device_mask) = backend.threshold_and_morph_mask(
-                            &device_delta_norm,
-                            threshold_value,
-                            morph_params.morph_shape,
-                            morph_params.morph_kernel,
-                            morph_params.morph_close_iterations,
-                            morph_params.morph_open_iterations,
-                        )? {
-                            if morph_params.min_area > 0 {
-                                if let Some(filtered_mask) = backend
-                                    .filter_min_area_mask(&device_mask, morph_params.min_area)?
+                        let mut device_mask = if supports_device_auto_threshold {
+                            backend.threshold_and_morph_mask_auto(
+                                &device_delta_norm,
+                                morph_params.threshold_offset,
+                                morph_params.morph_shape,
+                                morph_params.morph_kernel,
+                                morph_params.morph_close_iterations,
+                                morph_params.morph_open_iterations,
+                            )?
+                        } else {
+                            None
+                        };
+
+                        if device_mask.is_none() {
+                            let delta_norm = backend.download_mask_u8(&device_delta_norm)?;
+                            let threshold_value = threshold::choose_threshold(
+                                &delta_norm,
+                                &roi_mask,
+                                morph_params.manual_threshold,
+                                morph_params.percentile_threshold,
+                                morph_params.threshold_offset,
+                            )?;
+                            host_delta_norm = Some(delta_norm.clone());
+                            if let Some(mask) = backend.threshold_and_morph_mask(
+                                &device_delta_norm,
+                                threshold_value,
+                                morph_params.morph_shape,
+                                morph_params.morph_kernel,
+                                morph_params.morph_close_iterations,
+                                morph_params.morph_open_iterations,
+                            )? {
+                                device_mask = Some(mask);
+                            } else {
+                                let unlocked = detect_mask_from_delta_norm_threshold(
+                                    &delta_norm,
+                                    threshold_value,
+                                    &morph_params,
+                                )?;
+                                host_mask = Some(apply_locking(
+                                    &unlocked,
+                                    config.lock_frames,
+                                    lock_state.as_mut(),
+                                )?);
+                            }
+                        }
+
+                        if let Some(mask) = device_mask.take() {
+                            let mask = if morph_params.min_area > 0 {
+                                if let Some(filtered_mask) =
+                                    backend.filter_min_area_mask(&mask, morph_params.min_area)?
                                 {
-                                    backend.download_mask_u8(&filtered_mask)?
+                                    filtered_mask
                                 } else {
-                                    let mut mask = backend.download_mask_u8(&device_mask)?;
-                                    mask = filter_min_area_array(&mask, morph_params.min_area)?;
+                                    let filtered = filter_min_area_array(
+                                        &backend.download_mask_u8(&mask)?,
+                                        morph_params.min_area,
+                                    )?;
+                                    host_mask = Some(apply_locking(
+                                        &filtered,
+                                        config.lock_frames,
+                                        lock_state.as_mut(),
+                                    )?);
                                     mask
                                 }
                             } else {
-                                backend.download_mask_u8(&device_mask)?
+                                mask
+                            };
+
+                            if host_mask.is_none() {
+                                let mask = if config.lock_frames > 0 {
+                                    if let Some(state) = device_lock_state.as_mut() {
+                                        if let Some(locked_mask) = backend.apply_locking_device(
+                                            &mask,
+                                            config.lock_frames,
+                                            state,
+                                        )? {
+                                            locked_mask
+                                        } else {
+                                            host_mask = Some(apply_locking(
+                                                &backend.download_mask_u8(&mask)?,
+                                                config.lock_frames,
+                                                lock_state.as_mut(),
+                                            )?);
+                                            mask
+                                        }
+                                    } else {
+                                        host_mask = Some(apply_locking(
+                                            &backend.download_mask_u8(&mask)?,
+                                            config.lock_frames,
+                                            lock_state.as_mut(),
+                                        )?);
+                                        mask
+                                    }
+                                } else {
+                                    mask
+                                };
+
+                                if need_host_mask && host_mask.is_none() {
+                                    host_mask = Some(backend.download_mask_u8(&mask)?);
+                                }
                             }
-                        } else {
-                            detect_mask_from_delta_norm_threshold(
-                                &delta_norm,
-                                threshold_value,
-                                &morph_params,
-                            )?
-                        };
-                        DetectionOutputs { mask, delta_norm }
+                        }
+
+                        if need_host_delta_norm && host_delta_norm.is_none() {
+                            host_delta_norm = Some(backend.download_mask_u8(&device_delta_norm)?);
+                        }
                     } else {
                         let delta = backend.download_plane_f32(&device_delta)?;
-                        detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
+                        let detect = detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?;
+                        host_mask = Some(apply_locking(
+                            &detect.mask,
+                            config.lock_frames,
+                            lock_state.as_mut(),
+                        )?);
+                        host_delta_norm = Some(detect.delta_norm);
                     }
                 } else {
                     let host_reference = reference_for_frame
@@ -710,7 +803,13 @@ where
                             .as_ref()
                             .filter(|_| config.peak_reference),
                     )?;
-                    detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
+                    let detect = detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?;
+                    host_mask = Some(apply_locking(
+                        &detect.mask,
+                        config.lock_frames,
+                        lock_state.as_mut(),
+                    )?);
+                    host_delta_norm = Some(detect.delta_norm);
                 }
             } else {
                 let host_reference = reference_for_frame
@@ -729,28 +828,41 @@ where
                         .as_ref()
                         .filter(|_| config.peak_reference),
                 )?;
-                detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
-            };
-            let mask = Arc::new(apply_locking(
-                &detect.mask,
-                config.lock_frames,
-                lock_state.as_mut(),
-            )?);
-            let delta_norm = Arc::new(detect.delta_norm);
+                let detect = detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?;
+                host_mask = Some(apply_locking(
+                    &detect.mask,
+                    config.lock_frames,
+                    lock_state.as_mut(),
+                )?);
+                host_delta_norm = Some(detect.delta_norm);
+            }
+            let mask = host_mask.map(Arc::new);
+            let delta_norm = host_delta_norm.map(Arc::new);
             let overlay = if config.write_overlay_pngs {
-                Some(Arc::new(create_overlay(&frame_bgr, &mask)?))
+                Some(Arc::new(create_overlay(
+                    &frame_bgr,
+                    mask.as_ref()
+                        .ok_or_else(|| anyhow!("overlay generation requires a host mask"))?,
+                )?))
             } else {
                 None
             };
             let heatmap = if config.write_heatmap_pngs {
-                Some(Arc::new(apply_turbo_colormap(&delta_norm)?))
+                Some(Arc::new(apply_turbo_colormap(
+                    delta_norm
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("heatmap generation requires host delta_norm"))?,
+                )?))
             } else {
                 None
             };
 
             if !config.annotation_formats.is_empty() {
+                let mask = mask
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("annotation export requires a host mask"))?;
                 let boxes = extract_bounding_boxes(
-                    &mask,
+                    mask,
                     config.annotation_segmentation_tolerance,
                     config.annotation_segmentation_max_edge_length,
                 )?;
@@ -772,7 +884,13 @@ where
 
             let basename = format!("frame_{frame_index:06}.png");
             if let Some(writer) = mask_png_writer.as_mut() {
-                writer.write_gray(mask_dir.join(&basename), (*mask).clone())?;
+                writer.write_gray(
+                    mask_dir.join(&basename),
+                    (**mask
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("mask PNG writing requires a host mask"))?)
+                    .clone(),
+                )?;
             }
             if let (Some(writer), Some(overlay)) = (overlay_png_writer.as_mut(), overlay.as_ref()) {
                 writer.write_bgr(overlay_dir.join(&basename), (**overlay).clone())?;
@@ -781,10 +899,19 @@ where
                 writer.write_bgr(heatmap_dir.join(&basename), (**heatmap).clone())?;
             }
             if let Some(writer) = mask_writer.as_mut() {
-                writer.write_gray(mask.clone())?;
+                writer.write_gray(
+                    mask.as_ref()
+                        .ok_or_else(|| anyhow!("mask video staging requires a host mask"))?
+                        .clone(),
+                )?;
             }
             if let Some(writer) = delta_norm_writer.as_mut() {
-                writer.write_gray(delta_norm.clone())?;
+                writer.write_gray(
+                    delta_norm
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("heatmap video staging requires host delta_norm"))?
+                        .clone(),
+                )?;
             }
 
             if matches!(config.ref_mode, ReferenceMode::Dynamic) {
@@ -792,7 +919,12 @@ where
                 dynamic_first_lag.get_or_insert(lag);
                 dynamic_last_lag = Some(lag);
                 dynamic_lag_log.push((frame_index, lag));
-                let mask_area = mask.iter().filter(|value| **value > 0).count();
+                let mask_area = mask
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("dynamic reference mode requires a host mask"))?
+                    .iter()
+                    .filter(|value| **value > 0)
+                    .count();
                 if dynamic_factor.is_none()
                     && metadata.fps > 0.0
                     && frame_index > 1

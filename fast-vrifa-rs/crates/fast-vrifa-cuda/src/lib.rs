@@ -54,6 +54,14 @@ pub struct CudaMaskU8 {
     height: usize,
 }
 
+#[derive(Clone)]
+pub struct CudaLockState {
+    counter: CudaSlice<u16>,
+    locked: CudaSlice<u8>,
+    width: usize,
+    height: usize,
+}
+
 struct CudaBackendInner {
     stream: Arc<CudaStream>,
     _module: Arc<CudaModule>,
@@ -66,10 +74,14 @@ struct CudaBackendInner {
     reduce_minmax: CudaFunction,
     normalize_u8: CudaFunction,
     threshold_binary: CudaFunction,
+    threshold_binary_device: CudaFunction,
+    histogram_u8: CudaFunction,
+    otsu_threshold: CudaFunction,
     dilate_binary: CudaFunction,
     erode_binary: CudaFunction,
     count_components: CudaFunction,
     filter_components: CudaFunction,
+    lock_mask: CudaFunction,
     lab_lut: CudaSlice<u32>,
     npp: Option<Arc<npp::NppLibrary>>,
 }
@@ -155,6 +167,15 @@ impl CudaBackendInner {
         let threshold_binary = module
             .load_function("threshold_binary_u8")
             .context("loading CUDA threshold kernel")?;
+        let threshold_binary_device = module
+            .load_function("threshold_binary_u8_device")
+            .context("loading CUDA device-threshold kernel")?;
+        let histogram_u8 = module
+            .load_function("histogram_u8")
+            .context("loading CUDA histogram kernel")?;
+        let otsu_threshold = module
+            .load_function("otsu_threshold_from_histogram")
+            .context("loading CUDA Otsu kernel")?;
         let dilate_binary = module
             .load_function("dilate_binary_u8")
             .context("loading CUDA dilation kernel")?;
@@ -167,6 +188,9 @@ impl CudaBackendInner {
         let filter_components = module
             .load_function("filter_labeled_components_u8")
             .context("loading CUDA component-filter kernel")?;
+        let lock_mask = module
+            .load_function("apply_locking_u8")
+            .context("loading CUDA lock-state kernel")?;
         let host_lut = load_or_build_lab_lut()?;
         let lab_lut = stream
             .clone_htod(&host_lut)
@@ -184,10 +208,14 @@ impl CudaBackendInner {
             reduce_minmax,
             normalize_u8,
             threshold_binary,
+            threshold_binary_device,
+            histogram_u8,
+            otsu_threshold,
             dilate_binary,
             erode_binary,
             count_components,
             filter_components,
+            lock_mask,
             lab_lut,
             npp,
         })
@@ -205,6 +233,7 @@ impl ImageBackend for CudaBackend {
     type DeviceFrameLab = CudaFrameLab;
     type DevicePlaneF32 = CudaPlaneF32;
     type DeviceMaskU8 = CudaMaskU8;
+    type DeviceLockState = CudaLockState;
 
     fn kind(&self) -> BackendKind {
         BackendKind::Cuda
@@ -684,6 +713,152 @@ impl PeakImageBackend for CudaBackend {
         }))
     }
 
+    fn threshold_and_morph_mask_auto(
+        &self,
+        delta_norm: &Self::DeviceMaskU8,
+        threshold_offset: f32,
+        morph_shape: MorphShape,
+        morph_kernel: usize,
+        morph_close_iterations: usize,
+        morph_open_iterations: usize,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let inner = self.inner()?;
+        let pixel_count = delta_norm.width * delta_norm.height;
+        let histogram_cfg = LaunchConfig {
+            grid_dim: ((pixel_count as u32).div_ceil(256), 1, 1),
+            block_dim: (256, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        let pixel_count_i32 = pixel_count as i32;
+        let mut histogram = inner
+            .stream
+            .alloc_zeros::<u32>(256)
+            .context("allocating CUDA Otsu histogram")?;
+        let mut histogram_launch = inner.stream.launch_builder(&inner.histogram_u8);
+        histogram_launch.arg(&delta_norm.data);
+        histogram_launch.arg(&mut histogram);
+        histogram_launch.arg(&pixel_count_i32);
+        unsafe { histogram_launch.launch(histogram_cfg) }
+            .context("launching CUDA histogram kernel")?;
+
+        let mut threshold = inner
+            .stream
+            .alloc_zeros::<f32>(1)
+            .context("allocating CUDA Otsu threshold")?;
+        let otsu_cfg = LaunchConfig {
+            grid_dim: (1, 1, 1),
+            block_dim: (1, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        let mut otsu_launch = inner.stream.launch_builder(&inner.otsu_threshold);
+        otsu_launch.arg(&histogram);
+        otsu_launch.arg(&mut threshold);
+        otsu_launch.arg(&threshold_offset);
+        unsafe { otsu_launch.launch(otsu_cfg) }.context("launching CUDA Otsu kernel")?;
+
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let mut current = inner
+            .stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA threshold output")?;
+        let mut threshold_launch = inner.stream.launch_builder(&inner.threshold_binary_device);
+        threshold_launch.arg(&delta_norm.data);
+        threshold_launch.arg(&mut current);
+        threshold_launch.arg(&threshold);
+        threshold_launch.arg(&pixel_count_i32);
+        unsafe { threshold_launch.launch(cfg) }
+            .context("launching CUDA device-threshold kernel")?;
+
+        if morph_close_iterations == 0 && morph_open_iterations == 0 {
+            return Ok(Some(CudaMaskU8 {
+                data: current,
+                width: delta_norm.width,
+                height: delta_norm.height,
+            }));
+        }
+
+        let kernel_size = canonical_morph_kernel_size(morph_kernel);
+        let kernel_mask = structuring_element_mask(morph_shape, kernel_size)?;
+        let kernel_buffer = inner
+            .stream
+            .clone_htod(&kernel_mask)
+            .context("uploading CUDA morphology kernel mask")?;
+        let width_i32 = delta_norm.width as i32;
+        let height_i32 = delta_norm.height as i32;
+        let kernel_i32 = kernel_size as i32;
+        let mut scratch = inner
+            .stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA morphology scratch buffer")?;
+
+        for _ in 0..morph_close_iterations {
+            launch_binary_morph(
+                inner,
+                &inner.dilate_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "dilation",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+            launch_binary_morph(
+                inner,
+                &inner.erode_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "erosion",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+        }
+        for _ in 0..morph_open_iterations {
+            launch_binary_morph(
+                inner,
+                &inner.erode_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "erosion",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+            launch_binary_morph(
+                inner,
+                &inner.dilate_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "dilation",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+        }
+
+        Ok(Some(CudaMaskU8 {
+            data: current,
+            width: delta_norm.width,
+            height: delta_norm.height,
+        }))
+    }
+
     fn filter_min_area_mask(
         &self,
         mask: &Self::DeviceMaskU8,
@@ -827,6 +1002,60 @@ impl PeakImageBackend for CudaBackend {
                 height: mask.height,
             }))
         }
+    }
+
+    fn create_lock_state(&self, shape: (usize, usize)) -> Result<Option<Self::DeviceLockState>> {
+        let inner = self.inner()?;
+        let pixel_count = shape.0 * shape.1;
+        Ok(Some(CudaLockState {
+            counter: inner
+                .stream
+                .alloc_zeros::<u16>(pixel_count)
+                .context("allocating CUDA lock counter")?,
+            locked: inner
+                .stream
+                .alloc_zeros::<u8>(pixel_count)
+                .context("allocating CUDA locked mask")?,
+            width: shape.1,
+            height: shape.0,
+        }))
+    }
+
+    fn apply_locking_device(
+        &self,
+        mask: &Self::DeviceMaskU8,
+        lock_frames: usize,
+        state: &mut Self::DeviceLockState,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let inner = self.inner()?;
+        anyhow::ensure!(
+            (state.height, state.width) == (mask.height, mask.width),
+            "device lock state shape does not match mask"
+        );
+        if lock_frames == 0 {
+            return Ok(Some(mask.clone()));
+        }
+        let pixel_count = mask.width * mask.height;
+        let pixel_count_i32 = pixel_count as i32;
+        let lock_frames_u16 = lock_frames.min(u16::MAX as usize) as u16;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let mut output = inner
+            .stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA lock output mask")?;
+        let mut launch = inner.stream.launch_builder(&inner.lock_mask);
+        launch.arg(&mask.data);
+        launch.arg(&mut state.counter);
+        launch.arg(&mut state.locked);
+        launch.arg(&mut output);
+        launch.arg(&lock_frames_u16);
+        launch.arg(&pixel_count_i32);
+        unsafe { launch.launch(cfg) }.context("launching CUDA lock kernel")?;
+        Ok(Some(CudaMaskU8 {
+            data: output,
+            width: mask.width,
+            height: mask.height,
+        }))
     }
 }
 

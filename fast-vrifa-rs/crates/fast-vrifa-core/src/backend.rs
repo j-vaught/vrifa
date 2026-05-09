@@ -30,6 +30,7 @@ pub trait ImageBackend: Send + Sync {
     type DeviceFrameLab;
     type DevicePlaneF32;
     type DeviceMaskU8;
+    type DeviceLockState;
 
     fn kind(&self) -> BackendKind;
     fn label(&self) -> &'static str;
@@ -100,12 +101,47 @@ pub trait PeakImageBackend: ImageBackend {
         Ok(None)
     }
 
+    fn threshold_and_morph_mask_auto(
+        &self,
+        delta_norm: &Self::DeviceMaskU8,
+        threshold_offset: f32,
+        morph_shape: MorphShape,
+        morph_kernel: usize,
+        morph_close_iterations: usize,
+        morph_open_iterations: usize,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let _ = (
+            delta_norm,
+            threshold_offset,
+            morph_shape,
+            morph_kernel,
+            morph_close_iterations,
+            morph_open_iterations,
+        );
+        Ok(None)
+    }
+
     fn filter_min_area_mask(
         &self,
         mask: &Self::DeviceMaskU8,
         min_area: usize,
     ) -> Result<Option<Self::DeviceMaskU8>> {
         let _ = (mask, min_area);
+        Ok(None)
+    }
+
+    fn create_lock_state(&self, shape: (usize, usize)) -> Result<Option<Self::DeviceLockState>> {
+        let _ = shape;
+        Ok(None)
+    }
+
+    fn apply_locking_device(
+        &self,
+        mask: &Self::DeviceMaskU8,
+        lock_frames: usize,
+        state: &mut Self::DeviceLockState,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let _ = (mask, lock_frames, state);
         Ok(None)
     }
 }

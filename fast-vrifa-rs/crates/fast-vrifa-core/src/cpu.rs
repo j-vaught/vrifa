@@ -33,6 +33,7 @@ impl ImageBackend for CpuBackend {
     type DeviceFrameLab = CpuFrameLab;
     type DevicePlaneF32 = CpuPlaneF32;
     type DeviceMaskU8 = CpuMaskU8;
+    type DeviceLockState = ();
 
     fn kind(&self) -> BackendKind {
         BackendKind::Cpu

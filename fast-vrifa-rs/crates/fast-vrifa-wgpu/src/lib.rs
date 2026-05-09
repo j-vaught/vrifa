@@ -284,6 +284,7 @@ impl ImageBackend for WgpuBackend {
     type DeviceFrameLab = WgpuFrameLab;
     type DevicePlaneF32 = WgpuPlaneF32;
     type DeviceMaskU8 = WgpuMaskU8;
+    type DeviceLockState = ();
 
     fn kind(&self) -> BackendKind {
         BackendKind::Wgpu
