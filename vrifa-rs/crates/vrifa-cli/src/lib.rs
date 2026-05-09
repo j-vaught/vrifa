@@ -11,7 +11,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
-use vrifa_annotations::AnnotationFrame;
+use vrifa_annotations::{AnnotationExportOptions, AnnotationFrame};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_core::contours::extract_bounding_boxes;
 use vrifa_core::lock::{apply_locking, LockState};
@@ -738,6 +738,7 @@ pub fn run_config(config: Config) -> Result<()> {
             metadata.width,
             metadata.height,
             &config.annotation_formats,
+            &AnnotationExportOptions::default(),
         )?;
     }
 
