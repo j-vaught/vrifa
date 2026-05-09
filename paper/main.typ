@@ -54,14 +54,14 @@
     vacuum bag as their primary process indicator, yet the open
     toolchain for turning that video into a reproducible,
     time-resolved flow-front segmentation is thin. Published vision
-    systems for VARTM and Liquid Composite Molding either ship as
-    proprietary controllers tied to a specific cell or as deep
-    convolutional networks trained on simulated frames whose
+    systems for VARTM and Liquid Composite Molding are released
+    either as proprietary controllers tied to a specific cell or as
+    deep convolutional networks trained on simulated frames whose
     distribution does not match a typical research-bench camera,
-    leaving practitioners without a starting point. Here we show
-    that a twelve-stage classical computer-vision pipeline
-    implemented in Rust, configured via roughly fifty command-line
-    flags, and shipped under the MIT license, segments resin flow
+    leaving practitioners without a starting point. This work
+    presents a twelve-stage classical computer-vision pipeline
+    implemented in Rust, configured via roughly fifty parameters,
+    and released under the MIT license, that segments resin flow
     fronts in VARTM video at thirty frames per second end-to-end on
     a single CPU. On a fifty-five-frame hand-labeled subset spanning
     eleven distinct VARTM runs, the default configuration achieves

@@ -26,36 +26,37 @@ The pipeline is deliberately classical, which is what makes it suitable as a ref
 
 == Frame decode and colorspace conversion
 
-The first stage decodes each Blue-Green-Red (BGR) frame from the input video. The second converts that frame into a working colorspace. VRIFA exposes four options, namely the International Commission on Illumination (CIE) 1976 _L\*a\*b\*_ colorspace (CIELAB), Red-Green-Blue (RGB), Hue-Saturation-Value (HSV), and 8-bit grayscale, all routed through OpenCV color converters. CIELAB is the default because resin wetting darkens the lightness channel _L\*_ much more than it shifts chrominance, which makes the single-channel _L\*_ projection used in the difference computation both sufficient and robust. We denote the converted frame at index $t$ by $F_t in bb(R)^(H times W times C)$, where $C$ is the channel count of the chosen colorspace.
+The first stage decodes each Blue-Green-Red (BGR) frame from the input video. The second converts that frame into a working colorspace. VRIFA exposes four options, namely the International Commission on Illumination (CIE) 1976 $L^* a^* b^*$ colorspace (CIELAB), Red-Green-Blue (RGB), Hue-Saturation-Value (HSV), and 8-bit grayscale, all routed through standard color converters. CIELAB is the default because resin wetting darkens the lightness channel $L^*$ much more than it shifts chrominance, which makes the single-channel $L^*$ projection used in the difference computation both sufficient and robust. We denote the converted frame at index $t$ by $F_t in bb(R)^(H times W times C)$, where $C$ is the channel count of the chosen colorspace.
 
 == Region of interest
 
-A rectangular region of interest excludes the part frame, manifold flange, and bag wrinkles outside the laminate. The user supplies four fractional margins, one per edge, each clamped to the closed interval from zero to forty-nine hundredths of the corresponding side, and the algorithm builds a binary mask $R$ that is one inside the resulting rectangle and zero elsewhere. A single command-line flag sets all four margins symmetrically, with per-edge overrides available. All subsequent stages operate only on pixels where $R = 1$.
+A rectangular region of interest excludes the part frame, manifold flange, and bag wrinkles outside the laminate. The user supplies four fractional margins, one per edge, each clamped to the closed interval from zero to forty-nine hundredths of the corresponding side, and the algorithm builds a binary mask $R$ that is one inside the resulting rectangle and zero elsewhere. A single configuration parameter sets all four margins symmetrically, with per-edge overrides available. All subsequent stages operate only on pixels where $R = 1$.
 
 == Peak-brightness reference
 
-VRIFA accumulates a running maximum of the working channel across all frames seen so far. The motivation is that the dry preform is, by definition, the brightest the fabric will ever appear in the working channel. Treating that running maximum as the per-pixel reference instead of a single early frame absorbs the slow lighting drift caused by lamp warm-up and bag deformation, leaving the difference field free to respond to wetting alone. Figure~@fig:peak shows the effect at one tracked pixel of the canonical input clip. The raw _L\*_ value drifts upward as the lamps stabilize, the running peak _P_ tracks that drift monotonically, and the front arrival cleanly separates as a sharp drop of more than thirty units below the peak. A fixed reference would have started at the value reached on frame zero and missed the post-warm-up lift entirely.
+VRIFA accumulates a running maximum of the working channel across all frames seen so far. The motivation is that the dry preform is, by definition, the brightest the fabric will ever appear in the working channel. Treating that running maximum as the per-pixel reference instead of a single early frame absorbs the slow lighting drift caused by lamp warm-up and bag deformation, leaving the difference field free to respond to wetting alone. Figure~@fig:peak shows the effect at one tracked pixel of the canonical input clip. The raw $L^*$ value drifts upward as the lamps stabilize, the running peak $P$ tracks that drift monotonically, and the front arrival cleanly separates as a sharp drop of more than thirty units below the peak. A fixed reference would have started at the value reached on frame zero and missed the post-warm-up lift entirely.
 
 #figure(
   image("/typst/figures/peak_reference.pdf", width: 95%),
   caption: [
-    One pixel of `input_1` tracked across all 706 frames. The raw
-    CIELAB lightness _L\*_ drifts up by roughly twenty units before
-    the front arrives, and the running peak _P_ absorbs that drift.
-    When the resin reaches the pixel, _L\*_ collapses by more than
-    thirty units below the peak, which is the signal the difference
-    stage detects. A single fixed reference at frame zero would have
-    treated the warm-up brightening as a (negative) wetting event.
+    One pixel of the first canonical input clip tracked across all
+    706 frames. The raw CIELAB lightness $L^*$ drifts up by roughly
+    twenty units before the front arrives, and the running peak $P$
+    absorbs that drift. When the resin reaches the pixel, $L^*$
+    collapses by more than thirty units below the peak, which is
+    the signal the difference stage detects. A single fixed
+    reference at frame zero would have treated the warm-up
+    brightening as a (negative) wetting event.
   ],
 ) <fig:peak>
 
-The peak map can be disabled with a single command-line flag for users who want a strictly fixed reference, or who are diagnosing a lighting failure where the assumption of monotone brightness no longer holds.
+The peak map can be disabled through a single configuration parameter for users who want a strictly fixed reference, or who are diagnosing a lighting failure where the assumption of monotone brightness no longer holds.
 
 == Reference selection
 
-The reference image $G_t$ used for the difference computation has five modes. _First_ pins $G_t = F_0$ for every $t$. _Running_ updates an exponential moving average $G_t = (1 - alpha) G_(t-1) + alpha F_t$ with default $alpha = 0.05$. _Prev_ uses a fixed-offset history $G_t = F_(t - k)$, with the buffer bootstrapped from $F_0$ until $t > k$. _Absolute_ pins $G_t$ to a user-specified absolute frame index. _Dynamic_ adapts the lag online from a sqrt-area growth model fit to the early frames. The default mode is _first_, which, combined with the peak map above, gives a piecewise-static reference whose only adaptation is the peak update.
+The reference image $G_t$ used for the difference computation has five modes. The first-frame mode pins $G_t = F_0$ for every $t$. The running mode updates an exponential moving average $G_t = (1 - alpha) G_(t-1) + alpha F_t$ with default $alpha = 0.05$. The previous-frame mode uses a fixed-offset history $G_t = F_(t - k)$, with the buffer bootstrapped from $F_0$ until $t > k$. The absolute mode pins $G_t$ to a user-specified absolute frame index. The dynamic mode adapts the lag online from a square-root-area growth model fit to the early frames. The default selection is the first-frame mode, which, combined with the peak map above, gives a piecewise-static reference whose only adaptation is the peak update.
 
-The dynamic mode is worth a closer look because it is what enables comparable behavior across runs of different fill speeds. For the first $N_"calib"$ frames after detection bootstrapping, VRIFA records the wet area $a_t$ inside the region of interest and the elapsed time $tau_t = (t-1)/f$ in seconds, where $f$ is the video frame rate. It then estimates a growth-rate factor $kappa$ as the median of $a_t / tau_t^(3/2)$ across the calibration frames; the three-halves exponent comes from the area-growth law observed for radial Darcy infusion, where wetted area is approximately proportional to time at the three-halves power once flow is well established. Given $kappa$ and a target wet fraction $rho$ of the region-of-interest area $|R|$ (default $0.2$), the dynamic lag $Delta tau_t$ in seconds that places the reference at the moment when the wet area was a fraction $rho$ of the current area is
+The dynamic mode warrants a closer look because it is what enables comparable behavior across runs of different fill speeds. For the first $N_"calib"$ frames after detection bootstrapping, VRIFA records the wet area $a_t$ inside the region of interest and the elapsed time $tau_t = (t-1)/f$ in seconds, where $f$ is the video frame rate. It then estimates a growth-rate factor $kappa$ as the median of $a_t / tau_t^(3/2)$ across the calibration frames; the three-halves exponent comes from the area-growth law observed for radial Darcy infusion, where wetted area is approximately proportional to time at the three-halves power once flow is well established. Given $kappa$ and a target wet fraction $rho$ of the region-of-interest area $|R|$ (default $0.2$), the dynamic lag $Delta tau_t$ in seconds that places the reference at the moment when the wet area was a fraction $rho$ of the current area is
 
 $ Delta tau_t = lambda dot.c [ ( (rho |R|) / kappa + sqrt(tau_t) )^2 - tau_t ], $ <eq:dynlag>
 
@@ -63,11 +64,11 @@ clipped to be non-negative and scaled by a user lag factor $lambda$ (default $1.
 
 == Delta computation
 
-Stage six produces the per-pixel scalar field $D_t$ that drives all downstream decisions. The default _darken-only_ mode operates on the working (first) channel and records how much darker the frame is than its reference,
+Stage six produces the per-pixel scalar field $D_t$ that drives all downstream decisions. The default darken-only mode operates on the working (first) channel and records how much darker the frame is than its reference,
 
 $ D_t (y, x) = R(y, x) dot.c max(0, w_0 dot.c (G_t^star (y, x) - F_t (y, x, 0))), $ <eq:delta_darken>
 
-where $G_t^star$ equals the peak map $P_t$ when peak-reference mode is enabled and otherwise equals the channel-zero slice of $G_t$. The clip to non-negative values discards every pixel that becomes _brighter_ than the reference, which removes specular flashes from the silicone vacuum bag and from condensation, neither of which are wetting events. A full-color mode replaces the difference with the channel-weighted Euclidean distance across all $C$ channels, exposed via a single flag and intended for HSV and RGB workflows where chrominance shifts are diagnostic. Figure~@fig:darken_only shows what the clip is doing.
+where $G_t^star$ equals the peak map $P_t$ when the peak-reference mode is enabled and otherwise equals the channel-zero slice of $G_t$. The clip to non-negative values discards every pixel that becomes brighter than the reference, which removes specular flashes from the silicone vacuum bag and from condensation, neither of which are wetting events. A full-color mode replaces the difference with the channel-weighted Euclidean distance across all $C$ channels, exposed through a single configuration parameter and intended for HSV and RGB workflows where chrominance shifts are diagnostic. Figure~@fig:darken_only shows the effect of the clip.
 
 #figure(
   image("/typst/figures/darken_only_compare.pdf", width: 100%),
@@ -83,28 +84,29 @@ where $G_t^star$ equals the peak map $P_t$ when peak-reference mode is enabled a
 
 == Smoothing, normalization, and threshold
 
-The delta field is smoothed with a separable Gaussian kernel of size $k_b times k_b$ pixels (default $9$, forced odd at runtime) so that the dynamic range of the downstream normalized image is set by structure rather than by isolated speckle. The smoothed field is then rescaled to the byte range using OpenCV's min-max linear rescaling, producing a $tilde(D)_t$ that fits in eight bits and feeds both the threshold-selection stage and the heatmap renderer.
+The delta field is smoothed with a separable Gaussian kernel of size $k_b times k_b$ pixels (default $9$, forced odd at runtime) so that the dynamic range of the downstream normalized image is set by structure rather than by isolated speckle. The smoothed field is then rescaled to the byte range using a min-max linear rescaling, producing a $tilde(D)_t$ that fits in eight bits and feeds both the threshold-selection stage and the heatmap renderer.
 
 Three thresholding modes share a single offset. If the user passes a manual value $tau_"man"$, the algorithm uses $tau = tau_"man" + delta_tau$. If the user passes a percentile $p in [0, 100]$, the algorithm sorts the region-of-interest pixels of $tilde(D)_t$, recovers the $p$-th percentile by linear interpolation between adjacent ranks, and adds $delta_tau$. Otherwise, Otsu's between-class variance method recovers an automatic threshold $tau_"otsu"$ over the full $tilde(D)_t$ histogram, and the offset is again added. In all three cases the final threshold is clipped to the byte range. The default offset $delta_tau = -30$ biases Otsu slightly toward the wet class to capture the partially-wetted halo that classical Otsu would otherwise miss; manual and percentile modes are reserved for parameter studies and are not used for the headline numbers reported in this paper.
 
 == Mask cleanup
 
-The binary mask leaving the threshold stage is rough. It contains gaps where transient bag wrinkles muted the local response, isolated specks where the threshold caught a single noisy pixel, and components small enough that they are obviously noise rather than wetted fabric. Stages ten and the connected-components filter clean those artefacts in a fixed sequence: morphological _closing_ with an elliptical structuring element of size $k_m$ (default thirteen pixels) fills the gaps and welds neighbouring patches into one front; morphological _opening_ with the same kernel removes specks below the kernel size; and connected-components labelling discards any region whose pixel area is below $a_"min"$ pixels (default $400$). Figure~@fig:cleanup shows the same frame at every step of that sequence.
+The binary mask leaving the threshold stage is rough. It contains gaps where transient bag wrinkles muted the local response, isolated specks where the threshold caught a single noisy pixel, and components small enough that they are obviously noise rather than wetted fabric. The morphological cleanup and the connected-components filter remove those artefacts in a fixed sequence. Morphological closing with an elliptical structuring element of size $k_m$ (default thirteen pixels) fills the gaps and welds neighbouring patches into one front. Morphological opening with the same kernel removes specks below the kernel size. Connected-components labelling discards any region whose pixel area is below $a_"min"$ pixels (default $400$). Figure~@fig:cleanup shows the same frame at every step of that sequence.
 
 #figure(
   image("/typst/figures/mask_cleanup.pdf", width: 100%),
   caption: [
-    Mask cleanup on `input_1` frame 200. The normalized response
-    field (1) is thresholded into a noisy binary mask (2). Closing
-    welds neighbouring wet patches and fills small gaps (3).
-    Opening removes specks the closing kernel could not fill (4).
-    Connected-components labelling removes the few residual islands
-    below the four-hundred-pixel area floor, leaving the final mask
-    on which the temporal lock operates (5).
+    Mask cleanup on the first canonical input clip at frame 200.
+    The normalized response field (1) is thresholded into a noisy
+    binary mask (2). Closing welds neighbouring wet patches and
+    fills small gaps (3). Opening removes specks the closing
+    kernel could not fill (4). Connected-components labelling
+    removes the few residual islands below the four-hundred-pixel
+    area floor, leaving the final mask on which the temporal lock
+    operates (5).
   ],
 ) <fig:cleanup>
 
-The kernel parities are forced odd at runtime so that anchor handling is symmetric. The structuring-element shape is _ellipse_ by default with optional _rect_ and _cross_ alternatives, exposed because the front shape changes with infusion geometry.
+The kernel parities are forced odd at runtime so that anchor handling is symmetric. The structuring-element shape is elliptical by default with optional rectangular and cross-shaped alternatives, exposed because the front shape changes with infusion geometry.
 
 == Temporal locking
 
@@ -123,54 +125,55 @@ Stage eleven imposes hysteresis along the time axis. Each pixel keeps a small pe
   ],
 ) <fig:lock>
 
-The default $n_"lock" = 3$ trades a small number of frames of recovery latency for boundary stability that downstream consumers need. Setting `--lock-frames 0` disables the stage altogether for users who want raw per-frame masks.
+The default $n_"lock" = 3$ trades a small number of frames of recovery latency for boundary stability that downstream consumers need. Setting the lock window to zero disables the stage altogether for users who want raw per-frame masks.
 
 == Heatmap, overlay, and contour export
 
-The last two display stages exist for inspection and label export. The heatmap renderer maps the normalized delta $tilde(D)_t$ through OpenCV's _turbo_ colormap to produce a three-channel pseudocolor image. The overlay renderer extracts the boundary of the locked mask via a five-by-five rectangular morphological gradient and paints those boundary pixels red on a copy of the original BGR frame. Neither renderer is part of the detection logic; they expose, in human-readable form, the field on which the threshold acted and the boundary that the locked mask encloses.
+The last two display stages exist for inspection and label export. The heatmap renderer maps the normalized delta $tilde(D)_t$ through the Turbo colormap to produce a three-channel pseudocolor image. The overlay renderer extracts the boundary of the locked mask via a five-by-five rectangular morphological gradient and paints those boundary pixels red on a copy of the original BGR frame. Neither renderer is part of the detection logic; they expose, in human-readable form, the field on which the threshold acted and the boundary that the locked mask encloses.
 
-For machine-readable export, contour extraction emits Common Objects in Context (COCO) and YOLO-format polygons for every connected component of the locked mask. Polygon segmentation is computed with `findContours`, optionally simplified by the Douglas-Peucker algorithm with tolerance $epsilon$, and optionally densified to a maximum edge length so that downstream rasterization preserves curvature. The annotation-sampling utility selects which frames receive labels using one of three modes, namely _all_, evenly-spaced _count_, or fixed-_stride_, with deduplication of consecutive ties so that the integer-truncated linear-spacing exactly reproduces NumPy's behaviour.
+For machine-readable export, the contour-extraction stage emits Common Objects in Context (COCO) and YOLO-format polygons for every connected component of the locked mask. Polygon segmentation is computed with a standard contour-extraction routine, optionally simplified by the Douglas-Peucker algorithm with tolerance $epsilon$, and optionally densified to a maximum edge length so that downstream rasterization preserves curvature. The annotation-sampling utility selects which frames receive labels using one of three modes, namely all-frame, evenly-spaced count, or fixed-stride, with deduplication of consecutive ties so that the integer-truncated linear-spacing exactly reproduces the standard reference behaviour.
 
 == Hyperparameter defaults
 
-Table~@tab:defaults collects the parameters exposed by the command-line interface together with the values used for every result reported in this paper. Defaults were chosen during development and held fixed across all runs in the evaluation set, so the reported metrics reflect the algorithm as a user would see it on a fresh checkout rather than the outcome of a per-video search.
+Table~@tab:defaults collects the parameters exposed by the configuration interface together with the values used for every result reported in this paper. Defaults were chosen during development and held fixed across all runs in the evaluation set, so the reported metrics reflect the algorithm as a user would see it on a fresh checkout rather than the outcome of a per-video search.
 
 #figure(
   table(
     columns: (auto, auto, auto),
     align: (left, left, left),
     stroke: (x: none, y: 0.5pt),
-    table.header[*Symbol / flag*][*Default*][*Description*],
-    [`--colorspace`], [`CIELAB`], [Working colorspace for the difference computation.],
-    [`--roi-margin`], [`0.15`], [Symmetric fractional ROI margin per edge.],
-    [`--ref-mode`], [`first`], [Reference selection mode.],
-    [`--ref-running-alpha`, $alpha$], [`0.05`], [EMA weight for the running reference.],
-    [`--peak-reference`], [`true`], [Use the running peak map in the working channel.],
-    [`--darken-only`], [`true`], [Clip the delta to non-negative wetting deltas.],
-    [`--blur-kernel`, $k_b$], [`9`], [Gaussian blur kernel size in pixels.],
-    [`--threshold-offset`, $delta_tau$], [`-30`], [Offset added to Otsu/percentile/manual threshold.],
-    [`--morph-kernel`, $k_m$], [`13`], [Morphology structuring-element size.],
-    [`--morph-shape`], [`ellipse`], [Structuring-element shape.],
-    [`--morph-close-iterations`], [`1`], [Morphological closing iterations.],
-    [`--morph-open-iterations`], [`1`], [Morphological opening iterations.],
-    [`--min-area`, $a_"min"$], [`400`], [Minimum connected-component area, in pixels.],
-    [`--lock-frames`, $n_"lock"$], [`3`], [Temporal lock window, in frames.],
-    [`--frame-step`], [`1`], [Frame stride at decode time.],
-    [`--dynamic-calibration-frames`, $N_"calib"$], [`10`], [Frames used to fit the dynamic-reference factor $kappa$.],
-    [`--dynamic-target-fraction`, $rho$], [`0.2`], [Target wet-area fraction for dynamic-reference lag.],
-    [`--dynamic-lag-scale`, $lambda$], [`1.0`], [Multiplicative scale on the dynamic-mode lag.],
-    [`--dynamic-ref-cache-size`], [`32`], [Frames cached for the dynamic-reference reader.],
+    table.header[*Symbol / parameter*][*Default*][*Description*],
+    [colorspace], [CIELAB], [Working colorspace for the difference computation.],
+    [roi-margin], [0.15], [Symmetric fractional ROI margin per edge.],
+    [ref-mode], [first], [Reference selection mode.],
+    [ref-running-alpha, $alpha$], [0.05], [EMA weight for the running reference.],
+    [peak-reference], [true], [Use the running peak map in the working channel.],
+    [darken-only], [true], [Clip the delta to non-negative wetting deltas.],
+    [blur-kernel, $k_b$], [9], [Gaussian blur kernel size in pixels.],
+    [threshold-offset, $delta_tau$], [-30], [Offset added to Otsu/percentile/manual threshold.],
+    [morph-kernel, $k_m$], [13], [Morphology structuring-element size.],
+    [morph-shape], [ellipse], [Structuring-element shape.],
+    [morph-close-iterations], [1], [Morphological closing iterations.],
+    [morph-open-iterations], [1], [Morphological opening iterations.],
+    [min-area, $a_"min"$], [400], [Minimum connected-component area, in pixels.],
+    [lock-frames, $n_"lock"$], [3], [Temporal lock window, in frames.],
+    [frame-step], [1], [Frame stride at decode time.],
+    [dynamic-calibration-frames, $N_"calib"$], [10], [Frames used to fit the dynamic-reference factor $kappa$.],
+    [dynamic-target-fraction, $rho$], [0.2], [Target wet-area fraction for dynamic-reference lag.],
+    [dynamic-lag-scale, $lambda$], [1.0], [Multiplicative scale on the dynamic-mode lag.],
+    [dynamic-ref-cache-size], [32], [Frames cached for the dynamic-reference reader.],
   ),
   caption: [
-    Hyperparameter defaults shipped in `vrifa-cli` and used for
-    every result in this paper. Symbols match the variables
-    introduced above; the only equation that depends on them
-    explicitly is the dynamic-mode lag of Eq.~@eq:dynlag.
+    Hyperparameter defaults shipped in the VRIFA configuration
+    interface and used for every result in this paper. Symbols
+    match the variables introduced above; the only equation that
+    depends on them explicitly is the dynamic-mode lag of
+    Eq.~@eq:dynlag.
   ],
 ) <tab:defaults>
 
 == Implementation pointer
 
-VRIFA is organized as a Cargo workspace with five crates. The `vrifa-core` crate hosts the stage logic, with one Rust source file per stage under `crates/vrifa-core/src/`. The file names track the stage names used above, namely `colorspace.rs`, `roi.rs`, `peak.rs`, `reference.rs`, `delta.rs`, `morphology.rs`, `threshold.rs`, `lock.rs`, `heatmap.rs`, `overlay.rs`, `contours.rs`, and `sampling.rs`, with a small `cvutil.rs` shim that converts between `ndarray` arrays and OpenCV `Mat` views. The `vrifa-io` crate wraps video decode and encode through OpenCV's `VideoCapture` and `VideoWriter`, plus an asynchronous PNG writer used for per-frame artifact dumps. The `vrifa-cli` crate is the user-facing binary; it owns argument parsing, run orchestration, the dynamic-reference cache, and the per-frame loop that ties the twelve stages together. The `vrifa-annotations` crate handles COCO and YOLO export of the contours produced by `vrifa-core::contours`. The `vrifa-py` crate exposes the same stage functions as a PyO3 module, used only by internal-development tooling rather than by end-user workflows.
+VRIFA is organized as a Cargo workspace with five crates. The core algorithm crate hosts the stage logic, with one Rust source file per stage. The file names track the stage names used above, namely the colorspace conversion, region-of-interest, peak, reference, delta, morphology, threshold, lock, heatmap, overlay, contour-extraction, and sampling stages, with a small conversion shim that mediates between native array containers and the underlying matrix views used by the computer-vision routines. The input/output crate wraps video decode and encode through standard video-capture and video-writer interfaces, plus an asynchronous PNG writer used for per-frame artifact dumps. The command-line crate is the user-facing binary; it owns argument parsing, run orchestration, the dynamic-reference cache, and the per-frame loop that ties the twelve stages together. The annotations crate handles COCO and YOLO export of the contours produced by the contour-extraction stage. The Python-bindings crate exposes the same stage functions as a PyO3 module, used only by internal-development tooling rather than by end-user workflows.
 
-The Implementation section returns to the same crate layout and describes the buffer-reuse strategy, the OpenCV bindings, and the bit-exact stage-parity result that motivates VRIFA being released as a _reference_ implementation rather than as one detector among many.
+The Implementation section returns to the same crate layout and describes the buffer-reuse strategy, the computer-vision bindings, and the bit-exact stage-parity result that motivates VRIFA being framed as a reference implementation rather than as one detector among many.
