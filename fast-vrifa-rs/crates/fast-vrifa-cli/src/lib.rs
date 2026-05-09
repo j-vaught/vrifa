@@ -599,13 +599,23 @@ where
                     morph_open_iterations: config.morph_open_iterations,
                 },
             )?;
-            let heatmap = Arc::new(apply_turbo_colormap(&detect.delta_norm)?);
             let mask = Arc::new(apply_locking(
                 &detect.mask,
                 config.lock_frames,
                 lock_state.as_mut(),
             )?);
-            let overlay = Arc::new(create_overlay(&frame_bgr, &mask)?);
+            let write_overlay = config.write_overlay_pngs || config.write_overlay_video;
+            let write_heatmap = config.write_heatmap_pngs || config.write_heatmap_video;
+            let overlay = if write_overlay {
+                Some(Arc::new(create_overlay(&frame_bgr, &mask)?))
+            } else {
+                None
+            };
+            let heatmap = if write_heatmap {
+                Some(Arc::new(apply_turbo_colormap(&detect.delta_norm)?))
+            } else {
+                None
+            };
 
             if !config.annotation_formats.is_empty() {
                 let boxes = extract_bounding_boxes(
@@ -633,19 +643,19 @@ where
             if let Some(writer) = mask_png_writer.as_mut() {
                 writer.write_gray(mask_dir.join(&basename), (*mask).clone())?;
             }
-            if let Some(writer) = overlay_png_writer.as_mut() {
-                writer.write_bgr(overlay_dir.join(&basename), (*overlay).clone())?;
+            if let (Some(writer), Some(overlay)) = (overlay_png_writer.as_mut(), overlay.as_ref()) {
+                writer.write_bgr(overlay_dir.join(&basename), (**overlay).clone())?;
             }
-            if let Some(writer) = heatmap_png_writer.as_mut() {
-                writer.write_bgr(heatmap_dir.join(&basename), (*heatmap).clone())?;
+            if let (Some(writer), Some(heatmap)) = (heatmap_png_writer.as_mut(), heatmap.as_ref()) {
+                writer.write_bgr(heatmap_dir.join(&basename), (**heatmap).clone())?;
             }
             if let Some(writer) = mask_writer.as_mut() {
                 writer.write_gray(mask.clone())?;
             }
-            if let Some(writer) = overlay_writer.as_mut() {
+            if let (Some(writer), Some(overlay)) = (overlay_writer.as_mut(), overlay.as_ref()) {
                 writer.write_bgr(overlay.clone())?;
             }
-            if let Some(writer) = heat_writer.as_mut() {
+            if let (Some(writer), Some(heatmap)) = (heat_writer.as_mut(), heatmap.as_ref()) {
                 writer.write_bgr(heatmap.clone())?;
             }
 
