@@ -9,6 +9,7 @@ use std::collections::{BTreeSet, VecDeque};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Instant;
 use vrifa_annotations::AnnotationFrame;
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
@@ -587,8 +588,13 @@ pub fn run_config(config: Config) -> Result<()> {
                     .as_ref()
                     .filter(|_| config.peak_reference),
             )?;
-            let mask = apply_locking(&mask_raw, config.lock_frames, lock_state.as_mut())?;
-            let overlay = create_overlay(&frame_bgr, &mask)?;
+            let mask = Arc::new(apply_locking(
+                &mask_raw,
+                config.lock_frames,
+                lock_state.as_mut(),
+            )?);
+            let overlay = Arc::new(create_overlay(&frame_bgr, &mask)?);
+            let heatmap = Arc::new(heatmap);
 
             if !config.annotation_formats.is_empty() {
                 let boxes = extract_bounding_boxes(
@@ -605,13 +611,13 @@ pub fn run_config(config: Config) -> Result<()> {
 
             let basename = format!("frame_{frame_index:06}.png");
             if let Some(writer) = mask_png_writer.as_mut() {
-                writer.write_gray(mask_dir.join(&basename), mask.clone())?;
+                writer.write_gray(mask_dir.join(&basename), (*mask).clone())?;
             }
             if let Some(writer) = overlay_png_writer.as_mut() {
-                writer.write_bgr(overlay_dir.join(&basename), overlay.clone())?;
+                writer.write_bgr(overlay_dir.join(&basename), (*overlay).clone())?;
             }
             if let Some(writer) = heatmap_png_writer.as_mut() {
-                writer.write_bgr(heatmap_dir.join(&basename), heatmap.clone())?;
+                writer.write_bgr(heatmap_dir.join(&basename), (*heatmap).clone())?;
             }
             if let Some(writer) = mask_writer.as_mut() {
                 writer.write_gray(mask.clone())?;

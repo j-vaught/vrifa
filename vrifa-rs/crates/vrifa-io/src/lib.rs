@@ -6,6 +6,7 @@ use opencv::prelude::*;
 use opencv::videoio;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use vrifa_core::cvutil;
 
@@ -96,8 +97,8 @@ pub struct VideoWriter {
 }
 
 enum VideoFrame {
-    Bgr(BgrFrame),
-    Gray(Array2<u8>),
+    Bgr(Arc<BgrFrame>),
+    Gray(Arc<Array2<u8>>),
 }
 
 enum PngFrame {
@@ -145,7 +146,7 @@ impl AsyncVideoWriter {
         })
     }
 
-    pub fn write_bgr(&self, frame: BgrFrame) -> Result<()> {
+    pub fn write_bgr(&self, frame: Arc<BgrFrame>) -> Result<()> {
         if !self.is_color {
             return Err(anyhow!("writer was opened as grayscale"));
         }
@@ -154,7 +155,7 @@ impl AsyncVideoWriter {
             .map_err(|err| anyhow!("video writer thread stopped: {err}"))
     }
 
-    pub fn write_gray(&self, frame: Array2<u8>) -> Result<()> {
+    pub fn write_gray(&self, frame: Arc<Array2<u8>>) -> Result<()> {
         if self.is_color {
             return Err(anyhow!("writer was opened as color"));
         }
