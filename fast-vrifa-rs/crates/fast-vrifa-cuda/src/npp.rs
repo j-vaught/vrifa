@@ -138,7 +138,7 @@ mod imp {
                     _image: image,
                 }
             };
-            Ok(library).context("loading NPP symbols")
+            Ok(library)
         }
 
         pub fn set_stream(&self, stream: CUstream) -> Result<()> {

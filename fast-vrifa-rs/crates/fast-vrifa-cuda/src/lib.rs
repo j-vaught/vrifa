@@ -719,24 +719,26 @@ impl PeakImageBackend for CudaBackend {
                 .alloc_zeros::<u8>(label_buffer_size.max(0) as usize)
                 .context("allocating CUDA label scratch buffer")?;
 
-            let (src_ptr, _src_record) = mask.data.device_ptr(&inner.stream);
-            let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
-            let (label_buffer_ptr, _label_buffer_record) =
-                label_buffer.device_ptr_mut(&inner.stream);
-            npp::status(
-                unsafe {
-                    (npp.label_markers)(
-                        src_ptr as *mut u8,
-                        mask.width as i32,
-                        labels_ptr as *mut u32,
-                        (mask.width * std::mem::size_of::<u32>()) as i32,
-                        roi,
-                        npp::NPPI_NORM_INF,
-                        label_buffer_ptr as *mut u8,
-                    )
-                },
-                "nppiLabelMarkersUF_8u32u_C1R",
-            )?;
+            {
+                let (src_ptr, _src_record) = mask.data.device_ptr(&inner.stream);
+                let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
+                let (label_buffer_ptr, _label_buffer_record) =
+                    label_buffer.device_ptr_mut(&inner.stream);
+                npp::status(
+                    unsafe {
+                        (npp.label_markers)(
+                            src_ptr as *mut u8,
+                            mask.width as i32,
+                            labels_ptr as *mut u32,
+                            (mask.width * std::mem::size_of::<u32>()) as i32,
+                            roi,
+                            npp::NPPI_NORM_INF,
+                            label_buffer_ptr as *mut u8,
+                        )
+                    },
+                    "nppiLabelMarkersUF_8u32u_C1R",
+                )?;
+            }
 
             let mut compress_buffer_size = 0i32;
             let starting_number = (mask.width * mask.height) as i32;
@@ -751,22 +753,24 @@ impl PeakImageBackend for CudaBackend {
                 .alloc_zeros::<u8>(compress_buffer_size.max(0) as usize)
                 .context("allocating CUDA label-compress scratch buffer")?;
             let mut new_number = 0i32;
-            let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
-            let (compress_buffer_ptr, _compress_record) =
-                compress_buffer.device_ptr_mut(&inner.stream);
-            npp::status(
-                unsafe {
-                    (npp.compress_markers)(
-                        labels_ptr as *mut u32,
-                        (mask.width * std::mem::size_of::<u32>()) as i32,
-                        roi,
-                        starting_number,
-                        &mut new_number as *mut _,
-                        compress_buffer_ptr as *mut u8,
-                    )
-                },
-                "nppiCompressMarkerLabelsUF_32u_C1IR",
-            )?;
+            {
+                let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
+                let (compress_buffer_ptr, _compress_record) =
+                    compress_buffer.device_ptr_mut(&inner.stream);
+                npp::status(
+                    unsafe {
+                        (npp.compress_markers)(
+                            labels_ptr as *mut u32,
+                            (mask.width * std::mem::size_of::<u32>()) as i32,
+                            roi,
+                            starting_number,
+                            &mut new_number as *mut _,
+                            compress_buffer_ptr as *mut u8,
+                        )
+                    },
+                    "nppiCompressMarkerLabelsUF_32u_C1IR",
+                )?;
+            }
             if new_number <= 0 {
                 return Ok(Some(CudaMaskU8 {
                     data: inner
@@ -787,30 +791,33 @@ impl PeakImageBackend for CudaBackend {
                 .stream
                 .alloc_zeros::<u8>(info_list_size.max(1) as usize)
                 .context("allocating CUDA marker-info buffer")?;
-            let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
-            let (info_ptr, _info_record) = info_buffer.device_ptr_mut(&inner.stream);
-            npp::status(
-                unsafe {
-                    (npp.info_list)(
-                        labels_ptr as *mut u32,
-                        (mask.width * std::mem::size_of::<u32>()) as i32,
-                        roi,
-                        new_number as u32,
-                        info_ptr as *mut npp::NppiCompressedMarkerLabelsInfo,
-                        std::ptr::null_mut(),
-                        0,
-                        std::ptr::null_mut(),
-                        0,
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        stream_ctx,
-                    )
-                },
-                "nppiCompressedMarkerLabelsUFInfo_32u_C1R_Ctx",
-            )?;
+            let info_ptr_u64 = {
+                let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
+                let (info_ptr, _info_record) = info_buffer.device_ptr_mut(&inner.stream);
+                npp::status(
+                    unsafe {
+                        (npp.info_list)(
+                            labels_ptr as *mut u32,
+                            (mask.width * std::mem::size_of::<u32>()) as i32,
+                            roi,
+                            new_number as u32,
+                            info_ptr as *mut npp::NppiCompressedMarkerLabelsInfo,
+                            std::ptr::null_mut(),
+                            0,
+                            std::ptr::null_mut(),
+                            0,
+                            std::ptr::null_mut(),
+                            std::ptr::null_mut(),
+                            std::ptr::null_mut(),
+                            std::ptr::null_mut(),
+                            std::ptr::null_mut(),
+                            stream_ctx,
+                        )
+                    },
+                    "nppiCompressedMarkerLabelsUFInfo_32u_C1R_Ctx",
+                )?;
+                info_ptr as u64
+            };
 
             let mut filtered = inner
                 .stream
@@ -822,7 +829,6 @@ impl PeakImageBackend for CudaBackend {
             let mut launch = inner.stream.launch_builder(&inner.filter_components);
             launch.arg(&mask.data);
             launch.arg(&labels);
-            let info_ptr_u64 = info_ptr;
             launch.arg(&info_ptr_u64);
             launch.arg(&mut filtered);
             launch.arg(&min_area_u32);
