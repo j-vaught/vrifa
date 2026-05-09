@@ -4,7 +4,7 @@ use common::{load_delta_norm, load_fixture_config, load_roi_mask, load_threshold
 use vrifa_core::threshold::choose_threshold;
 
 #[test]
-fn threshold_scalar_matches_python_goldens_for_input_2() {
+fn threshold_scalar_matches_frozen_goldens_for_input_2() {
     let config = load_fixture_config("input_2");
     let roi_mask = load_roi_mask("input_2");
 

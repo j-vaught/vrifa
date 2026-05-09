@@ -4,7 +4,7 @@ use common::{assert_u8_exact, load_mask, load_overlay, load_source_bgr};
 use vrifa_core::overlay::create_overlay;
 
 #[test]
-fn overlay_matches_python_goldens_for_input_1() {
+fn overlay_matches_frozen_goldens_for_input_1() {
     for frame in [50, 200, 500] {
         let input = "input_1";
         let frame_bgr = load_source_bgr(input, frame);
@@ -16,7 +16,7 @@ fn overlay_matches_python_goldens_for_input_1() {
 }
 
 #[test]
-fn overlay_matches_python_goldens_for_input_2() {
+fn overlay_matches_frozen_goldens_for_input_2() {
     for frame in [30, 60, 90] {
         let input = "input_2";
         let frame_bgr = load_source_bgr(input, frame);

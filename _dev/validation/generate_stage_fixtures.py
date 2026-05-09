@@ -15,8 +15,11 @@ import cv2
 import numpy as np
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-FIXTURE_ROOT = Path(__file__).resolve().parent
+VALIDATION_ROOT = Path(__file__).resolve().parent
+DEV_ROOT = VALIDATION_ROOT.parent
+REPO_ROOT = DEV_ROOT.parent
+FIXTURE_ROOT = REPO_ROOT / "vrifa-rs" / "tests" / "fixtures"
+REFERENCE_ENTRYPOINT = DEV_ROOT / "reference_impl" / "vrifa.py"
 MAX_NPY_BYTES = 5 * 1024 * 1024
 COMPRESS_ABOVE_BYTES = 1 * 1024 * 1024
 STAGE_NAMES = (
@@ -51,9 +54,9 @@ SPECS = {
 
 
 def load_vrifa_module():
-    spec = importlib.util.spec_from_file_location("vrifa_reference", REPO_ROOT / "vrifa.py")
+    spec = importlib.util.spec_from_file_location("vrifa_reference", REFERENCE_ENTRYPOINT)
     if spec is None or spec.loader is None:
-        raise RuntimeError("unable to load vrifa.py")
+        raise RuntimeError(f"unable to load {REFERENCE_ENTRYPOINT}")
     module = importlib.util.module_from_spec(spec)
     sys.modules["vrifa_reference"] = module
     spec.loader.exec_module(module)
@@ -72,7 +75,7 @@ def parse_args(vrifa: Any, forwarded: list[str]):
 def run_stage_dump(output_dir: Path, frames: list[int], forwarded_args: list[str]) -> None:
     cmd = [
         "python3",
-        "tools/dump_python_stages.py",
+        str(VALIDATION_ROOT / "dump_stages.py"),
         "--output-dir",
         str(output_dir),
         "--frames",

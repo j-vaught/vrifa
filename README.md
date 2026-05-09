@@ -1,76 +1,65 @@
-# VRIFA: VARTM Resin Infusion Flow-Front Assessment
+# VRIFA
 
-A computer vision tool for automated detection and tracking of resin flow fronts in Vacuum-Assisted Resin Transfer Molding (VARTM) processes. VRIFA processes video recordings of composite manufacturing to generate binary masks, visual overlays, temporal heatmaps, and machine learning training datasets.
+VRIFA detects and tracks resin flow fronts in Vacuum-Assisted Resin Transfer Molding (VARTM) video. It produces binary masks, red-edge overlays, normalized heatmaps, and machine-learning annotation sets in COCO, YOLOv5, and Darknet layouts.
 
-## Demo
+## What It Is
 
-YOLO object detection overlay on a VARTM infusion, trained on VRIFA-generated annotations:
+The pipeline is designed for repeatable, offline analysis of infusion video. A run converts each frame into a working colorspace, compares it against a configurable reference, thresholds the response, cleans the mask with morphology, applies temporal locking, and writes the requested artifacts to disk.
 
-<video src="https://github.com/j-vaught/vrifa/releases/download/v0.1.0/yolo_overlay_input4.mp4" controls width="100%"></video>
+## Install / Build
 
-## Features
-
-- Darken-only detection to track resin wetting (ignores brightening artifacts)
-- Peak brightness reference for handling variable lighting conditions
-- Flow-front detection using adaptive Otsu thresholding with configurable offset
-- Multiple reference frame strategies (first frame, running average, dynamic lag)
-- Temporal consistency filtering to reduce noise and glare artifacts
-- ML annotation export in COCO, YOLOv5, and Darknet formats
-- Configurable ROI cropping to focus on relevant regions
-
-## Installation
-
-**Requirements:** Python 3.10+
+Build the workspace from `vrifa-rs/`:
 
 ```bash
-git clone https://github.com/j-vaught/vrifa.git
-cd vrifa
-pip install -r requirements.txt
+cd vrifa-rs
+cargo build --release
+```
+
+If Cargo cannot find OpenCV on macOS with Homebrew, set:
+
+```bash
+export PKG_CONFIG_PATH="$(brew --prefix opencv)/lib/pkgconfig:$PKG_CONFIG_PATH"
 ```
 
 ## Quick Start
 
+From the repository root:
+
 ```bash
-python vrifa.py --video-path data/input_1.mp4 --output-dir outputs --write-videos
+./vrifa-rs/target/release/vrifa \
+  --video-path data/input_1.mp4 \
+  --output-dir outputs \
+  --write-videos
 ```
-
-This detects darkening pixels (resin wetting) compared to their peak brightness, applies adaptive thresholding, exports COCO annotations, and generates overlay, mask, and heatmap videos.
-
-See [USAGE.md](USAGE.md) for the full configuration reference, detection modes, annotation formats, examples, and troubleshooting.
 
 ## Output Structure
 
 ```
 outputs/
-├── videos/             # MP4 outputs (overlay, mask, heatmap)
-├── formatCOCO/         # COCO annotations (default)
-│   ├── annotations/    # JSON annotation files
-│   └── images/         # Extracted frames
-├── formatYOLO/         # YOLOv5 annotations (if enabled)
-├── formatYOLO_v2/      # Darknet annotations (if enabled)
-└── run_summary.yaml    # Configuration and timing log
+├── videos/                  # MP4 outputs when --write-videos is enabled
+├── masks/                   # PNG mask frames when requested
+├── overlays/                # PNG overlay frames when requested
+├── heatmap/                 # PNG heatmap frames when requested
+├── formatCOCO/              # COCO annotations and extracted frames
+│   ├── annotations/
+│   └── images/
+├── formatYOLO/              # YOLOv5-style segmentation labels
+├── formatYOLO_v2/           # Darknet bounding-box labels
+└── run_summary.yaml         # Serialized configuration and timing log
 ```
 
-## Sample Data
+## Demo
 
-The `data/` folder contains input videos used for the example runs. The `outputs_run*/` folders contain COCO annotations and run summaries, but not the extracted image frames (to keep the repository size manageable).
+YOLO segmentation overlay generated from VRIFA annotation output:
 
-To regenerate frames from an input video:
-
-```bash
-ffmpeg -i data/input_1.mp4 frames/frame_%06d.png
-```
-
-Or run VRIFA directly to produce both frames and annotations:
-
-```bash
-python vrifa.py --video-path data/input_1.mp4 --output-dir outputs_run --annotation-formats coco
-```
+<video src="https://github.com/j-vaught/vrifa/releases/download/v0.1.0/yolo_overlay_input4.mp4" controls width="100%"></video>
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT. See [LICENSE](LICENSE).
 
-## Contributing
+## See Also
 
-Contributions are welcome. Please open an issue to discuss proposed changes before submitting a pull request.
+- [USAGE.md](USAGE.md) for the full CLI reference and algorithm options.
+- [vrifa-rs/README.md](vrifa-rs/README.md) for workspace layout, fixtures, and benchmarks.
+- [vrifa-rs/HACKING.md](vrifa-rs/HACKING.md) for change workflow and verification guidance.

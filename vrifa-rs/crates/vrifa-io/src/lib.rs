@@ -314,7 +314,7 @@ fn write_bgr_png_impl(path: &Path, frame: &BgrFrame) -> Result<()> {
             "BGR PNG frame must have 3 channels, got {channels}"
         ));
     }
-    // Match Python's cv2.imwrite output to keep parity artifacts deterministic.
+    // Match the baseline cv2.imwrite output to keep parity artifacts deterministic.
     let mat = cvutil::array3_u8_to_mat(frame)?;
     imgcodecs::imwrite_def(&path.to_string_lossy(), &mat)
         .with_context(|| format!("writing PNG {}", path.display()))?;
@@ -322,7 +322,7 @@ fn write_bgr_png_impl(path: &Path, frame: &BgrFrame) -> Result<()> {
 }
 
 fn write_gray_png_impl(path: &Path, frame: &Array2<u8>) -> Result<()> {
-    // Match Python's cv2.imwrite output to keep parity artifacts deterministic.
+    // Match the baseline cv2.imwrite output to keep parity artifacts deterministic.
     let mat = cvutil::array2_u8_to_mat(frame)?;
     imgcodecs::imwrite_def(&path.to_string_lossy(), &mat)
         .with_context(|| format!("writing PNG {}", path.display()))?;

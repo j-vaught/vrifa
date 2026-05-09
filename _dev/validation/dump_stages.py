@@ -12,14 +12,17 @@ import cv2
 import numpy as np
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+VALIDATION_ROOT = Path(__file__).resolve().parent
+DEV_ROOT = VALIDATION_ROOT.parent
+REPO_ROOT = DEV_ROOT.parent
+REFERENCE_ENTRYPOINT = DEV_ROOT / "reference_impl" / "vrifa.py"
 
 
 def load_vrifa_module():
     module_name = "vrifa_reference"
-    spec = importlib.util.spec_from_file_location(module_name, REPO_ROOT / "vrifa.py")
+    spec = importlib.util.spec_from_file_location(module_name, REFERENCE_ENTRYPOINT)
     if spec is None or spec.loader is None:
-        raise RuntimeError("unable to load vrifa.py")
+        raise RuntimeError(f"unable to load {REFERENCE_ENTRYPOINT}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
@@ -328,7 +331,7 @@ def main() -> int:
     missing = sorted(targets - dumped)
     if missing:
         raise RuntimeError(f"failed to dump frame(s): {missing}")
-    print(f"Dumped Python stage intermediates for {sorted(dumped)} to {cli_args.output_dir}")
+    print(f"Dumped validation stage intermediates for {sorted(dumped)} to {cli_args.output_dir}")
     return 0
 
 

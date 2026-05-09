@@ -4,7 +4,7 @@ use common::{box_rows, load_contours_rows, load_fixture_config, load_mask, ALL_S
 use vrifa_core::contours::extract_bounding_boxes;
 
 #[test]
-fn contours_match_python_goldens_after_sorting() {
+fn contours_match_frozen_goldens_after_sorting() {
     for (input, frame) in ALL_STAGE_FRAMES {
         let config = load_fixture_config(input);
         let mask = load_mask(input, frame);

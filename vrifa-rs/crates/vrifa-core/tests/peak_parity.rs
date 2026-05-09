@@ -4,7 +4,7 @@ use common::{assert_f32_max_abs, load_frame_converted_f32, load_peak_after_3, IN
 use vrifa_core::peak::update_peak_brightness;
 
 #[test]
-fn peak_tracker_matches_python_golden_after_three_frames() {
+fn peak_tracker_matches_frozen_golden_after_three_frames() {
     let expected = load_peak_after_3("input_2");
     let mut peak = None;
     for frame in INPUT_2_FRAMES {

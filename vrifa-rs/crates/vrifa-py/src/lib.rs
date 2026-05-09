@@ -100,7 +100,7 @@ impl PyConfig {
 
 #[pyfunction]
 fn run(config: &PyConfig) -> PyResult<()> {
-    vrifa_cli::run_python_config(config.to_config()?)
+    vrifa_cli::run_binding_config(config.to_config()?)
         .map_err(|err| PyRuntimeError::new_err(err.to_string()))
 }
 
