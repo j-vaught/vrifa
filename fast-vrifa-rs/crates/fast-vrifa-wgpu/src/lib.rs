@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use bytemuck::{Pod, Zeroable};
-use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, RoiMargins};
+use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
 use ndarray::{Array2, Array3};
 use pollster::block_on;
 use std::borrow::Cow;
@@ -76,9 +76,13 @@ pub struct WgpuBackend {
     queue: wgpu::Queue,
     lab_lut: wgpu::Buffer,
     colorspace_layout: wgpu::BindGroupLayout,
+    l_plane_layout: wgpu::BindGroupLayout,
+    peak_layout: wgpu::BindGroupLayout,
     roi_layout: wgpu::BindGroupLayout,
     delta_layout: wgpu::BindGroupLayout,
     colorspace_pipeline: wgpu::ComputePipeline,
+    l_plane_pipeline: wgpu::ComputePipeline,
+    peak_pipeline: wgpu::ComputePipeline,
     roi_pipeline: wgpu::ComputePipeline,
     delta_pipeline: wgpu::ComputePipeline,
 }
@@ -119,6 +123,23 @@ impl WgpuBackend {
                 uniform_buffer_entry(3),
             ],
         });
+        let l_plane_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("fast-vrifa-l-plane-layout"),
+            entries: &[
+                storage_buffer_entry(0, true),
+                storage_buffer_entry(1, false),
+                uniform_buffer_entry(2),
+            ],
+        });
+        let peak_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("fast-vrifa-peak-layout"),
+            entries: &[
+                storage_buffer_entry(0, true),
+                storage_buffer_entry(1, true),
+                storage_buffer_entry(2, false),
+                uniform_buffer_entry(3),
+            ],
+        });
         let roi_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("fast-vrifa-roi-layout"),
             entries: &[storage_buffer_entry(0, false), uniform_buffer_entry(1)],
@@ -140,6 +161,18 @@ impl WgpuBackend {
             &colorspace_layout,
             include_str!("shaders/colorspace_bgr_to_lab.wgsl"),
         );
+        let l_plane_pipeline = create_compute_pipeline(
+            &device,
+            "fast-vrifa-l-plane-pipeline",
+            &l_plane_layout,
+            include_str!("shaders/extract_l_plane.wgsl"),
+        );
+        let peak_pipeline = create_compute_pipeline(
+            &device,
+            "fast-vrifa-peak-pipeline",
+            &peak_layout,
+            include_str!("shaders/update_peak_brightness.wgsl"),
+        );
         let roi_pipeline = create_compute_pipeline(
             &device,
             "fast-vrifa-roi-pipeline",
@@ -158,9 +191,13 @@ impl WgpuBackend {
             queue,
             lab_lut,
             colorspace_layout,
+            l_plane_layout,
+            peak_layout,
             roi_layout,
             delta_layout,
             colorspace_pipeline,
+            l_plane_pipeline,
+            peak_pipeline,
             roi_pipeline,
             delta_pipeline,
         })
@@ -175,6 +212,15 @@ impl WgpuBackend {
                 | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         })
+    }
+
+    fn upload_f32_plane_buffer(&self, label: &'static str, plane: &[f32]) -> wgpu::Buffer {
+        self.device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::cast_slice(plane),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            })
     }
 
     fn dispatch_1d(
@@ -408,17 +454,170 @@ impl ImageBackend for WgpuBackend {
             "ROI mask shape does not match frame"
         );
 
-        let pixel_count = frame_lab.width * frame_lab.height;
         let reference = reference_plane
             .as_slice_memory_order()
             .ok_or_else(|| anyhow!("reference plane must be contiguous"))?;
-        let reference_buffer = self
+        let reference_buffer = WgpuPlaneF32 {
+            buffer: self.upload_f32_plane_buffer("fast-vrifa-reference-plane", reference),
+            width: frame_lab.width,
+            height: frame_lab.height,
+        };
+        self.compute_delta_darken_only_device(frame_lab, &reference_buffer, roi_mask, channel_weight)
+    }
+
+    fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>> {
+        let pixel_count = plane.width * plane.height;
+        let bytes = self.readback_bytes(&plane.buffer, byte_len_for_f32(pixel_count))?;
+        let values = bytes_to_f32(&bytes)?;
+        Array2::from_shape_vec((plane.height, plane.width), values)
+            .context("reshaping downloaded delta plane")
+    }
+}
+
+impl PeakImageBackend for WgpuBackend {
+    fn extract_l_plane(&self, frame_lab: &Self::DeviceFrameLab) -> Result<Self::DevicePlaneF32> {
+        let pixel_count = frame_lab.width * frame_lab.height;
+        let output =
+            self.create_storage_buffer("fast-vrifa-l-plane", byte_len_for_f32(pixel_count));
+        let uniform = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("fast-vrifa-reference-plane"),
-                contents: bytemuck::cast_slice(reference),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                label: Some("fast-vrifa-l-plane-uniform"),
+                contents: bytemuck::bytes_of(&PixelCountUniform {
+                    pixel_count: pixel_count as u32,
+                    _pad0: 0,
+                    _pad1: 0,
+                    _pad2: 0,
+                }),
+                usage: wgpu::BufferUsages::UNIFORM,
             });
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("fast-vrifa-l-plane-bind-group"),
+            layout: &self.l_plane_layout,
+            entries: &[
+                storage_buffer_binding(0, &frame_lab.buffer),
+                storage_buffer_binding(1, &output),
+                uniform_buffer_binding(2, &uniform),
+            ],
+        });
+        self.dispatch_1d(
+            "fast-vrifa-l-plane-dispatch",
+            &self.l_plane_pipeline,
+            &bind_group,
+            pixel_count,
+        );
+        Ok(WgpuPlaneF32 {
+            buffer: output,
+            width: frame_lab.width,
+            height: frame_lab.height,
+        })
+    }
+
+    fn update_peak_brightness_device(
+        &self,
+        frame_lab: &Self::DeviceFrameLab,
+        previous_peak: Option<&Self::DevicePlaneF32>,
+    ) -> Result<Self::DevicePlaneF32> {
+        let pixel_count = frame_lab.width * frame_lab.height;
+        let zeroes = vec![0.0f32; pixel_count];
+        let previous_buffer = if let Some(previous_peak) = previous_peak {
+            anyhow::ensure!(
+                (previous_peak.height, previous_peak.width) == (frame_lab.height, frame_lab.width),
+                "previous peak shape does not match frame"
+            );
+            &previous_peak.buffer
+        } else {
+            let uploaded = self.upload_f32_plane_buffer("fast-vrifa-zero-peak", &zeroes);
+            let output =
+                self.create_storage_buffer("fast-vrifa-peak-plane", byte_len_for_f32(pixel_count));
+            let uniform = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("fast-vrifa-peak-uniform"),
+                    contents: bytemuck::bytes_of(&PixelCountUniform {
+                        pixel_count: pixel_count as u32,
+                        _pad0: 0,
+                        _pad1: 0,
+                        _pad2: 0,
+                    }),
+                    usage: wgpu::BufferUsages::UNIFORM,
+                });
+            let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("fast-vrifa-peak-bind-group"),
+                layout: &self.peak_layout,
+                entries: &[
+                    storage_buffer_binding(0, &frame_lab.buffer),
+                    storage_buffer_binding(1, &uploaded),
+                    storage_buffer_binding(2, &output),
+                    uniform_buffer_binding(3, &uniform),
+                ],
+            });
+            self.dispatch_1d(
+                "fast-vrifa-peak-dispatch",
+                &self.peak_pipeline,
+                &bind_group,
+                pixel_count,
+            );
+            return Ok(WgpuPlaneF32 {
+                buffer: output,
+                width: frame_lab.width,
+                height: frame_lab.height,
+            });
+        };
+
+        let output = self.create_storage_buffer("fast-vrifa-peak-plane", byte_len_for_f32(pixel_count));
+        let uniform = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("fast-vrifa-peak-uniform"),
+                contents: bytemuck::bytes_of(&PixelCountUniform {
+                    pixel_count: pixel_count as u32,
+                    _pad0: 0,
+                    _pad1: 0,
+                    _pad2: 0,
+                }),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("fast-vrifa-peak-bind-group"),
+            layout: &self.peak_layout,
+            entries: &[
+                storage_buffer_binding(0, &frame_lab.buffer),
+                storage_buffer_binding(1, previous_buffer),
+                storage_buffer_binding(2, &output),
+                uniform_buffer_binding(3, &uniform),
+            ],
+        });
+        self.dispatch_1d(
+            "fast-vrifa-peak-dispatch",
+            &self.peak_pipeline,
+            &bind_group,
+            pixel_count,
+        );
+        Ok(WgpuPlaneF32 {
+            buffer: output,
+            width: frame_lab.width,
+            height: frame_lab.height,
+        })
+    }
+
+    fn compute_delta_darken_only_device(
+        &self,
+        frame_lab: &Self::DeviceFrameLab,
+        reference_plane: &Self::DevicePlaneF32,
+        roi_mask: &Self::DeviceMaskU8,
+        channel_weight: f32,
+    ) -> Result<Self::DevicePlaneF32> {
+        anyhow::ensure!(
+            (reference_plane.height, reference_plane.width) == (frame_lab.height, frame_lab.width),
+            "reference plane shape does not match frame"
+        );
+        anyhow::ensure!(
+            (roi_mask.height, roi_mask.width) == (frame_lab.height, frame_lab.width),
+            "ROI mask shape does not match frame"
+        );
+
+        let pixel_count = frame_lab.width * frame_lab.height;
         let output =
             self.create_storage_buffer("fast-vrifa-delta-plane", byte_len_for_f32(pixel_count));
         let uniform = self
@@ -442,7 +641,7 @@ impl ImageBackend for WgpuBackend {
             layout: &self.delta_layout,
             entries: &[
                 storage_buffer_binding(0, &frame_lab.buffer),
-                storage_buffer_binding(1, &reference_buffer),
+                storage_buffer_binding(1, &reference_plane.buffer),
                 storage_buffer_binding(2, &roi_mask.buffer),
                 storage_buffer_binding(3, &output),
                 uniform_buffer_binding(4, &uniform),
@@ -459,14 +658,6 @@ impl ImageBackend for WgpuBackend {
             width: frame_lab.width,
             height: frame_lab.height,
         })
-    }
-
-    fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>> {
-        let pixel_count = plane.width * plane.height;
-        let bytes = self.readback_bytes(&plane.buffer, byte_len_for_f32(pixel_count))?;
-        let values = bytes_to_f32(&bytes)?;
-        Array2::from_shape_vec((plane.height, plane.width), values)
-            .context("reshaping downloaded delta plane")
     }
 }
 
@@ -615,7 +806,7 @@ fn load_or_build_lab_lut() -> Result<Vec<u32>> {
 #[cfg(test)]
 mod tests {
     use super::WgpuBackend;
-    use fast_vrifa_core::{ImageBackend, RoiMargins};
+    use fast_vrifa_core::{ImageBackend, PeakImageBackend, RoiMargins};
     use ndarray::array;
 
     #[test]
@@ -644,5 +835,25 @@ mod tests {
             .unwrap();
         assert_eq!(backend.download_mask_u8(&mask).unwrap().shape(), &[1, 2]);
         assert_eq!(backend.download_plane_f32(&delta).unwrap().shape(), &[1, 2]);
+    }
+
+    #[test]
+    fn wgpu_backend_extracts_and_updates_peak_plane() {
+        let backend = WgpuBackend::new().unwrap();
+        let frame = array![[[0u8, 0u8, 0u8], [255u8, 255u8, 255u8]]];
+        let uploaded = backend.upload_frame_bgr(&frame).unwrap();
+        let converted = backend.convert_bgr_to_lab(&uploaded).unwrap();
+
+        let l_plane = backend.extract_l_plane(&converted).unwrap();
+        let extracted = backend.download_plane_f32(&l_plane).unwrap();
+        let host = backend.download_frame_f32(&converted).unwrap();
+        assert_eq!(extracted[(0, 0)], host[(0, 0, 0)]);
+        assert_eq!(extracted[(0, 1)], host[(0, 1, 0)]);
+
+        let peak = backend
+            .update_peak_brightness_device(&converted, Some(&l_plane))
+            .unwrap();
+        let peak_host = backend.download_plane_f32(&peak).unwrap();
+        assert_eq!(peak_host, extracted);
     }
 }

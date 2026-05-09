@@ -1,83 +1,82 @@
 use anyhow::{anyhow, bail, Context, Result};
-#[cfg(feature = "wgpu")]
 use chrono::{SecondsFormat, Utc};
 use clap::Parser;
-#[cfg(feature = "wgpu")]
-use fast_vrifa_core::ImageBackend;
-#[cfg(feature = "wgpu")]
+use fast_vrifa_core::{CpuBackend, ImageBackend, PeakImageBackend};
 use indexmap::IndexMap;
-#[cfg(feature = "wgpu")]
-use ndarray::{s, Array3};
-#[cfg(feature = "wgpu")]
+use ndarray::{s, Array2, Array3};
+use opencv::core::{self, Point, Scalar, Size};
+use opencv::imgproc;
+use opencv::prelude::*;
 use serde_yaml::Value;
-#[cfg(feature = "wgpu")]
 use std::collections::VecDeque;
 use std::env;
 use std::ffi::{OsStr, OsString};
-#[cfg(feature = "wgpu")]
 use std::fs::{self, File};
-#[cfg(feature = "wgpu")]
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
-#[cfg(feature = "wgpu")]
 use std::sync::Arc;
-#[cfg(feature = "wgpu")]
 use std::time::Instant;
-#[cfg(feature = "wgpu")]
 use vrifa_annotations::AnnotationFrame;
-#[cfg(feature = "wgpu")]
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
-#[cfg(feature = "wgpu")]
 use vrifa_core::contours::extract_bounding_boxes;
-#[cfg(feature = "wgpu")]
+use vrifa_core::cvutil;
 use vrifa_core::delta::compute_delta;
-#[cfg(feature = "wgpu")]
 use vrifa_core::heatmap::apply_turbo_colormap;
-#[cfg(feature = "wgpu")]
 use vrifa_core::lock::{apply_locking, LockState};
-#[cfg(feature = "wgpu")]
-use vrifa_core::morphology::{detect_mask_from_delta_debug, MorphologyParams};
-#[cfg(feature = "wgpu")]
+use vrifa_core::morphology::{MorphShape, MorphologyParams};
 use vrifa_core::overlay::create_overlay;
-#[cfg(feature = "wgpu")]
 use vrifa_core::peak::update_peak_brightness;
-#[cfg(feature = "wgpu")]
 use vrifa_core::reference::{
     compute_dynamic_factor, select_dynamic_reference_index, DynamicReferenceParams,
 };
-#[cfg(feature = "wgpu")]
 use vrifa_core::roi::resolve_roi_margins;
-#[cfg(feature = "wgpu")]
+use vrifa_core::threshold;
 use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
 
+#[cfg(feature = "cuda")]
+use fast_vrifa_cuda::CudaBackend;
 #[cfg(feature = "wgpu")]
 use fast_vrifa_wgpu::WgpuBackend;
 
 pub use vrifa_cli::Config;
-#[cfg(feature = "wgpu")]
 use vrifa_cli::ReferenceMode;
 
+const MASK_PNG_WORKERS: usize = 2;
+const MASK_PNG_QUEUE: usize = 32;
+const COLOR_PNG_WORKERS: usize = 2;
+const COLOR_PNG_QUEUE: usize = 16;
+const COCO_PNG_WORKERS: usize = 12;
+const COCO_PNG_QUEUE: usize = 32;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum BackendMode {
+pub enum BackendMode {
     Delegate,
+    Cpu,
     Wgpu,
+    Cuda,
 }
 
 impl BackendMode {
-    fn parse(raw: &str) -> Result<Self> {
+    pub fn parse(raw: &str) -> Result<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
-            "delegate" | "cpu" => Ok(Self::Delegate),
+            "delegate" => Ok(Self::Delegate),
+            "cpu" => Ok(Self::Cpu),
             "wgpu" => Ok(Self::Wgpu),
+            "cuda" => Ok(Self::Cuda),
             other => bail!("--backend unsupported option '{other}'"),
         }
     }
 }
 
-#[cfg(feature = "wgpu")]
 struct ConvertedFrame<D> {
     device_lab: Option<D>,
-    host: Array3<f32>,
+    host: Option<Array3<f32>>,
+}
+
+struct DetectionOutputs {
+    delta_norm: Array2<u8>,
+    mask: Array2<u8>,
 }
 
 pub fn run() -> Result<()> {
@@ -92,14 +91,25 @@ pub fn run() -> Result<()> {
         .context("parsing fast-vrifa CLI arguments")?;
     let config = Config::try_from(cli_args)?;
 
-    match backend {
-        BackendMode::Delegate => run_config(config),
-        BackendMode::Wgpu => run_wgpu_backend(config),
-    }
+    run_with_backend(config, backend)
 }
 
 pub fn run_config(config: Config) -> Result<()> {
     vrifa_cli::run_binding_config(config).context("delegating bound config to reference vrifa")
+}
+
+pub fn run_with_backend_name(config: Config, backend: &str) -> Result<()> {
+    let backend = BackendMode::parse(backend)?;
+    run_with_backend(config, backend)
+}
+
+pub fn run_with_backend(config: Config, backend: BackendMode) -> Result<()> {
+    match backend {
+        BackendMode::Delegate => run_config(config),
+        BackendMode::Cpu => run_cpu_backend(config),
+        BackendMode::Wgpu => run_wgpu_backend(config),
+        BackendMode::Cuda => run_cuda_backend(config),
+    }
 }
 
 pub fn delegated_backend_label() -> &'static str {
@@ -194,6 +204,11 @@ fn contains_debug_dump_flags(args: &[OsString]) -> bool {
     })
 }
 
+fn run_cpu_backend(config: Config) -> Result<()> {
+    let backend = CpuBackend;
+    run_hybrid_pipeline(config, &backend)
+}
+
 fn run_wgpu_backend(config: Config) -> Result<()> {
     #[cfg(feature = "wgpu")]
     {
@@ -208,10 +223,29 @@ fn run_wgpu_backend(config: Config) -> Result<()> {
     }
 }
 
-#[cfg(feature = "wgpu")]
+fn run_cuda_backend(config: Config) -> Result<()> {
+    #[cfg(feature = "cuda")]
+    {
+        let backend = CudaBackend::new();
+        if !matches!(backend.status(), fast_vrifa_core::BackendStatus::Ready) {
+            let detail = backend
+                .init_error()
+                .unwrap_or("CUDA runtime initialization failed");
+            bail!("--backend cuda is unavailable on this machine: {detail}");
+        }
+        return run_hybrid_pipeline(config, &backend);
+    }
+
+    #[cfg(not(feature = "cuda"))]
+    {
+        let _ = config;
+        bail!("--backend cuda requires building fast-vrifa with --features cuda");
+    }
+}
+
 fn run_hybrid_pipeline<B>(config: Config, backend: &B) -> Result<()>
 where
-    B: ImageBackend,
+    B: PeakImageBackend,
 {
     fs::create_dir_all(&config.output_dir)?;
     let mut reader = VideoReader::open(&config.video_path)?;
@@ -219,38 +253,58 @@ where
     let Some((_, first_frame_bgr)) = reader.read_next()? else {
         bail!("failed to read reference frame");
     };
-    let first_frame_converted =
-        convert_frame_with_backend(backend, &first_frame_bgr, config.colorspace)?.host;
+    let first_frame =
+        convert_frame_with_backend(backend, &first_frame_bgr, config.colorspace, true)?;
+    let first_frame_converted = first_frame
+        .host
+        .clone()
+        .ok_or_else(|| anyhow!("first-frame conversion unexpectedly omitted host data"))?;
 
     let absolute_index = match config.ref_mode {
         ReferenceMode::Absolute(index) => Some(index),
         _ => None,
     };
-    let absolute_reference = if let Some(index) = absolute_index {
-        if let Some(total) = metadata.total_frames {
-            if index >= total {
-                bail!("requested absolute frame index exceeds video length");
+    let reference_values_needed = !(config.peak_reference && config.darken_only);
+    let absolute_reference = if reference_values_needed {
+        if let Some(index) = absolute_index {
+            if let Some(total) = metadata.total_frames {
+                if index >= total {
+                    bail!("requested absolute frame index exceeds video length");
+                }
             }
+            let frame = reader
+                .read_frame_at_zero_based(index)
+                .with_context(|| format!("reading absolute reference frame {index}"))?
+                .ok_or_else(|| anyhow!("unable to read absolute reference frame {index}"))?;
+            Some(
+                convert_frame_with_backend(backend, &frame, config.colorspace, true)?
+                    .host
+                    .ok_or_else(|| {
+                        anyhow!("absolute reference conversion unexpectedly omitted host data")
+                    })?,
+            )
+        } else {
+            Some(first_frame_converted.clone())
         }
-        let frame = reader
-            .read_frame_at_zero_based(index)
-            .with_context(|| format!("reading absolute reference frame {index}"))?
-            .ok_or_else(|| anyhow!("unable to read absolute reference frame {index}"))?;
-        convert_frame_with_backend(backend, &frame, config.colorspace)?.host
-    } else {
-        first_frame_converted.clone()
-    };
-
-    let mut running_reference = first_frame_converted.clone();
-    let mut prev_buffer: Option<VecDeque<Array3<f32>>> = match config.ref_mode {
-        ReferenceMode::Prev(offset) => Some(VecDeque::with_capacity(offset)),
-        _ => None,
-    };
-    let mut dynamic_reader = if matches!(config.ref_mode, ReferenceMode::Dynamic) {
-        Some(VideoReader::open(&config.video_path)?)
     } else {
         None
     };
+
+    let mut running_reference = reference_values_needed.then_some(first_frame_converted.clone());
+    let mut prev_buffer: Option<VecDeque<Array3<f32>>> = if reference_values_needed {
+        match config.ref_mode {
+            ReferenceMode::Prev(offset) => Some(VecDeque::with_capacity(offset)),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let mut dynamic_reader =
+        if reference_values_needed && matches!(config.ref_mode, ReferenceMode::Dynamic) {
+            Some(VideoReader::open(&config.video_path)?)
+        } else {
+            None
+        };
     let mut dynamic_cache: IndexMap<usize, Array3<f32>> = IndexMap::new();
     let mut dynamic_measurements: Vec<(f32, f32)> = Vec::new();
     let mut dynamic_factor: Option<f32> = None;
@@ -272,8 +326,19 @@ where
     let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
-    let mut peak_brightness_map = if config.peak_reference {
+    let device_delta_eligible =
+        config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
+    let mut peak_brightness_map = if config.peak_reference && !device_delta_eligible {
         Some(first_frame_converted.slice(s![.., .., 0]).to_owned())
+    } else {
+        None
+    };
+    let mut peak_brightness_device = if config.peak_reference && device_delta_eligible {
+        first_frame
+            .device_lab
+            .as_ref()
+            .map(|frame| backend.extract_l_plane(frame))
+            .transpose()?
     } else {
         None
     };
@@ -292,15 +357,15 @@ where
     }
     let mut mask_png_writer = config
         .write_mask_pngs
-        .then(|| AsyncPngWriter::open(false))
+        .then(|| AsyncPngWriter::open_with_workers(false, MASK_PNG_WORKERS, MASK_PNG_QUEUE))
         .transpose()?;
     let mut overlay_png_writer = config
         .write_overlay_pngs
-        .then(|| AsyncPngWriter::open(true))
+        .then(|| AsyncPngWriter::open_with_workers(true, COLOR_PNG_WORKERS, COLOR_PNG_QUEUE))
         .transpose()?;
     let mut heatmap_png_writer = config
         .write_heatmap_pngs
-        .then(|| AsyncPngWriter::open(true))
+        .then(|| AsyncPngWriter::open_with_workers(true, COLOR_PNG_WORKERS, COLOR_PNG_QUEUE))
         .transpose()?;
 
     let video_dir = config.output_dir.join("videos");
@@ -351,7 +416,11 @@ where
         .join("default");
     let mut coco_image_writer = if stream_coco_images {
         fs::create_dir_all(&coco_images_dir)?;
-        Some(AsyncPngWriter::open_with_workers(true, 8, 64)?)
+        Some(AsyncPngWriter::open_with_workers(
+            true,
+            COCO_PNG_WORKERS,
+            COCO_PNG_QUEUE,
+        )?)
     } else {
         None
     };
@@ -361,33 +430,76 @@ where
     let mut processing_time_accum = 0.0f64;
     let run_start = Instant::now();
     let mut processed_records = Vec::new();
+    let need_host_current = !device_delta_eligible
+        || (reference_values_needed
+            && matches!(
+                config.ref_mode,
+                ReferenceMode::Running | ReferenceMode::Prev(_) | ReferenceMode::Dynamic
+            ));
 
     while let Some((frame_index, frame_bgr)) = reader.read_next()? {
-        let current = convert_frame_with_backend(backend, &frame_bgr, config.colorspace)?;
-        let frame_converted = &current.host;
+        let current =
+            convert_frame_with_backend(backend, &frame_bgr, config.colorspace, need_host_current)?;
+        let frame_converted = current.host.as_ref();
         let mut reference_frame_index = 1usize;
-        let reference_for_frame = match config.ref_mode {
-            ReferenceMode::First => first_frame_converted.clone(),
-            ReferenceMode::Absolute(_) => {
-                reference_frame_index = absolute_index.filter(|index| *index > 0).unwrap_or(1);
-                absolute_reference.clone()
-            }
-            ReferenceMode::Running => running_reference.clone(),
-            ReferenceMode::Prev(offset) => {
-                if let Some(buffer) = &prev_buffer {
-                    if buffer.len() >= offset {
-                        buffer
-                            .front()
-                            .cloned()
-                            .unwrap_or_else(|| first_frame_converted.clone())
+        let reference_for_frame = if reference_values_needed {
+            Some(match config.ref_mode {
+                ReferenceMode::First => first_frame_converted.clone(),
+                ReferenceMode::Absolute(_) => {
+                    reference_frame_index = absolute_index.filter(|index| *index > 0).unwrap_or(1);
+                    absolute_reference
+                        .as_ref()
+                        .cloned()
+                        .unwrap_or_else(|| first_frame_converted.clone())
+                }
+                ReferenceMode::Running => running_reference
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| first_frame_converted.clone()),
+                ReferenceMode::Prev(offset) => {
+                    if let Some(buffer) = &prev_buffer {
+                        if buffer.len() >= offset {
+                            buffer
+                                .front()
+                                .cloned()
+                                .unwrap_or_else(|| first_frame_converted.clone())
+                        } else {
+                            first_frame_converted.clone()
+                        }
                     } else {
                         first_frame_converted.clone()
                     }
-                } else {
-                    first_frame_converted.clone()
                 }
-            }
-            ReferenceMode::Dynamic => {
+                ReferenceMode::Dynamic => {
+                    let params = DynamicReferenceParams {
+                        factor: dynamic_factor,
+                        target_fraction: config.dynamic_target_fraction,
+                        lag_scale: config.dynamic_lag_scale,
+                        linear_mode: config.dynamic_lag_linear,
+                        linear_start: config.dynamic_lag_linear_start,
+                        linear_max: config.dynamic_lag_linear_max,
+                        total_frames: metadata.total_frames,
+                    };
+                    let ref_index = select_dynamic_reference_index(
+                        frame_index,
+                        metadata.fps as f32,
+                        roi_pixels,
+                        &params,
+                    );
+                    reference_frame_index = ref_index;
+                    fetch_reference_converted(
+                        ref_index,
+                        dynamic_reader.as_mut(),
+                        &mut dynamic_cache,
+                        config.dynamic_ref_cache_size,
+                        &first_frame_converted,
+                        config.colorspace,
+                        backend,
+                    )?
+                }
+            })
+        } else {
+            if matches!(config.ref_mode, ReferenceMode::Dynamic) {
                 let params = DynamicReferenceParams {
                     factor: dynamic_factor,
                     target_fraction: config.dynamic_target_fraction,
@@ -397,100 +509,176 @@ where
                     linear_max: config.dynamic_lag_linear_max,
                     total_frames: metadata.total_frames,
                 };
-                let ref_index = select_dynamic_reference_index(
+                reference_frame_index = select_dynamic_reference_index(
                     frame_index,
                     metadata.fps as f32,
                     roi_pixels,
                     &params,
                 );
-                reference_frame_index = ref_index;
-                fetch_reference_converted(
-                    ref_index,
-                    dynamic_reader.as_mut(),
-                    &mut dynamic_cache,
-                    config.dynamic_ref_cache_size,
-                    &first_frame_converted,
-                    config.colorspace,
-                    backend,
-                )?
+            } else if matches!(config.ref_mode, ReferenceMode::Absolute(_)) {
+                reference_frame_index = absolute_index.filter(|index| *index > 0).unwrap_or(1);
             }
+            None
         };
 
         if frame_index % config.frame_step == 0 {
             let compute_start = Instant::now();
+            let morph_params = MorphologyParams {
+                blur_kernel: config.blur_kernel,
+                morph_kernel: config.morph_kernel,
+                min_area: config.min_area,
+                manual_threshold: config.contrast_threshold,
+                percentile_threshold: config.contrast_percentile,
+                threshold_offset: config.threshold_offset,
+                blur_enabled: !config.skip_blur,
+                morph_shape: config.morph_shape,
+                morph_close_iterations: config.morph_close_iterations,
+                morph_open_iterations: config.morph_open_iterations,
+            };
             if config.peak_reference {
-                peak_brightness_map = Some(update_peak_brightness(
-                    frame_converted,
-                    peak_brightness_map.as_ref(),
-                )?);
+                if device_delta_eligible {
+                    let device_lab = current.device_lab.as_ref().ok_or_else(|| {
+                        anyhow!("device peak path requires a device CIELAB frame")
+                    })?;
+                    peak_brightness_device = Some(backend.update_peak_brightness_device(
+                        device_lab,
+                        peak_brightness_device.as_ref(),
+                    )?);
+                } else {
+                    peak_brightness_map = Some(update_peak_brightness(
+                        frame_converted.ok_or_else(|| {
+                            anyhow!("host peak path requires a converted host frame")
+                        })?,
+                        peak_brightness_map.as_ref(),
+                    )?);
+                }
             }
 
-            let reference_plane = if config.peak_reference {
-                peak_brightness_map
-                    .as_ref()
-                    .cloned()
-                    .ok_or_else(|| anyhow!("peak reference was enabled without a peak map"))?
-            } else {
-                reference_for_frame.slice(s![.., .., 0]).to_owned()
-            };
-
-            let delta = if let Some(device_lab) = current.device_lab.as_ref() {
-                if config.darken_only && matches!(config.colorspace, ColorSpace::Cielab) {
-                    let device_delta = backend.compute_delta_darken_only(
-                        device_lab,
-                        &reference_plane,
-                        &device_roi_mask,
-                        config.channel_weights[0],
-                    )?;
-                    backend.download_plane_f32(&device_delta)?
+            let detect = if let Some(device_lab) = current.device_lab.as_ref() {
+                if device_delta_eligible {
+                    let device_delta = if config.peak_reference {
+                        backend.compute_delta_darken_only_device(
+                            device_lab,
+                            peak_brightness_device.as_ref().ok_or_else(|| {
+                                anyhow!("peak reference was enabled without a device peak map")
+                            })?,
+                            &device_roi_mask,
+                            config.channel_weights[0],
+                        )?
+                    } else {
+                        let reference_plane = reference_for_frame
+                            .as_ref()
+                            .ok_or_else(|| anyhow!("missing reference frame for device delta"))?
+                            .slice(s![.., .., 0])
+                            .to_owned();
+                        backend.compute_delta_darken_only(
+                            device_lab,
+                            &reference_plane,
+                            &device_roi_mask,
+                            config.channel_weights[0],
+                        )?
+                    };
+                    if let Some(device_delta_norm) = backend.blur_and_normalize_delta(
+                        &device_delta,
+                        morph_params.blur_kernel,
+                        morph_params.blur_enabled,
+                    )? {
+                        let delta_norm = backend.download_mask_u8(&device_delta_norm)?;
+                        let threshold_value = threshold::choose_threshold(
+                            &delta_norm,
+                            &roi_mask,
+                            morph_params.manual_threshold,
+                            morph_params.percentile_threshold,
+                            morph_params.threshold_offset,
+                        )?;
+                        let mask = if let Some(device_mask) = backend.threshold_and_morph_mask(
+                            &device_delta_norm,
+                            threshold_value,
+                            morph_params.morph_shape,
+                            morph_params.morph_kernel,
+                            morph_params.morph_close_iterations,
+                            morph_params.morph_open_iterations,
+                        )? {
+                            if morph_params.min_area > 0 {
+                                if let Some(filtered_mask) = backend
+                                    .filter_min_area_mask(&device_mask, morph_params.min_area)?
+                                {
+                                    backend.download_mask_u8(&filtered_mask)?
+                                } else {
+                                    let mut mask = backend.download_mask_u8(&device_mask)?;
+                                    mask = filter_min_area_array(&mask, morph_params.min_area)?;
+                                    mask
+                                }
+                            } else {
+                                backend.download_mask_u8(&device_mask)?
+                            }
+                        } else {
+                            detect_mask_from_delta_norm_threshold(
+                                &delta_norm,
+                                threshold_value,
+                                &morph_params,
+                            )?
+                        };
+                        DetectionOutputs { mask, delta_norm }
+                    } else {
+                        let delta = backend.download_plane_f32(&device_delta)?;
+                        detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
+                    }
                 } else {
-                    compute_delta(
-                        frame_converted,
-                        &reference_for_frame,
+                    let host_reference = reference_for_frame
+                        .as_ref()
+                        .or((!reference_values_needed).then_some(&first_frame_converted))
+                        .ok_or_else(|| anyhow!("missing reference frame for host delta"))?;
+                    let delta = compute_delta(
+                        frame_converted.ok_or_else(|| {
+                            anyhow!("host delta path requires a converted host frame")
+                        })?,
+                        host_reference,
                         &roi_mask,
                         &config.channel_weights,
                         config.darken_only,
                         peak_brightness_map
                             .as_ref()
                             .filter(|_| config.peak_reference),
-                    )?
+                    )?;
+                    detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
                 }
             } else {
-                compute_delta(
-                    frame_converted,
-                    &reference_for_frame,
+                let host_reference = reference_for_frame
+                    .as_ref()
+                    .or((!reference_values_needed).then_some(&first_frame_converted))
+                    .ok_or_else(|| anyhow!("missing reference frame for host delta"))?;
+                let delta = compute_delta(
+                    frame_converted.ok_or_else(|| {
+                        anyhow!("host delta path requires a converted host frame")
+                    })?,
+                    host_reference,
                     &roi_mask,
                     &config.channel_weights,
                     config.darken_only,
                     peak_brightness_map
                         .as_ref()
                         .filter(|_| config.peak_reference),
-                )?
+                )?;
+                detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
             };
-
-            let detect = detect_mask_from_delta_debug(
-                &delta,
-                &roi_mask,
-                &MorphologyParams {
-                    blur_kernel: config.blur_kernel,
-                    morph_kernel: config.morph_kernel,
-                    min_area: config.min_area,
-                    manual_threshold: config.contrast_threshold,
-                    percentile_threshold: config.contrast_percentile,
-                    threshold_offset: config.threshold_offset,
-                    blur_enabled: !config.skip_blur,
-                    morph_shape: config.morph_shape,
-                    morph_close_iterations: config.morph_close_iterations,
-                    morph_open_iterations: config.morph_open_iterations,
-                },
-            )?;
-            let heatmap = Arc::new(apply_turbo_colormap(&detect.delta_norm)?);
             let mask = Arc::new(apply_locking(
                 &detect.mask,
                 config.lock_frames,
                 lock_state.as_mut(),
             )?);
-            let overlay = Arc::new(create_overlay(&frame_bgr, &mask)?);
+            let write_overlay = config.write_overlay_pngs || config.write_overlay_video;
+            let write_heatmap = config.write_heatmap_pngs || config.write_heatmap_video;
+            let overlay = if write_overlay {
+                Some(Arc::new(create_overlay(&frame_bgr, &mask)?))
+            } else {
+                None
+            };
+            let heatmap = if write_heatmap {
+                Some(Arc::new(apply_turbo_colormap(&detect.delta_norm)?))
+            } else {
+                None
+            };
 
             if !config.annotation_formats.is_empty() {
                 let boxes = extract_bounding_boxes(
@@ -518,19 +706,19 @@ where
             if let Some(writer) = mask_png_writer.as_mut() {
                 writer.write_gray(mask_dir.join(&basename), (*mask).clone())?;
             }
-            if let Some(writer) = overlay_png_writer.as_mut() {
-                writer.write_bgr(overlay_dir.join(&basename), (*overlay).clone())?;
+            if let (Some(writer), Some(overlay)) = (overlay_png_writer.as_mut(), overlay.as_ref()) {
+                writer.write_bgr(overlay_dir.join(&basename), (**overlay).clone())?;
             }
-            if let Some(writer) = heatmap_png_writer.as_mut() {
-                writer.write_bgr(heatmap_dir.join(&basename), (*heatmap).clone())?;
+            if let (Some(writer), Some(heatmap)) = (heatmap_png_writer.as_mut(), heatmap.as_ref()) {
+                writer.write_bgr(heatmap_dir.join(&basename), (**heatmap).clone())?;
             }
             if let Some(writer) = mask_writer.as_mut() {
                 writer.write_gray(mask.clone())?;
             }
-            if let Some(writer) = overlay_writer.as_mut() {
+            if let (Some(writer), Some(overlay)) = (overlay_writer.as_mut(), overlay.as_ref()) {
                 writer.write_bgr(overlay.clone())?;
             }
-            if let Some(writer) = heat_writer.as_mut() {
+            if let (Some(writer), Some(heatmap)) = (heat_writer.as_mut(), heatmap.as_ref()) {
                 writer.write_bgr(heatmap.clone())?;
             }
 
@@ -562,12 +750,25 @@ where
                 if buffer.len() == offset {
                     buffer.pop_front();
                 }
-                buffer.push_back(frame_converted.clone());
+                buffer.push_back(
+                    frame_converted
+                        .ok_or_else(|| {
+                            anyhow!("prev reference mode requires a converted host frame")
+                        })?
+                        .clone(),
+                );
             }
         }
-        if matches!(config.ref_mode, ReferenceMode::Running) {
+        if matches!(config.ref_mode, ReferenceMode::Running) && running_reference.is_some() {
             let alpha = config.ref_running_alpha;
-            for (running, current) in running_reference.iter_mut().zip(frame_converted.iter()) {
+            let frame_converted = frame_converted
+                .ok_or_else(|| anyhow!("running reference mode requires a converted host frame"))?;
+            for (running, current) in running_reference
+                .as_mut()
+                .ok_or_else(|| anyhow!("running reference storage was not initialized"))?
+                .iter_mut()
+                .zip(frame_converted.iter())
+            {
                 *running = (1.0 - alpha) * *running + alpha * *current;
             }
         }
@@ -663,11 +864,187 @@ where
     Ok(())
 }
 
-#[cfg(feature = "wgpu")]
+fn detect_mask_and_delta_norm(
+    delta: &Array2<f32>,
+    roi_mask: &Array2<u8>,
+    params: &MorphologyParams,
+) -> Result<DetectionOutputs> {
+    let delta_blur = if params.blur_enabled {
+        let mut kernel = params.blur_kernel;
+        if kernel % 2 == 0 {
+            kernel += 1;
+        }
+        let src = cvutil::array2_f32_to_mat(delta)?;
+        let mut dst = opencv::core::Mat::default();
+        imgproc::gaussian_blur_def(&src, &mut dst, Size::new(kernel as i32, kernel as i32), 0.0)?;
+        dst
+    } else {
+        cvutil::array2_f32_to_mat(delta)?
+    };
+
+    let delta_norm = normalize_minmax_to_u8(&delta_blur)?;
+    Ok(DetectionOutputs {
+        mask: detect_mask_from_delta_norm(&delta_norm, roi_mask, params)?,
+        delta_norm,
+    })
+}
+
+fn detect_mask_from_delta_norm(
+    delta_norm: &Array2<u8>,
+    roi_mask: &Array2<u8>,
+    params: &MorphologyParams,
+) -> Result<Array2<u8>> {
+    let threshold_value = threshold::choose_threshold(
+        &delta_norm,
+        roi_mask,
+        params.manual_threshold,
+        params.percentile_threshold,
+        params.threshold_offset,
+    )?;
+    detect_mask_from_delta_norm_threshold(delta_norm, threshold_value, params)
+}
+
+fn detect_mask_from_delta_norm_threshold(
+    delta_norm: &Array2<u8>,
+    threshold_value: f32,
+    params: &MorphologyParams,
+) -> Result<Array2<u8>> {
+    let mut binary = threshold_to_mat(delta_norm, threshold_value)?;
+    apply_morphology_in_place(&mut binary, params)?;
+    if params.min_area > 0 {
+        binary = filter_min_area(&binary, params.min_area)?;
+    }
+    Ok(cvutil::mat_to_array2_u8(&binary)?)
+}
+
+fn threshold_to_mat(delta_norm: &Array2<u8>, threshold_value: f32) -> Result<opencv::core::Mat> {
+    let norm_mat = cvutil::array2_u8_to_mat(&delta_norm)?;
+    let mut binary = opencv::core::Mat::default();
+    imgproc::threshold(
+        &norm_mat,
+        &mut binary,
+        threshold_value as f64,
+        255.0,
+        imgproc::THRESH_BINARY,
+    )?;
+    Ok(binary)
+}
+
+fn apply_morphology_in_place(
+    binary: &mut opencv::core::Mat,
+    params: &MorphologyParams,
+) -> Result<()> {
+    let mut kernel_size = params.morph_kernel + (1 - params.morph_kernel % 2);
+    if kernel_size == 0 {
+        kernel_size = 1;
+    }
+    let kernel = imgproc::get_structuring_element_def(
+        morph_shape_code(params.morph_shape),
+        Size::new(kernel_size as i32, kernel_size as i32),
+    )?;
+
+    for _ in 0..params.morph_close_iterations {
+        let mut next = opencv::core::Mat::default();
+        imgproc::morphology_ex(
+            binary,
+            &mut next,
+            imgproc::MORPH_CLOSE,
+            &kernel,
+            Point::new(-1, -1),
+            1,
+            core::BORDER_CONSTANT,
+            imgproc::morphology_default_border_value()?,
+        )?;
+        *binary = next;
+    }
+    for _ in 0..params.morph_open_iterations {
+        let mut next = opencv::core::Mat::default();
+        imgproc::morphology_ex(
+            binary,
+            &mut next,
+            imgproc::MORPH_OPEN,
+            &kernel,
+            Point::new(-1, -1),
+            1,
+            core::BORDER_CONSTANT,
+            imgproc::morphology_default_border_value()?,
+        )?;
+        *binary = next;
+    }
+    Ok(())
+}
+
+fn filter_min_area_array(binary: &Array2<u8>, min_area: usize) -> Result<Array2<u8>> {
+    let binary = cvutil::array2_u8_to_mat(binary)?;
+    Ok(cvutil::mat_to_array2_u8(&filter_min_area(
+        &binary, min_area,
+    )?)?)
+}
+
+fn normalize_minmax_to_u8(delta: &opencv::core::Mat) -> Result<Array2<u8>> {
+    let mut normalized = opencv::core::Mat::default();
+    core::normalize(
+        delta,
+        &mut normalized,
+        0.0,
+        255.0,
+        core::NORM_MINMAX,
+        core::CV_32F,
+        &core::no_array(),
+    )?;
+    let normalized = cvutil::mat_to_array2_f32(&normalized)?;
+    Ok(normalized.mapv(|value| value.clamp(0.0, 255.0) as u8))
+}
+
+fn filter_min_area(binary: &opencv::core::Mat, min_area: usize) -> Result<opencv::core::Mat> {
+    let mut labels = opencv::core::Mat::default();
+    let mut stats = opencv::core::Mat::default();
+    let mut centroids = opencv::core::Mat::default();
+    let num_labels = imgproc::connected_components_with_stats_def(
+        binary,
+        &mut labels,
+        &mut stats,
+        &mut centroids,
+    )?;
+
+    let rows = binary.rows();
+    let cols = binary.cols();
+    let mut filtered = opencv::core::Mat::new_rows_cols_with_default(
+        rows,
+        cols,
+        core::CV_8UC1,
+        Scalar::default(),
+    )?;
+    let label_values = labels.data_typed::<i32>()?;
+    let stats_values = stats.data_typed::<i32>()?;
+    let out = filtered.data_bytes_mut()?;
+    let stat_cols = stats.cols() as usize;
+
+    for (offset, label) in label_values.iter().enumerate() {
+        let label = *label as usize;
+        if label > 0 && label < num_labels as usize {
+            let area = stats_values[label * stat_cols + imgproc::CC_STAT_AREA as usize] as usize;
+            if area >= min_area {
+                out[offset] = 255;
+            }
+        }
+    }
+    Ok(filtered)
+}
+
+fn morph_shape_code(shape: MorphShape) -> i32 {
+    match shape {
+        MorphShape::Ellipse => imgproc::MORPH_ELLIPSE,
+        MorphShape::Rect => imgproc::MORPH_RECT,
+        MorphShape::Cross => imgproc::MORPH_CROSS,
+    }
+}
+
 fn convert_frame_with_backend<B>(
     backend: &B,
     frame_bgr: &Array3<u8>,
     colorspace: ColorSpace,
+    download_host: bool,
 ) -> Result<ConvertedFrame<B::DeviceFrameLab>>
 where
     B: ImageBackend,
@@ -675,7 +1052,11 @@ where
     if matches!(colorspace, ColorSpace::Cielab) {
         let uploaded = backend.upload_frame_bgr(frame_bgr)?;
         let device_lab = backend.convert_bgr_to_lab(&uploaded)?;
-        let host = backend.download_frame_f32(&device_lab)?;
+        let host = if download_host {
+            Some(backend.download_frame_f32(&device_lab)?)
+        } else {
+            None
+        };
         Ok(ConvertedFrame {
             device_lab: Some(device_lab),
             host,
@@ -683,12 +1064,13 @@ where
     } else {
         Ok(ConvertedFrame {
             device_lab: None,
-            host: convert_frame_to_colorspace(frame_bgr, colorspace)?.mapv(|value| value as f32),
+            host: Some(
+                convert_frame_to_colorspace(frame_bgr, colorspace)?.mapv(|value| value as f32),
+            ),
         })
     }
 }
 
-#[cfg(feature = "wgpu")]
 fn fetch_reference_converted<B>(
     index: usize,
     reader: Option<&mut VideoReader>,
@@ -714,7 +1096,9 @@ where
     let Some(frame) = reader.read_frame_at(index)? else {
         return Ok(first_frame_converted.clone());
     };
-    let converted = convert_frame_with_backend(backend, &frame, colorspace)?.host;
+    let converted = convert_frame_with_backend(backend, &frame, colorspace, true)?
+        .host
+        .ok_or_else(|| anyhow!("reference conversion unexpectedly omitted host data"))?;
     cache.insert(index, converted.clone());
     while cache.len() > cache_capacity {
         cache.shift_remove_index(0);
@@ -723,7 +1107,6 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-#[cfg(feature = "wgpu")]
 fn write_run_summary(
     config: &Config,
     total_frames: Option<usize>,
@@ -880,7 +1263,6 @@ fn write_run_summary(
     Ok(())
 }
 
-#[cfg(feature = "wgpu")]
 fn reference_mode_name(mode: &ReferenceMode) -> &'static str {
     match mode {
         ReferenceMode::First => "first",
@@ -891,7 +1273,6 @@ fn reference_mode_name(mode: &ReferenceMode) -> &'static str {
     }
 }
 
-#[cfg(feature = "wgpu")]
 fn reference_mode_offset(mode: &ReferenceMode) -> Option<usize> {
     match mode {
         ReferenceMode::Prev(value) | ReferenceMode::Absolute(value) => Some(*value),
@@ -899,7 +1280,6 @@ fn reference_mode_offset(mode: &ReferenceMode) -> Option<usize> {
     }
 }
 
-#[cfg(feature = "wgpu")]
 fn yaml_f32(value: f32) -> f64 {
     ((value as f64) * 1_000_000.0).round() / 1_000_000.0
 }
@@ -935,5 +1315,11 @@ mod tests {
         assert_eq!(backend, BackendMode::Wgpu);
         assert_eq!(stripped.len(), 3);
         assert_eq!(stripped[1], OsString::from("--video-path"));
+    }
+
+    #[test]
+    fn backend_parser_accepts_cpu_and_cuda() {
+        assert_eq!(BackendMode::parse("cpu").unwrap(), BackendMode::Cpu);
+        assert_eq!(BackendMode::parse("cuda").unwrap(), BackendMode::Cuda);
     }
 }
