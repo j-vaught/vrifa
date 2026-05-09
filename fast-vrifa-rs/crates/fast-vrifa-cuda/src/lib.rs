@@ -734,9 +734,10 @@ impl PeakImageBackend for CudaBackend {
                             roi,
                             npp::NPPI_NORM_INF,
                             label_buffer_ptr as *mut u8,
+                            stream_ctx,
                         )
                     },
-                    "nppiLabelMarkersUF_8u32u_C1R",
+                    "nppiLabelMarkersUF_8u32u_C1R_Ctx",
                 )?;
             }
 
@@ -766,9 +767,10 @@ impl PeakImageBackend for CudaBackend {
                             starting_number,
                             &mut new_number as *mut _,
                             compress_buffer_ptr as *mut u8,
+                            stream_ctx,
                         )
                     },
-                    "nppiCompressMarkerLabelsUF_32u_C1IR",
+                    "nppiCompressMarkerLabelsUF_32u_C1IR_Ctx",
                 )?;
             }
             if new_number <= 0 {

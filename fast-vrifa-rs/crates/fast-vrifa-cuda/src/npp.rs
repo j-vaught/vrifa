@@ -63,12 +63,27 @@ mod imp {
     type NppSetStream = unsafe extern "C" fn(CUstream) -> NppStatus;
     type NppGetStreamContext = unsafe extern "C" fn(*mut NppStreamContext) -> NppStatus;
     type NppiLabelMarkersUFGetBufferSize32u = unsafe extern "C" fn(NppiSize, *mut i32) -> NppStatus;
-    type NppiLabelMarkersUF8u32u =
-        unsafe extern "C" fn(*mut u8, i32, *mut u32, i32, NppiSize, i32, *mut u8) -> NppStatus;
+    type NppiLabelMarkersUF8u32u = unsafe extern "C" fn(
+        *mut u8,
+        i32,
+        *mut u32,
+        i32,
+        NppiSize,
+        i32,
+        *mut u8,
+        NppStreamContext,
+    ) -> NppStatus;
     type NppiCompressMarkerLabelsGetBufferSize32u =
         unsafe extern "C" fn(i32, *mut i32) -> NppStatus;
-    type NppiCompressMarkerLabelsUF32u =
-        unsafe extern "C" fn(*mut u32, i32, NppiSize, i32, *mut i32, *mut u8) -> NppStatus;
+    type NppiCompressMarkerLabelsUF32u = unsafe extern "C" fn(
+        *mut u32,
+        i32,
+        NppiSize,
+        i32,
+        *mut i32,
+        *mut u8,
+        NppStreamContext,
+    ) -> NppStatus;
     type NppiCompressedMarkerLabelsUFGetInfoListSize32u =
         unsafe extern "C" fn(u32, *mut u32) -> NppStatus;
     type NppiCompressedMarkerLabelsUFInfo32u = unsafe extern "C" fn(
@@ -127,10 +142,10 @@ mod imp {
                     npp_set_stream: *core.get(b"nppSetStream\0")?,
                     npp_get_stream_context: *core.get(b"nppGetStreamContext\0")?,
                     label_buffer_size: *image.get(b"nppiLabelMarkersUFGetBufferSize_32u_C1R\0")?,
-                    label_markers: *image.get(b"nppiLabelMarkersUF_8u32u_C1R\0")?,
+                    label_markers: *image.get(b"nppiLabelMarkersUF_8u32u_C1R_Ctx\0")?,
                     compress_buffer_size: *image
                         .get(b"nppiCompressMarkerLabelsGetBufferSize_32u_C1R\0")?,
-                    compress_markers: *image.get(b"nppiCompressMarkerLabelsUF_32u_C1IR\0")?,
+                    compress_markers: *image.get(b"nppiCompressMarkerLabelsUF_32u_C1IR_Ctx\0")?,
                     info_list_size: *image
                         .get(b"nppiCompressedMarkerLabelsUFGetInfoListSize_32u_C1R\0")?,
                     info_list: *image.get(b"nppiCompressedMarkerLabelsUFInfo_32u_C1R_Ctx\0")?,
