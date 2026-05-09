@@ -44,6 +44,7 @@ pub trait ImageBackend: Send + Sync {
         margins: RoiMargins,
     ) -> Result<Self::DeviceMaskU8>;
     fn download_mask_u8(&self, mask: &Self::DeviceMaskU8) -> Result<Array2<u8>>;
+    fn upload_plane_f32(&self, plane: &Array2<f32>) -> Result<Self::DevicePlaneF32>;
     fn compute_delta_darken_only(
         &self,
         frame_lab: &Self::DeviceFrameLab,

@@ -32,7 +32,13 @@ use vrifa_core::reference::{
 };
 use vrifa_core::roi::resolve_roi_margins;
 use vrifa_core::threshold;
-use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
+use vrifa_io::{AsyncPngWriter, VideoReader};
+
+mod raw_video;
+use raw_video::{
+    finalize_raw_stream_to_mp4, AsyncRawVideoWriter, RawGrayFrameReader, RawPixelFormat,
+    RawVideoArtifact,
+};
 
 #[cfg(feature = "cuda")]
 use fast_vrifa_cuda::CudaBackend;
@@ -55,6 +61,12 @@ pub enum BackendMode {
     Cpu,
     Wgpu,
     Cuda,
+}
+
+#[derive(Clone, Debug)]
+struct FastCliOptions {
+    backend: BackendMode,
+    ffmpeg_postprocess: bool,
 }
 
 impl BackendMode {
@@ -81,8 +93,9 @@ struct DetectionOutputs {
 
 pub fn run() -> Result<()> {
     let raw_args: Vec<OsString> = env::args_os().collect();
-    let (backend, stripped_args) = parse_backend_args(raw_args)?;
-    if matches!(backend, BackendMode::Delegate) || contains_debug_dump_flags(&stripped_args) {
+    let (options, stripped_args) = parse_fast_args(raw_args)?;
+    if matches!(options.backend, BackendMode::Delegate) || contains_debug_dump_flags(&stripped_args)
+    {
         let status = forward_to_reference(stripped_args.iter().skip(1))?;
         return handle_reference_status(status);
     }
@@ -91,7 +104,7 @@ pub fn run() -> Result<()> {
         .context("parsing fast-vrifa CLI arguments")?;
     let config = Config::try_from(cli_args)?;
 
-    run_with_backend(config, backend)
+    run_with_options(config, &options)
 }
 
 pub fn run_config(config: Config) -> Result<()> {
@@ -99,16 +112,23 @@ pub fn run_config(config: Config) -> Result<()> {
 }
 
 pub fn run_with_backend_name(config: Config, backend: &str) -> Result<()> {
-    let backend = BackendMode::parse(backend)?;
-    run_with_backend(config, backend)
+    run_with_backend(config, BackendMode::parse(backend)?)
 }
 
 pub fn run_with_backend(config: Config, backend: BackendMode) -> Result<()> {
-    match backend {
+    let options = FastCliOptions {
+        backend,
+        ffmpeg_postprocess: false,
+    };
+    run_with_options(config, &options)
+}
+
+fn run_with_options(config: Config, options: &FastCliOptions) -> Result<()> {
+    match options.backend {
         BackendMode::Delegate => run_config(config),
-        BackendMode::Cpu => run_cpu_backend(config),
-        BackendMode::Wgpu => run_wgpu_backend(config),
-        BackendMode::Cuda => run_cuda_backend(config),
+        BackendMode::Cpu => run_cpu_backend(config, options),
+        BackendMode::Wgpu => run_wgpu_backend(config, options),
+        BackendMode::Cuda => run_cuda_backend(config, options),
     }
 }
 
@@ -162,11 +182,14 @@ fn handle_reference_status(status: ExitStatus) -> Result<()> {
     bail!("reference vrifa terminated by signal");
 }
 
-fn parse_backend_args(raw_args: Vec<OsString>) -> Result<(BackendMode, Vec<OsString>)> {
+fn parse_fast_args(raw_args: Vec<OsString>) -> Result<(FastCliOptions, Vec<OsString>)> {
     let mut args = raw_args.into_iter();
     let program = args.next().unwrap_or_else(|| OsString::from("fast-vrifa"));
     let mut stripped = vec![program];
-    let mut backend = BackendMode::Delegate;
+    let mut options = FastCliOptions {
+        backend: BackendMode::Delegate,
+        ffmpeg_postprocess: false,
+    };
 
     while let Some(arg) = args.next() {
         if let Some(text) = arg.to_str() {
@@ -174,7 +197,7 @@ fn parse_backend_args(raw_args: Vec<OsString>) -> Result<(BackendMode, Vec<OsStr
                 let value = args
                     .next()
                     .ok_or_else(|| anyhow!("--backend requires a value"))?;
-                backend = BackendMode::parse(
+                options.backend = BackendMode::parse(
                     value
                         .to_str()
                         .ok_or_else(|| anyhow!("--backend value must be valid UTF-8"))?,
@@ -182,14 +205,26 @@ fn parse_backend_args(raw_args: Vec<OsString>) -> Result<(BackendMode, Vec<OsStr
                 continue;
             }
             if let Some(value) = text.strip_prefix("--backend=") {
-                backend = BackendMode::parse(value)?;
+                options.backend = BackendMode::parse(value)?;
+                continue;
+            }
+            if text == "--ffmpeg-postprocess" {
+                options.ffmpeg_postprocess = true;
+                continue;
+            }
+            if text == "--no-ffmpeg-postprocess" {
+                options.ffmpeg_postprocess = false;
+                continue;
+            }
+            if let Some(value) = text.strip_prefix("--ffmpeg-postprocess=") {
+                options.ffmpeg_postprocess = parse_fast_bool_flag(value, "--ffmpeg-postprocess")?;
                 continue;
             }
         }
         stripped.push(arg);
     }
 
-    Ok((backend, stripped))
+    Ok((options, stripped))
 }
 
 fn contains_debug_dump_flags(args: &[OsString]) -> bool {
@@ -204,26 +239,34 @@ fn contains_debug_dump_flags(args: &[OsString]) -> bool {
     })
 }
 
-fn run_cpu_backend(config: Config) -> Result<()> {
-    let backend = CpuBackend;
-    run_hybrid_pipeline(config, &backend)
+fn parse_fast_bool_flag(raw: &str, flag: &str) -> Result<bool> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "true" | "yes" | "1" => Ok(true),
+        "false" | "no" | "0" => Ok(false),
+        other => bail!("{flag} expects true/false/yes/no/1/0, got '{other}'"),
+    }
 }
 
-fn run_wgpu_backend(config: Config) -> Result<()> {
+fn run_cpu_backend(config: Config, options: &FastCliOptions) -> Result<()> {
+    let backend = CpuBackend;
+    run_hybrid_pipeline(config, &backend, options)
+}
+
+fn run_wgpu_backend(config: Config, options: &FastCliOptions) -> Result<()> {
     #[cfg(feature = "wgpu")]
     {
         let backend = WgpuBackend::new().context("initializing wgpu backend")?;
-        return run_hybrid_pipeline(config, &backend);
+        return run_hybrid_pipeline(config, &backend, options);
     }
 
     #[cfg(not(feature = "wgpu"))]
     {
-        let _ = config;
+        let _ = (config, options);
         bail!("--backend wgpu requires building fast-vrifa with --features wgpu");
     }
 }
 
-fn run_cuda_backend(config: Config) -> Result<()> {
+fn run_cuda_backend(config: Config, options: &FastCliOptions) -> Result<()> {
     #[cfg(feature = "cuda")]
     {
         let backend = CudaBackend::new();
@@ -233,17 +276,17 @@ fn run_cuda_backend(config: Config) -> Result<()> {
                 .unwrap_or("CUDA runtime initialization failed");
             bail!("--backend cuda is unavailable on this machine: {detail}");
         }
-        return run_hybrid_pipeline(config, &backend);
+        return run_hybrid_pipeline(config, &backend, options);
     }
 
     #[cfg(not(feature = "cuda"))]
     {
-        let _ = config;
+        let _ = (config, options);
         bail!("--backend cuda requires building fast-vrifa with --features cuda");
     }
 }
 
-fn run_hybrid_pipeline<B>(config: Config, backend: &B) -> Result<()>
+fn run_hybrid_pipeline<B>(config: Config, backend: &B, options: &FastCliOptions) -> Result<()>
 where
     B: PeakImageBackend,
 {
@@ -265,6 +308,8 @@ where
         _ => None,
     };
     let reference_values_needed = !(config.peak_reference && config.darken_only);
+    let device_delta_eligible =
+        config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
     let absolute_reference = if reference_values_needed {
         if let Some(index) = absolute_index {
             if let Some(total) = metadata.total_frames {
@@ -286,6 +331,19 @@ where
         } else {
             Some(first_frame_converted.clone())
         }
+    } else {
+        None
+    };
+    let first_reference_device = if device_delta_eligible && reference_values_needed {
+        Some(backend.upload_plane_f32(&first_frame_converted.slice(s![.., .., 0]).to_owned())?)
+    } else {
+        None
+    };
+    let absolute_reference_device = if device_delta_eligible {
+        absolute_reference
+            .as_ref()
+            .map(|reference| backend.upload_plane_f32(&reference.slice(s![.., .., 0]).to_owned()))
+            .transpose()?
     } else {
         None
     };
@@ -326,8 +384,6 @@ where
     let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
-    let device_delta_eligible =
-        config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
     let mut peak_brightness_map = if config.peak_reference && !device_delta_eligible {
         Some(first_frame_converted.slice(s![.., .., 0]).to_owned())
     } else {
@@ -369,36 +425,36 @@ where
         .transpose()?;
 
     let video_dir = config.output_dir.join("videos");
+    let raw_stream_dir = config.output_dir.join(".streams");
+    let expected_video_frames = metadata
+        .total_frames
+        .map(|total_frames| total_frames / config.frame_step.max(1));
+    let need_mask_stream = config.write_mask_video || config.write_overlay_video;
+    let need_delta_norm_stream = config.write_heatmap_video;
     let mut mask_writer = None;
-    let mut overlay_writer = None;
-    let mut heat_writer = None;
-    if config.write_mask_video || config.write_overlay_video || config.write_heatmap_video {
-        fs::create_dir_all(&video_dir)?;
-        if config.write_mask_video {
-            mask_writer = Some(AsyncVideoWriter::open(
-                video_dir.join("mask.mp4"),
+    let mut delta_norm_writer = None;
+    if need_mask_stream || need_delta_norm_stream {
+        fs::create_dir_all(&raw_stream_dir)?;
+        if need_mask_stream {
+            mask_writer = Some(AsyncRawVideoWriter::open(
+                raw_stream_dir.join("mask.raw"),
                 metadata.fps,
                 metadata.width,
                 metadata.height,
-                false,
+                RawPixelFormat::Gray8,
+                expected_video_frames,
+                32,
             )?);
         }
-        if config.write_overlay_video {
-            overlay_writer = Some(AsyncVideoWriter::open(
-                video_dir.join("overlay.mp4"),
+        if need_delta_norm_stream {
+            delta_norm_writer = Some(AsyncRawVideoWriter::open(
+                raw_stream_dir.join("delta_norm.raw"),
                 metadata.fps,
                 metadata.width,
                 metadata.height,
-                true,
-            )?);
-        }
-        if config.write_heatmap_video {
-            heat_writer = Some(AsyncVideoWriter::open(
-                video_dir.join("heatmap.mp4"),
-                metadata.fps,
-                metadata.width,
-                metadata.height,
-                true,
+                RawPixelFormat::Gray8,
+                expected_video_frames,
+                32,
             )?);
         }
     }
@@ -565,6 +621,19 @@ where
                             &device_roi_mask,
                             config.channel_weights[0],
                         )?
+                    } else if let Some(device_reference_plane) = match config.ref_mode {
+                        ReferenceMode::First => first_reference_device.as_ref(),
+                        ReferenceMode::Absolute(_) => absolute_reference_device
+                            .as_ref()
+                            .or(first_reference_device.as_ref()),
+                        _ => None,
+                    } {
+                        backend.compute_delta_darken_only_device(
+                            device_lab,
+                            device_reference_plane,
+                            &device_roi_mask,
+                            config.channel_weights[0],
+                        )?
                     } else {
                         let reference_plane = reference_for_frame
                             .as_ref()
@@ -667,15 +736,14 @@ where
                 config.lock_frames,
                 lock_state.as_mut(),
             )?);
-            let write_overlay = config.write_overlay_pngs || config.write_overlay_video;
-            let write_heatmap = config.write_heatmap_pngs || config.write_heatmap_video;
-            let overlay = if write_overlay {
+            let delta_norm = Arc::new(detect.delta_norm);
+            let overlay = if config.write_overlay_pngs {
                 Some(Arc::new(create_overlay(&frame_bgr, &mask)?))
             } else {
                 None
             };
-            let heatmap = if write_heatmap {
-                Some(Arc::new(apply_turbo_colormap(&detect.delta_norm)?))
+            let heatmap = if config.write_heatmap_pngs {
+                Some(Arc::new(apply_turbo_colormap(&delta_norm)?))
             } else {
                 None
             };
@@ -715,11 +783,8 @@ where
             if let Some(writer) = mask_writer.as_mut() {
                 writer.write_gray(mask.clone())?;
             }
-            if let (Some(writer), Some(overlay)) = (overlay_writer.as_mut(), overlay.as_ref()) {
-                writer.write_bgr(overlay.clone())?;
-            }
-            if let (Some(writer), Some(heatmap)) = (heat_writer.as_mut(), heatmap.as_ref()) {
-                writer.write_bgr(heatmap.clone())?;
+            if let Some(writer) = delta_norm_writer.as_mut() {
+                writer.write_gray(delta_norm.clone())?;
             }
 
             if matches!(config.ref_mode, ReferenceMode::Dynamic) {
@@ -774,15 +839,16 @@ where
         }
     }
 
-    if let Some(writer) = mask_writer.take() {
-        writer.close()?;
-    }
-    if let Some(writer) = overlay_writer.take() {
-        writer.close()?;
-    }
-    if let Some(writer) = heat_writer.take() {
-        writer.close()?;
-    }
+    let mask_artifact = if let Some(writer) = mask_writer.take() {
+        Some(writer.close()?)
+    } else {
+        None
+    };
+    let delta_norm_artifact = if let Some(writer) = delta_norm_writer.take() {
+        Some(writer.close()?)
+    } else {
+        None
+    };
     if let Some(writer) = coco_image_writer.take() {
         writer.close()?;
     }
@@ -794,6 +860,46 @@ where
     }
     if let Some(writer) = heatmap_png_writer.take() {
         writer.close()?;
+    }
+    if options.ffmpeg_postprocess {
+        fs::create_dir_all(&video_dir)?;
+        let ffmpeg_bin = env::var_os("FFMPEG_BIN").unwrap_or_else(|| OsString::from("ffmpeg"));
+        if let Some(artifact) = mask_artifact.as_ref() {
+            if config.write_mask_video {
+                finalize_raw_stream_to_mp4(&ffmpeg_bin, artifact, video_dir.join("mask.mp4"))?;
+            }
+            if config.write_overlay_video {
+                postprocess_overlay_video(
+                    &config,
+                    metadata.fps,
+                    metadata.width,
+                    metadata.height,
+                    artifact,
+                    &raw_stream_dir,
+                    &ffmpeg_bin,
+                    video_dir.join("overlay.mp4"),
+                )?;
+            }
+        }
+        if config.write_heatmap_video {
+            if let Some(artifact) = delta_norm_artifact.as_ref() {
+                postprocess_heatmap_video(
+                    metadata.fps,
+                    metadata.width,
+                    metadata.height,
+                    artifact,
+                    &raw_stream_dir,
+                    &ffmpeg_bin,
+                    video_dir.join("heatmap.mp4"),
+                )?;
+            }
+        }
+        if let Some(artifact) = mask_artifact.as_ref() {
+            let _ = fs::remove_file(&artifact.path);
+        }
+        if let Some(artifact) = delta_norm_artifact.as_ref() {
+            let _ = fs::remove_file(&artifact.path);
+        }
     }
 
     if !config.annotation_formats.is_empty() {
@@ -861,6 +967,84 @@ where
         config.output_dir.display(),
         config.output_dir.join("run_summary.yaml").display()
     );
+    Ok(())
+}
+
+fn postprocess_overlay_video(
+    config: &Config,
+    fps: f64,
+    width: usize,
+    height: usize,
+    mask_artifact: &RawVideoArtifact,
+    raw_stream_dir: &Path,
+    ffmpeg_bin: &OsStr,
+    output_path: PathBuf,
+) -> Result<()> {
+    if mask_artifact.frames_written == 0 {
+        return Ok(());
+    }
+    let overlay_raw_path = raw_stream_dir.join("overlay_post.raw");
+    let overlay_writer = AsyncRawVideoWriter::open(
+        &overlay_raw_path,
+        fps,
+        width,
+        height,
+        RawPixelFormat::Bgr24,
+        Some(mask_artifact.frames_written),
+        8,
+    )?;
+    let mut source_reader = VideoReader::open(&config.video_path)?;
+    let mut mask_reader = RawGrayFrameReader::open(mask_artifact)?;
+
+    while let Some((frame_index, frame_bgr)) = source_reader.read_next()? {
+        if frame_index % config.frame_step != 0 {
+            continue;
+        }
+        let mask = mask_reader.read_next()?.ok_or_else(|| {
+            anyhow!("mask raw stream ended before overlay video reconstruction completed")
+        })?;
+        overlay_writer.write_bgr(Arc::new(create_overlay(&frame_bgr, &mask)?))?;
+    }
+
+    if mask_reader.read_next()?.is_some() {
+        bail!("mask raw stream contains extra frames after overlay reconstruction");
+    }
+
+    let artifact = overlay_writer.close()?;
+    finalize_raw_stream_to_mp4(ffmpeg_bin, &artifact, &output_path)?;
+    let _ = fs::remove_file(&artifact.path);
+    Ok(())
+}
+
+fn postprocess_heatmap_video(
+    fps: f64,
+    width: usize,
+    height: usize,
+    delta_norm_artifact: &RawVideoArtifact,
+    raw_stream_dir: &Path,
+    ffmpeg_bin: &OsStr,
+    output_path: PathBuf,
+) -> Result<()> {
+    if delta_norm_artifact.frames_written == 0 {
+        return Ok(());
+    }
+    let heatmap_raw_path = raw_stream_dir.join("heatmap_post.raw");
+    let heatmap_writer = AsyncRawVideoWriter::open(
+        &heatmap_raw_path,
+        fps,
+        width,
+        height,
+        RawPixelFormat::Bgr24,
+        Some(delta_norm_artifact.frames_written),
+        8,
+    )?;
+    let mut delta_norm_reader = RawGrayFrameReader::open(delta_norm_artifact)?;
+    while let Some(delta_norm) = delta_norm_reader.read_next()? {
+        heatmap_writer.write_bgr(Arc::new(apply_turbo_colormap(&delta_norm)?))?;
+    }
+    let artifact = heatmap_writer.close()?;
+    finalize_raw_stream_to_mp4(ffmpeg_bin, &artifact, &output_path)?;
+    let _ = fs::remove_file(&artifact.path);
     Ok(())
 }
 
@@ -1287,7 +1471,7 @@ fn yaml_f32(value: f32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        delegated_backend_label, parse_backend_args, reference_binary_candidates, BackendMode,
+        delegated_backend_label, parse_fast_args, reference_binary_candidates, BackendMode,
     };
     use std::ffi::OsString;
 
@@ -1311,8 +1495,24 @@ mod tests {
             OsString::from("--video-path"),
             OsString::from("data/input_1.mp4"),
         ];
-        let (backend, stripped) = parse_backend_args(args).unwrap();
-        assert_eq!(backend, BackendMode::Wgpu);
+        let (options, stripped) = parse_fast_args(args).unwrap();
+        assert_eq!(options.backend, BackendMode::Wgpu);
+        assert_eq!(stripped.len(), 3);
+        assert_eq!(stripped[1], OsString::from("--video-path"));
+    }
+
+    #[test]
+    fn ffmpeg_postprocess_flag_is_removed_before_forwarding() {
+        let args = vec![
+            OsString::from("fast-vrifa"),
+            OsString::from("--backend=cuda"),
+            OsString::from("--ffmpeg-postprocess"),
+            OsString::from("--video-path"),
+            OsString::from("data/input_2.mp4"),
+        ];
+        let (options, stripped) = parse_fast_args(args).unwrap();
+        assert_eq!(options.backend, BackendMode::Cuda);
+        assert!(options.ffmpeg_postprocess);
         assert_eq!(stripped.len(), 3);
         assert_eq!(stripped[1], OsString::from("--video-path"));
     }
