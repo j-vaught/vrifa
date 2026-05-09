@@ -42,10 +42,13 @@
 
   let cell-w = 2.6
   let cell-h = 0.95
-  let gap = 0.3
-  let row-pad = 0.85
+  let gap = 0.5
+  let row-pad = 1.0
   let cols = 6
   let rows = 2
+
+  // Black-filled stealth arrowhead, reused on every connector.
+  let arrow = (end: "stealth", fill: black, scale: 0.8)
 
   for (i, st) in stages.enumerate() {
     let col = calc.rem(i, cols)
@@ -77,7 +80,7 @@
     if next-row == row {
       // Within-row arrow: short horizontal hop into the next cell.
       line((x0, y0), (x0 + gap, y0),
-           stroke: 0.7pt + b70, mark: (end: ">"))
+           stroke: 0.8pt + black, mark: arrow)
     } else {
       // Wrap arrow: routed around the cell layout so it does not cut
       // through any row-1 cell. Six points, five segments:
@@ -94,23 +97,28 @@
         (-elbow-back, intermediate-y),
         (-elbow-back, entry-y),
         (0, entry-y),
-        stroke: 0.7pt + b70,
-        mark: (end: ">"),
+        stroke: 0.8pt + black,
+        mark: arrow,
       )
     }
   }
 
-  // Family legend underneath.
-  let leg-y = -2 * (cell-h + gap + row-pad) + 0.2
-  let leg-x = 0
+  // Family legend, centered horizontally under the cell layout.
   let families = (
     ("Ingest",   atlantic),
     ("Detect",   garnet),
     ("Clean",    horseshoe),
     ("Export",   warmgrey),
   )
+  let leg-spacing = 3.0
+  let layout-w = cols * cell-w + (cols - 1) * gap
+  // Each item runs from its swatch-left to roughly +1.8 (label width); last item adds 1.0 trailing margin.
+  let legend-w = (families.len() - 1) * leg-spacing + 1.8
+  let leg-x0 = (layout-w - legend-w) / 2
+  // Move the legend up so it sits closer to the bottom row of cells.
+  let leg-y = -2 * (cell-h + gap + row-pad) + 0.55
   for (i, (name, c)) in families.enumerate() {
-    let x = i * 3.5
+    let x = leg-x0 + i * leg-spacing
     rect((x, leg-y), (x + 0.5, leg-y - 0.35),
          fill: c.lighten(82%), stroke: 0.7pt + c)
     content((x + 1.4, leg-y - 0.18),
