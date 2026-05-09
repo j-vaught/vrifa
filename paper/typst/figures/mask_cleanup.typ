@@ -6,7 +6,7 @@
 #import "@preview/cetz:0.4.0"
 
 #set page(width: auto, height: auto, margin: 6pt, fill: white)
-#set text(font: ("Inter", "Helvetica"), size: 8.5pt)
+#set text(font: ("Helvetica", "Arial"), size: 8.5pt)
 
 #let garnet = rgb("#73000A")
 #let b70    = rgb("#5C5C5C")
@@ -16,7 +16,7 @@
   width: 3.4cm,
 )[
   #image(src, width: 100%)
-  #v(0.15em)
+  #v(-0.9em)
   #align(center)[
     #text(size: 8pt, weight: 700, fill: garnet)[#label]
   ]
@@ -26,7 +26,7 @@
 ]
 
 #grid(
-  columns: (1fr, 1fr, 1fr, 1fr, 1fr),
+  columns: (auto, auto, auto, auto, auto),
   column-gutter: 0.25cm,
   cell([1. delta_norm], "/assets/method/cleanup_1_delta_norm.png",
     [normalized response]),
