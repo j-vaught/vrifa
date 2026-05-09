@@ -79,6 +79,14 @@ struct DetectionOutputs {
     mask: Array2<u8>,
 }
 
+#[derive(Clone, Copy)]
+struct RoiBounds {
+    top: usize,
+    bottom: usize,
+    left: usize,
+    right: usize,
+}
+
 pub fn run() -> Result<()> {
     let raw_args: Vec<OsString> = env::args_os().collect();
     let (backend, stripped_args) = parse_backend_args(raw_args)?;
@@ -324,6 +332,7 @@ where
         roi_margins,
     )?;
     let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
+    let roi_bounds = roi_mask_bounds(&roi_mask);
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let device_delta_eligible =
@@ -601,7 +610,11 @@ where
                         )? {
                             let mut mask = backend.download_mask_u8(&device_mask)?;
                             if morph_params.min_area > 0 {
-                                mask = filter_min_area_array(&mask, morph_params.min_area)?;
+                                mask = filter_min_area_array(
+                                    &mask,
+                                    morph_params.min_area,
+                                    roi_bounds,
+                                )?;
                             }
                             mask
                         } else {
@@ -609,12 +622,13 @@ where
                                 &delta_norm,
                                 threshold_value,
                                 &morph_params,
+                                roi_bounds,
                             )?
                         };
                         DetectionOutputs { mask, delta_norm }
                     } else {
                         let delta = backend.download_plane_f32(&device_delta)?;
-                        detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
+                        detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params, roi_bounds)?
                     }
                 } else {
                     let host_reference = reference_for_frame
@@ -633,7 +647,7 @@ where
                             .as_ref()
                             .filter(|_| config.peak_reference),
                     )?;
-                    detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
+                    detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params, roi_bounds)?
                 }
             } else {
                 let host_reference = reference_for_frame
@@ -652,7 +666,7 @@ where
                         .as_ref()
                         .filter(|_| config.peak_reference),
                 )?;
-                detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
+                detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params, roi_bounds)?
             };
             let mask = Arc::new(apply_locking(
                 &detect.mask,
@@ -860,6 +874,7 @@ fn detect_mask_and_delta_norm(
     delta: &Array2<f32>,
     roi_mask: &Array2<u8>,
     params: &MorphologyParams,
+    roi_bounds: Option<RoiBounds>,
 ) -> Result<DetectionOutputs> {
     let delta_blur = if params.blur_enabled {
         let mut kernel = params.blur_kernel;
@@ -876,7 +891,7 @@ fn detect_mask_and_delta_norm(
 
     let delta_norm = normalize_minmax_to_u8(&delta_blur)?;
     Ok(DetectionOutputs {
-        mask: detect_mask_from_delta_norm(&delta_norm, roi_mask, params)?,
+        mask: detect_mask_from_delta_norm(&delta_norm, roi_mask, params, roi_bounds)?,
         delta_norm,
     })
 }
@@ -885,6 +900,7 @@ fn detect_mask_from_delta_norm(
     delta_norm: &Array2<u8>,
     roi_mask: &Array2<u8>,
     params: &MorphologyParams,
+    roi_bounds: Option<RoiBounds>,
 ) -> Result<Array2<u8>> {
     let threshold_value = threshold::choose_threshold(
         &delta_norm,
@@ -893,18 +909,19 @@ fn detect_mask_from_delta_norm(
         params.percentile_threshold,
         params.threshold_offset,
     )?;
-    detect_mask_from_delta_norm_threshold(delta_norm, threshold_value, params)
+    detect_mask_from_delta_norm_threshold(delta_norm, threshold_value, params, roi_bounds)
 }
 
 fn detect_mask_from_delta_norm_threshold(
     delta_norm: &Array2<u8>,
     threshold_value: f32,
     params: &MorphologyParams,
+    roi_bounds: Option<RoiBounds>,
 ) -> Result<Array2<u8>> {
     let mut binary = threshold_to_mat(delta_norm, threshold_value)?;
     apply_morphology_in_place(&mut binary, params)?;
     if params.min_area > 0 {
-        binary = filter_min_area(&binary, params.min_area)?;
+        binary = filter_min_area(&binary, params.min_area, roi_bounds)?;
     }
     Ok(cvutil::mat_to_array2_u8(&binary)?)
 }
@@ -966,10 +983,14 @@ fn apply_morphology_in_place(
     Ok(())
 }
 
-fn filter_min_area_array(binary: &Array2<u8>, min_area: usize) -> Result<Array2<u8>> {
+fn filter_min_area_array(
+    binary: &Array2<u8>,
+    min_area: usize,
+    roi_bounds: Option<RoiBounds>,
+) -> Result<Array2<u8>> {
     let binary = cvutil::array2_u8_to_mat(binary)?;
     Ok(cvutil::mat_to_array2_u8(&filter_min_area(
-        &binary, min_area,
+        &binary, min_area, roi_bounds,
     )?)?)
 }
 
@@ -988,7 +1009,37 @@ fn normalize_minmax_to_u8(delta: &opencv::core::Mat) -> Result<Array2<u8>> {
     Ok(normalized.mapv(|value| value.clamp(0.0, 255.0) as u8))
 }
 
-fn filter_min_area(binary: &opencv::core::Mat, min_area: usize) -> Result<opencv::core::Mat> {
+fn filter_min_area(
+    binary: &opencv::core::Mat,
+    min_area: usize,
+    roi_bounds: Option<RoiBounds>,
+) -> Result<opencv::core::Mat> {
+    if let Some(bounds) = roi_bounds.filter(|bounds| {
+        bounds.top > 0
+            || bounds.left > 0
+            || bounds.bottom < binary.rows() as usize
+            || bounds.right < binary.cols() as usize
+    }) {
+        let rect = core::Rect::new(
+            bounds.left as i32,
+            bounds.top as i32,
+            (bounds.right - bounds.left) as i32,
+            (bounds.bottom - bounds.top) as i32,
+        );
+        let roi = binary.roi(rect)?;
+        let roi = roi.try_clone()?;
+        let filtered_roi = filter_min_area(&roi, min_area, None)?;
+        let mut filtered = opencv::core::Mat::new_rows_cols_with_default(
+            binary.rows(),
+            binary.cols(),
+            core::CV_8UC1,
+            Scalar::default(),
+        )?;
+        let mut dst_roi = filtered.roi_mut(rect)?;
+        filtered_roi.copy_to(&mut dst_roi)?;
+        return Ok(filtered);
+    }
+
     let mut labels = opencv::core::Mat::default();
     let mut stats = opencv::core::Mat::default();
     let mut centroids = opencv::core::Mat::default();
@@ -1030,6 +1081,31 @@ fn morph_shape_code(shape: MorphShape) -> i32 {
         MorphShape::Rect => imgproc::MORPH_RECT,
         MorphShape::Cross => imgproc::MORPH_CROSS,
     }
+}
+
+fn roi_mask_bounds(roi_mask: &Array2<u8>) -> Option<RoiBounds> {
+    let (height, width) = roi_mask.dim();
+    let mut top = None;
+    let mut bottom = None;
+    let mut left = width;
+    let mut right = 0usize;
+    for y in 0..height {
+        for x in 0..width {
+            if roi_mask[(y, x)] == 0 {
+                continue;
+            }
+            top.get_or_insert(y);
+            bottom = Some(y + 1);
+            left = left.min(x);
+            right = right.max(x + 1);
+        }
+    }
+    top.zip(bottom).map(|(top, bottom)| RoiBounds {
+        top,
+        bottom,
+        left,
+        right,
+    })
 }
 
 fn convert_frame_with_backend<B>(
