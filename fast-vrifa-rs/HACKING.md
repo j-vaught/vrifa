@@ -4,15 +4,15 @@ This workspace is separate from `vrifa-rs/` on purpose. Treat the CPU tree as a 
 
 ## Add or reshape a backend trait
 
-Edit `crates/fast-vrifa-core/src/lib.rs`. The trait in that crate is the contract between the CLI and the eventual CUDA or wgpu backends.
+Edit `crates/fast-vrifa-core/src/backend.rs`. The trait in that crate is the contract between the CLI and the eventual CUDA or wgpu backends.
 
 ## Bring up a backend crate
 
-Edit either `crates/fast-vrifa-cuda` or `crates/fast-vrifa-wgpu`. Keep the crate independently buildable and expose a backend type that implements the trait from `fast-vrifa-core`.
+Edit either `crates/fast-vrifa-cuda` or `crates/fast-vrifa-wgpu`. The `wgpu` crate already carries the stage-1 path: upload, exact BGR->CIELAB lookup, ROI mask fill, and darken-only delta.
 
 ## Change the CLI
 
-Edit `crates/fast-vrifa-cli`. During scaffold bring-up the binary is a passthrough wrapper, so CLI-side changes should preserve the exact argument flow expected by the locked CPU implementation.
+Edit `crates/fast-vrifa-cli`. The default path still forwards to the locked CPU binary. The staged GPU path is behind `--backend wgpu`, and its job is to preserve the CPU output contract while moving more stages device-side one increment at a time.
 
 ## Change the binding
 
@@ -22,6 +22,7 @@ Edit `crates/fast-vrifa-py` and keep the surface aligned with `fast_vrifa.run(..
 
 ```bash
 PKG_CONFIG_PATH=/opt/homebrew/opt/opencv/lib/pkgconfig cargo test --workspace
+PKG_CONFIG_PATH=/opt/homebrew/opt/opencv/lib/pkgconfig cargo test --workspace --features wgpu
 tests/parity/run_smoke.sh
 ```
 
