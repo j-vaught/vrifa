@@ -43,7 +43,7 @@
   let cell-w = 2.6
   let cell-h = 0.95
   let gap = 0.5
-  let row-pad = 1.0
+  let row-pad = 0.6
   let cols = 6
   let rows = 2
 
@@ -117,7 +117,7 @@
   let layout-w = cols * cell-w + (cols - 1) * gap
   let legend-w = (families.len() - 1) * leg-spacing + item-w
   let leg-x0 = (layout-w - legend-w) / 2
-  let leg-y = -2 * (cell-h + gap + row-pad) + 0.55
+  let leg-y = -2 * (cell-h + gap + row-pad) + 0.85
   for (i, (name, c)) in families.enumerate() {
     let x = leg-x0 + i * leg-spacing
     rect((x, leg-y), (x + swatch-w, leg-y - 0.32),
