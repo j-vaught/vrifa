@@ -51,8 +51,8 @@ pub use vrifa_cli::Config;
 use vrifa_cli::ReferenceMode;
 
 const CUDA_BATCH_SIZE: usize = 32;
-const OUTPUT_WORKERS: usize = 3;
-const OUTPUT_QUEUE: usize = 16;
+const OUTPUT_WORKERS: usize = 12;
+const OUTPUT_QUEUE: usize = 64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendMode {
