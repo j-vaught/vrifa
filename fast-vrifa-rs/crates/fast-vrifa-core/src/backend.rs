@@ -98,4 +98,13 @@ pub trait PeakImageBackend: ImageBackend {
         );
         Ok(None)
     }
+
+    fn filter_min_area_mask(
+        &self,
+        mask: &Self::DeviceMaskU8,
+        min_area: usize,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let _ = (mask, min_area);
+        Ok(None)
+    }
 }

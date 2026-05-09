@@ -599,11 +599,19 @@ where
                             morph_params.morph_close_iterations,
                             morph_params.morph_open_iterations,
                         )? {
-                            let mut mask = backend.download_mask_u8(&device_mask)?;
                             if morph_params.min_area > 0 {
-                                mask = filter_min_area_array(&mask, morph_params.min_area)?;
+                                if let Some(filtered_mask) = backend
+                                    .filter_min_area_mask(&device_mask, morph_params.min_area)?
+                                {
+                                    backend.download_mask_u8(&filtered_mask)?
+                                } else {
+                                    let mut mask = backend.download_mask_u8(&device_mask)?;
+                                    mask = filter_min_area_array(&mask, morph_params.min_area)?;
+                                    mask
+                                }
+                            } else {
+                                backend.download_mask_u8(&device_mask)?
                             }
-                            mask
                         } else {
                             detect_mask_from_delta_norm_threshold(
                                 &delta_norm,

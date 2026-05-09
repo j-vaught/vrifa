@@ -2,7 +2,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use bytemuck::cast_slice;
 use cudarc::{
     driver::{
-        CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, LaunchConfig, PushKernelArg,
+        CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut,
+        LaunchConfig, PushKernelArg,
     },
     nvrtc::compile_ptx,
 };
@@ -19,6 +20,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_core::morphology::MorphShape;
+
+mod npp;
 
 const KERNELS: &str = include_str!("kernels/stage1.cu");
 
@@ -64,7 +67,9 @@ struct CudaBackendInner {
     threshold_binary: CudaFunction,
     dilate_binary: CudaFunction,
     erode_binary: CudaFunction,
+    filter_components: CudaFunction,
     lab_lut: CudaSlice<u32>,
+    npp: Option<Arc<npp::NppLibrary>>,
 }
 
 #[derive(Clone, Default)]
@@ -154,10 +159,14 @@ impl CudaBackendInner {
         let erode_binary = module
             .load_function("erode_binary_u8")
             .context("loading CUDA erosion kernel")?;
+        let filter_components = module
+            .load_function("filter_labeled_components_u8")
+            .context("loading CUDA component-filter kernel")?;
         let host_lut = load_or_build_lab_lut()?;
         let lab_lut = stream
             .clone_htod(&host_lut)
             .context("uploading BGR->CIELAB lookup table to CUDA")?;
+        let npp = npp::NppLibrary::load().ok();
         Ok(Self {
             stream,
             _module: module,
@@ -172,7 +181,9 @@ impl CudaBackendInner {
             threshold_binary,
             dilate_binary,
             erode_binary,
+            filter_components,
             lab_lut,
+            npp,
         })
     }
 }
@@ -661,6 +672,168 @@ impl PeakImageBackend for CudaBackend {
             width: delta_norm.width,
             height: delta_norm.height,
         }))
+    }
+
+    fn filter_min_area_mask(
+        &self,
+        mask: &Self::DeviceMaskU8,
+        min_area: usize,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (mask, min_area);
+            return Ok(None);
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if min_area == 0 {
+                return Ok(Some(mask.clone()));
+            }
+            let inner = self.inner()?;
+            let Some(npp) = inner.npp.as_ref() else {
+                return Ok(None);
+            };
+
+            npp.set_stream(inner.stream.cu_stream())
+                .context("binding NPP to the CUDA stream")?;
+            let stream_ctx = npp.stream_context().context("reading NPP stream context")?;
+            let roi = npp::NppiSize {
+                width: mask.width as i32,
+                height: mask.height as i32,
+            };
+            let pixel_count = mask.width * mask.height;
+            let labels_len = pixel_count;
+            let mut labels = inner
+                .stream
+                .alloc_zeros::<u32>(labels_len)
+                .context("allocating CUDA label buffer")?;
+
+            let mut label_buffer_size = 0i32;
+            npp::status(
+                unsafe { (npp.label_buffer_size)(roi, &mut label_buffer_size as *mut _) },
+                "nppiLabelMarkersUFGetBufferSize_32u_C1R",
+            )?;
+            let mut label_buffer = inner
+                .stream
+                .alloc_zeros::<u8>(label_buffer_size.max(0) as usize)
+                .context("allocating CUDA label scratch buffer")?;
+
+            let (src_ptr, _src_record) = mask.data.device_ptr(&inner.stream);
+            let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
+            let (label_buffer_ptr, _label_buffer_record) =
+                label_buffer.device_ptr_mut(&inner.stream);
+            npp::status(
+                unsafe {
+                    (npp.label_markers)(
+                        src_ptr as *mut u8,
+                        mask.width as i32,
+                        labels_ptr as *mut u32,
+                        (mask.width * std::mem::size_of::<u32>()) as i32,
+                        roi,
+                        npp::NPPI_NORM_INF,
+                        label_buffer_ptr as *mut u8,
+                    )
+                },
+                "nppiLabelMarkersUF_8u32u_C1R",
+            )?;
+
+            let mut compress_buffer_size = 0i32;
+            let starting_number = (mask.width * mask.height) as i32;
+            npp::status(
+                unsafe {
+                    (npp.compress_buffer_size)(starting_number, &mut compress_buffer_size as *mut _)
+                },
+                "nppiCompressMarkerLabelsGetBufferSize_32u_C1R",
+            )?;
+            let mut compress_buffer = inner
+                .stream
+                .alloc_zeros::<u8>(compress_buffer_size.max(0) as usize)
+                .context("allocating CUDA label-compress scratch buffer")?;
+            let mut new_number = 0i32;
+            let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
+            let (compress_buffer_ptr, _compress_record) =
+                compress_buffer.device_ptr_mut(&inner.stream);
+            npp::status(
+                unsafe {
+                    (npp.compress_markers)(
+                        labels_ptr as *mut u32,
+                        (mask.width * std::mem::size_of::<u32>()) as i32,
+                        roi,
+                        starting_number,
+                        &mut new_number as *mut _,
+                        compress_buffer_ptr as *mut u8,
+                    )
+                },
+                "nppiCompressMarkerLabelsUF_32u_C1IR",
+            )?;
+            if new_number <= 0 {
+                return Ok(Some(CudaMaskU8 {
+                    data: inner
+                        .stream
+                        .alloc_zeros::<u8>(pixel_count)
+                        .context("allocating empty filtered mask")?,
+                    width: mask.width,
+                    height: mask.height,
+                }));
+            }
+
+            let mut info_list_size = 0u32;
+            npp::status(
+                unsafe { (npp.info_list_size)(new_number as u32, &mut info_list_size as *mut _) },
+                "nppiCompressedMarkerLabelsUFGetInfoListSize_32u_C1R",
+            )?;
+            let mut info_buffer = inner
+                .stream
+                .alloc_zeros::<u8>(info_list_size.max(1) as usize)
+                .context("allocating CUDA marker-info buffer")?;
+            let (labels_ptr, _labels_record) = labels.device_ptr_mut(&inner.stream);
+            let (info_ptr, _info_record) = info_buffer.device_ptr_mut(&inner.stream);
+            npp::status(
+                unsafe {
+                    (npp.info_list)(
+                        labels_ptr as *mut u32,
+                        (mask.width * std::mem::size_of::<u32>()) as i32,
+                        roi,
+                        new_number as u32,
+                        info_ptr as *mut npp::NppiCompressedMarkerLabelsInfo,
+                        std::ptr::null_mut(),
+                        0,
+                        std::ptr::null_mut(),
+                        0,
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        stream_ctx,
+                    )
+                },
+                "nppiCompressedMarkerLabelsUFInfo_32u_C1R_Ctx",
+            )?;
+
+            let mut filtered = inner
+                .stream
+                .alloc_zeros::<u8>(pixel_count)
+                .context("allocating CUDA filtered mask")?;
+            let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+            let pixel_count_i32 = pixel_count as i32;
+            let min_area_u32 = min_area as u32;
+            let mut launch = inner.stream.launch_builder(&inner.filter_components);
+            launch.arg(&mask.data);
+            launch.arg(&labels);
+            launch.arg(&(info_ptr as *const npp::NppiCompressedMarkerLabelsInfo));
+            launch.arg(&mut filtered);
+            launch.arg(&min_area_u32);
+            launch.arg(&pixel_count_i32);
+            unsafe { launch.launch(cfg) }.context("launching CUDA min-area filter kernel")?;
+
+            Ok(Some(CudaMaskU8 {
+                data: filtered,
+                width: mask.width,
+                height: mask.height,
+            }))
+        }
     }
 }
 

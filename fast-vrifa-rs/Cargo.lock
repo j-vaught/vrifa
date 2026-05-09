@@ -673,6 +673,7 @@ dependencies = [
  "cudarc",
  "fast-vrifa-core",
  "image",
+ "libloading 0.8.9",
  "ndarray",
  "opencv",
  "vrifa-core",

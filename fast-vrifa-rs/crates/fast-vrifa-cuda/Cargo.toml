@@ -9,6 +9,7 @@ anyhow.workspace = true
 bytemuck.workspace = true
 cudarc = { version = "0.19.4", default-features = false, features = ["std", "driver", "nvrtc", "dynamic-loading", "cuda-12040"] }
 fast-vrifa-core = { path = "../fast-vrifa-core" }
+libloading.workspace = true
 ndarray.workspace = true
 opencv = { workspace = true, features = ["imgproc"] }
 vrifa-core.workspace = true
