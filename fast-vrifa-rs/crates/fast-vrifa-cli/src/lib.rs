@@ -247,33 +247,47 @@ where
         ReferenceMode::Absolute(index) => Some(index),
         _ => None,
     };
-    let absolute_reference = if let Some(index) = absolute_index {
-        if let Some(total) = metadata.total_frames {
-            if index >= total {
-                bail!("requested absolute frame index exceeds video length");
+    let reference_values_needed = !(config.peak_reference && config.darken_only);
+    let absolute_reference = if reference_values_needed {
+        if let Some(index) = absolute_index {
+            if let Some(total) = metadata.total_frames {
+                if index >= total {
+                    bail!("requested absolute frame index exceeds video length");
+                }
             }
+            let frame = reader
+                .read_frame_at_zero_based(index)
+                .with_context(|| format!("reading absolute reference frame {index}"))?
+                .ok_or_else(|| anyhow!("unable to read absolute reference frame {index}"))?;
+            Some(
+                convert_frame_with_backend(backend, &frame, config.colorspace, true)?
+                    .host
+                    .ok_or_else(|| {
+                        anyhow!("absolute reference conversion unexpectedly omitted host data")
+                    })?,
+            )
+        } else {
+            Some(first_frame_converted.clone())
         }
-        let frame = reader
-            .read_frame_at_zero_based(index)
-            .with_context(|| format!("reading absolute reference frame {index}"))?
-            .ok_or_else(|| anyhow!("unable to read absolute reference frame {index}"))?;
-        convert_frame_with_backend(backend, &frame, config.colorspace, true)?
-            .host
-            .ok_or_else(|| anyhow!("absolute reference conversion unexpectedly omitted host data"))?
-    } else {
-        first_frame_converted.clone()
-    };
-
-    let mut running_reference = first_frame_converted.clone();
-    let mut prev_buffer: Option<VecDeque<Array3<f32>>> = match config.ref_mode {
-        ReferenceMode::Prev(offset) => Some(VecDeque::with_capacity(offset)),
-        _ => None,
-    };
-    let mut dynamic_reader = if matches!(config.ref_mode, ReferenceMode::Dynamic) {
-        Some(VideoReader::open(&config.video_path)?)
     } else {
         None
     };
+
+    let mut running_reference = reference_values_needed.then_some(first_frame_converted.clone());
+    let mut prev_buffer: Option<VecDeque<Array3<f32>>> = if reference_values_needed {
+        match config.ref_mode {
+            ReferenceMode::Prev(offset) => Some(VecDeque::with_capacity(offset)),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let mut dynamic_reader =
+        if reference_values_needed && matches!(config.ref_mode, ReferenceMode::Dynamic) {
+            Some(VideoReader::open(&config.video_path)?)
+        } else {
+            None
+        };
     let mut dynamic_cache: IndexMap<usize, Array3<f32>> = IndexMap::new();
     let mut dynamic_measurements: Vec<(f32, f32)> = Vec::new();
     let mut dynamic_factor: Option<f32> = None;
@@ -295,7 +309,8 @@ where
     let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
-    let device_delta_eligible = config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
+    let device_delta_eligible =
+        config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
     let mut peak_brightness_map = if config.peak_reference && !device_delta_eligible {
         Some(first_frame_converted.slice(s![.., .., 0]).to_owned())
     } else {
@@ -395,38 +410,75 @@ where
     let run_start = Instant::now();
     let mut processed_records = Vec::new();
     let need_host_current = !device_delta_eligible
-        || matches!(
-            config.ref_mode,
-            ReferenceMode::Running | ReferenceMode::Prev(_) | ReferenceMode::Dynamic
-        );
+        || (reference_values_needed
+            && matches!(
+                config.ref_mode,
+                ReferenceMode::Running | ReferenceMode::Prev(_) | ReferenceMode::Dynamic
+            ));
 
     while let Some((frame_index, frame_bgr)) = reader.read_next()? {
         let current =
             convert_frame_with_backend(backend, &frame_bgr, config.colorspace, need_host_current)?;
         let frame_converted = current.host.as_ref();
         let mut reference_frame_index = 1usize;
-        let reference_for_frame = match config.ref_mode {
-            ReferenceMode::First => first_frame_converted.clone(),
-            ReferenceMode::Absolute(_) => {
-                reference_frame_index = absolute_index.filter(|index| *index > 0).unwrap_or(1);
-                absolute_reference.clone()
-            }
-            ReferenceMode::Running => running_reference.clone(),
-            ReferenceMode::Prev(offset) => {
-                if let Some(buffer) = &prev_buffer {
-                    if buffer.len() >= offset {
-                        buffer
-                            .front()
-                            .cloned()
-                            .unwrap_or_else(|| first_frame_converted.clone())
+        let reference_for_frame = if reference_values_needed {
+            Some(match config.ref_mode {
+                ReferenceMode::First => first_frame_converted.clone(),
+                ReferenceMode::Absolute(_) => {
+                    reference_frame_index = absolute_index.filter(|index| *index > 0).unwrap_or(1);
+                    absolute_reference
+                        .as_ref()
+                        .cloned()
+                        .unwrap_or_else(|| first_frame_converted.clone())
+                }
+                ReferenceMode::Running => running_reference
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| first_frame_converted.clone()),
+                ReferenceMode::Prev(offset) => {
+                    if let Some(buffer) = &prev_buffer {
+                        if buffer.len() >= offset {
+                            buffer
+                                .front()
+                                .cloned()
+                                .unwrap_or_else(|| first_frame_converted.clone())
+                        } else {
+                            first_frame_converted.clone()
+                        }
                     } else {
                         first_frame_converted.clone()
                     }
-                } else {
-                    first_frame_converted.clone()
                 }
-            }
-            ReferenceMode::Dynamic => {
+                ReferenceMode::Dynamic => {
+                    let params = DynamicReferenceParams {
+                        factor: dynamic_factor,
+                        target_fraction: config.dynamic_target_fraction,
+                        lag_scale: config.dynamic_lag_scale,
+                        linear_mode: config.dynamic_lag_linear,
+                        linear_start: config.dynamic_lag_linear_start,
+                        linear_max: config.dynamic_lag_linear_max,
+                        total_frames: metadata.total_frames,
+                    };
+                    let ref_index = select_dynamic_reference_index(
+                        frame_index,
+                        metadata.fps as f32,
+                        roi_pixels,
+                        &params,
+                    );
+                    reference_frame_index = ref_index;
+                    fetch_reference_converted(
+                        ref_index,
+                        dynamic_reader.as_mut(),
+                        &mut dynamic_cache,
+                        config.dynamic_ref_cache_size,
+                        &first_frame_converted,
+                        config.colorspace,
+                        backend,
+                    )?
+                }
+            })
+        } else {
+            if matches!(config.ref_mode, ReferenceMode::Dynamic) {
                 let params = DynamicReferenceParams {
                     factor: dynamic_factor,
                     target_fraction: config.dynamic_target_fraction,
@@ -436,33 +488,25 @@ where
                     linear_max: config.dynamic_lag_linear_max,
                     total_frames: metadata.total_frames,
                 };
-                let ref_index = select_dynamic_reference_index(
+                reference_frame_index = select_dynamic_reference_index(
                     frame_index,
                     metadata.fps as f32,
                     roi_pixels,
                     &params,
                 );
-                reference_frame_index = ref_index;
-                fetch_reference_converted(
-                    ref_index,
-                    dynamic_reader.as_mut(),
-                    &mut dynamic_cache,
-                    config.dynamic_ref_cache_size,
-                    &first_frame_converted,
-                    config.colorspace,
-                    backend,
-                )?
+            } else if matches!(config.ref_mode, ReferenceMode::Absolute(_)) {
+                reference_frame_index = absolute_index.filter(|index| *index > 0).unwrap_or(1);
             }
+            None
         };
 
         if frame_index % config.frame_step == 0 {
             let compute_start = Instant::now();
             if config.peak_reference {
                 if device_delta_eligible {
-                    let device_lab = current
-                        .device_lab
-                        .as_ref()
-                        .ok_or_else(|| anyhow!("device peak path requires a device CIELAB frame"))?;
+                    let device_lab = current.device_lab.as_ref().ok_or_else(|| {
+                        anyhow!("device peak path requires a device CIELAB frame")
+                    })?;
                     peak_brightness_device = Some(backend.update_peak_brightness_device(
                         device_lab,
                         peak_brightness_device.as_ref(),
@@ -489,7 +533,11 @@ where
                             config.channel_weights[0],
                         )?
                     } else {
-                        let reference_plane = reference_for_frame.slice(s![.., .., 0]).to_owned();
+                        let reference_plane = reference_for_frame
+                            .as_ref()
+                            .ok_or_else(|| anyhow!("missing reference frame for device delta"))?
+                            .slice(s![.., .., 0])
+                            .to_owned();
                         backend.compute_delta_darken_only(
                             device_lab,
                             &reference_plane,
@@ -499,11 +547,15 @@ where
                     };
                     backend.download_plane_f32(&device_delta)?
                 } else {
+                    let host_reference = reference_for_frame
+                        .as_ref()
+                        .or((!reference_values_needed).then_some(&first_frame_converted))
+                        .ok_or_else(|| anyhow!("missing reference frame for host delta"))?;
                     compute_delta(
                         frame_converted.ok_or_else(|| {
                             anyhow!("host delta path requires a converted host frame")
                         })?,
-                        &reference_for_frame,
+                        host_reference,
                         &roi_mask,
                         &config.channel_weights,
                         config.darken_only,
@@ -513,11 +565,15 @@ where
                     )?
                 }
             } else {
+                let host_reference = reference_for_frame
+                    .as_ref()
+                    .or((!reference_values_needed).then_some(&first_frame_converted))
+                    .ok_or_else(|| anyhow!("missing reference frame for host delta"))?;
                 compute_delta(
                     frame_converted.ok_or_else(|| {
                         anyhow!("host delta path requires a converted host frame")
                     })?,
-                    &reference_for_frame,
+                    host_reference,
                     &roi_mask,
                     &config.channel_weights,
                     config.darken_only,
@@ -623,16 +679,23 @@ where
                 }
                 buffer.push_back(
                     frame_converted
-                        .ok_or_else(|| anyhow!("prev reference mode requires a converted host frame"))?
+                        .ok_or_else(|| {
+                            anyhow!("prev reference mode requires a converted host frame")
+                        })?
                         .clone(),
                 );
             }
         }
-        if matches!(config.ref_mode, ReferenceMode::Running) {
+        if matches!(config.ref_mode, ReferenceMode::Running) && running_reference.is_some() {
             let alpha = config.ref_running_alpha;
             let frame_converted = frame_converted
                 .ok_or_else(|| anyhow!("running reference mode requires a converted host frame"))?;
-            for (running, current) in running_reference.iter_mut().zip(frame_converted.iter()) {
+            for (running, current) in running_reference
+                .as_mut()
+                .ok_or_else(|| anyhow!("running reference storage was not initialized"))?
+                .iter_mut()
+                .zip(frame_converted.iter())
+            {
                 *running = (1.0 - alpha) * *running + alpha * *current;
             }
         }
@@ -752,7 +815,9 @@ where
     } else {
         Ok(ConvertedFrame {
             device_lab: None,
-            host: Some(convert_frame_to_colorspace(frame_bgr, colorspace)?.mapv(|value| value as f32)),
+            host: Some(
+                convert_frame_to_colorspace(frame_bgr, colorspace)?.mapv(|value| value as f32),
+            ),
         })
     }
 }
