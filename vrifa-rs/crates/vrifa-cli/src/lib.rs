@@ -20,7 +20,7 @@ use vrifa_core::peak::update_peak_brightness;
 use vrifa_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
 use vrifa_core::roi::{build_roi_mask, resolve_roi_margins};
 use vrifa_core::{detect_front, detect_front_debug, DetectFrontDebug, DetectFrontParams};
-use vrifa_io::{AsyncVideoWriter, VideoReader};
+use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -450,6 +450,18 @@ pub fn run_config(config: Config) -> Result<()> {
     if config.write_heatmap_pngs {
         fs::create_dir_all(&heatmap_dir)?;
     }
+    let mut mask_png_writer = config
+        .write_mask_pngs
+        .then(|| AsyncPngWriter::open(false))
+        .transpose()?;
+    let mut overlay_png_writer = config
+        .write_overlay_pngs
+        .then(|| AsyncPngWriter::open(true))
+        .transpose()?;
+    let mut heatmap_png_writer = config
+        .write_heatmap_pngs
+        .then(|| AsyncPngWriter::open(true))
+        .transpose()?;
 
     let video_dir = config.output_dir.join("videos");
     let mut mask_writer = None;
@@ -592,14 +604,14 @@ pub fn run_config(config: Config) -> Result<()> {
             }
 
             let basename = format!("frame_{frame_index:06}.png");
-            if config.write_mask_pngs {
-                vrifa_io::write_gray_png(mask_dir.join(&basename), &mask)?;
+            if let Some(writer) = mask_png_writer.as_mut() {
+                writer.write_gray(mask_dir.join(&basename), mask.clone())?;
             }
-            if config.write_overlay_pngs {
-                vrifa_io::write_bgr_png(overlay_dir.join(&basename), &overlay)?;
+            if let Some(writer) = overlay_png_writer.as_mut() {
+                writer.write_bgr(overlay_dir.join(&basename), overlay.clone())?;
             }
-            if config.write_heatmap_pngs {
-                vrifa_io::write_bgr_png(heatmap_dir.join(&basename), &heatmap)?;
+            if let Some(writer) = heatmap_png_writer.as_mut() {
+                writer.write_bgr(heatmap_dir.join(&basename), heatmap.clone())?;
             }
             if let Some(writer) = mask_writer.as_mut() {
                 writer.write_gray(mask.clone())?;
@@ -658,6 +670,15 @@ pub fn run_config(config: Config) -> Result<()> {
         writer.close()?;
     }
     if let Some(writer) = heat_writer.take() {
+        writer.close()?;
+    }
+    if let Some(writer) = mask_png_writer.take() {
+        writer.close()?;
+    }
+    if let Some(writer) = overlay_png_writer.take() {
+        writer.close()?;
+    }
+    if let Some(writer) = heatmap_png_writer.take() {
         writer.close()?;
     }
 
