@@ -4,8 +4,9 @@ use opencv::core::{Mat, Size};
 use opencv::imgcodecs;
 use opencv::prelude::*;
 use opencv::videoio;
-use std::path::Path;
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use vrifa_core::cvutil;
 
@@ -96,13 +97,24 @@ pub struct VideoWriter {
 }
 
 enum VideoFrame {
-    Bgr(BgrFrame),
-    Gray(Array2<u8>),
+    Bgr(Arc<BgrFrame>),
+    Gray(Arc<Array2<u8>>),
+}
+
+enum PngFrame {
+    Bgr { path: PathBuf, frame: BgrFrame },
+    Gray { path: PathBuf, frame: Array2<u8> },
 }
 
 pub struct AsyncVideoWriter {
     sender: SyncSender<VideoFrame>,
     handle: JoinHandle<Result<()>>,
+    is_color: bool,
+}
+
+pub struct AsyncPngWriter {
+    sender: SyncSender<PngFrame>,
+    handles: Vec<JoinHandle<Result<()>>>,
     is_color: bool,
 }
 
@@ -134,7 +146,7 @@ impl AsyncVideoWriter {
         })
     }
 
-    pub fn write_bgr(&self, frame: BgrFrame) -> Result<()> {
+    pub fn write_bgr(&self, frame: Arc<BgrFrame>) -> Result<()> {
         if !self.is_color {
             return Err(anyhow!("writer was opened as grayscale"));
         }
@@ -143,7 +155,7 @@ impl AsyncVideoWriter {
             .map_err(|err| anyhow!("video writer thread stopped: {err}"))
     }
 
-    pub fn write_gray(&self, frame: Array2<u8>) -> Result<()> {
+    pub fn write_gray(&self, frame: Arc<Array2<u8>>) -> Result<()> {
         if self.is_color {
             return Err(anyhow!("writer was opened as color"));
         }
@@ -158,6 +170,85 @@ impl AsyncVideoWriter {
             .join()
             .map_err(|_| anyhow!("video writer thread panicked"))?
     }
+}
+
+impl AsyncPngWriter {
+    pub fn open(is_color: bool) -> Result<Self> {
+        Self::open_with_workers(is_color, 1, 8)
+    }
+
+    pub fn open_with_workers(
+        is_color: bool,
+        worker_count: usize,
+        queue_capacity: usize,
+    ) -> Result<Self> {
+        let (sender, receiver) = sync_channel::<PngFrame>(queue_capacity.max(1));
+        let receiver = Arc::new(Mutex::new(receiver));
+        let mut handles = Vec::with_capacity(worker_count.max(1));
+        for _ in 0..worker_count.max(1) {
+            handles.push(spawn_png_worker(Arc::clone(&receiver)));
+        }
+        Ok(Self {
+            sender,
+            handles,
+            is_color,
+        })
+    }
+
+    pub fn write_bgr(&self, path: impl AsRef<Path>, frame: BgrFrame) -> Result<()> {
+        if !self.is_color {
+            return Err(anyhow!("writer was opened as grayscale"));
+        }
+        self.sender
+            .send(PngFrame::Bgr {
+                path: path.as_ref().to_path_buf(),
+                frame,
+            })
+            .map_err(|err| anyhow!("png writer thread stopped: {err}"))
+    }
+
+    pub fn write_gray(&self, path: impl AsRef<Path>, frame: Array2<u8>) -> Result<()> {
+        if self.is_color {
+            return Err(anyhow!("writer was opened as color"));
+        }
+        self.sender
+            .send(PngFrame::Gray {
+                path: path.as_ref().to_path_buf(),
+                frame,
+            })
+            .map_err(|err| anyhow!("png writer thread stopped: {err}"))
+    }
+
+    pub fn close(self) -> Result<()> {
+        drop(self.sender);
+        for handle in self.handles {
+            handle
+                .join()
+                .map_err(|_| anyhow!("png writer thread panicked"))??;
+        }
+        Ok(())
+    }
+}
+
+fn spawn_png_worker(receiver: Arc<Mutex<Receiver<PngFrame>>>) -> JoinHandle<Result<()>> {
+    thread::spawn(move || -> Result<()> {
+        loop {
+            let frame = {
+                let receiver = receiver
+                    .lock()
+                    .map_err(|_| anyhow!("png writer queue poisoned"))?;
+                match receiver.recv() {
+                    Ok(frame) => frame,
+                    Err(_) => break,
+                }
+            };
+            match frame {
+                PngFrame::Bgr { path, frame } => write_bgr_png_impl(&path, &frame)?,
+                PngFrame::Gray { path, frame } => write_gray_png_impl(&path, &frame)?,
+            }
+        }
+        Ok(())
+    })
 }
 
 impl VideoWriter {
@@ -209,7 +300,14 @@ impl VideoWriter {
 }
 
 pub fn write_bgr_png(path: impl AsRef<Path>, frame: &BgrFrame) -> Result<()> {
-    let path = path.as_ref();
+    write_bgr_png_impl(path.as_ref(), frame)
+}
+
+pub fn write_gray_png(path: impl AsRef<Path>, frame: &Array2<u8>) -> Result<()> {
+    write_gray_png_impl(path.as_ref(), frame)
+}
+
+fn write_bgr_png_impl(path: &Path, frame: &BgrFrame) -> Result<()> {
     let (_, _, channels) = frame.dim();
     if channels != 3 {
         return Err(anyhow!(
@@ -223,8 +321,7 @@ pub fn write_bgr_png(path: impl AsRef<Path>, frame: &BgrFrame) -> Result<()> {
     Ok(())
 }
 
-pub fn write_gray_png(path: impl AsRef<Path>, frame: &Array2<u8>) -> Result<()> {
-    let path = path.as_ref();
+fn write_gray_png_impl(path: &Path, frame: &Array2<u8>) -> Result<()> {
     // Match Python's cv2.imwrite output to keep parity artifacts deterministic.
     let mat = cvutil::array2_u8_to_mat(frame)?;
     imgcodecs::imwrite_def(&path.to_string_lossy(), &mat)
