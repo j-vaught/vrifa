@@ -36,7 +36,8 @@ use vrifa_io::{AsyncPngWriter, VideoReader};
 
 mod raw_video;
 use raw_video::{
-    finalize_raw_stream_to_mp4, AsyncRawVideoWriter, RawPixelFormat, RawVideoArtifact,
+    finalize_raw_stream_to_mp4, AsyncRawVideoWriter, RawGrayFrameReader, RawPixelFormat,
+    RawVideoArtifact,
 };
 
 #[cfg(feature = "cuda")]
@@ -428,12 +429,13 @@ where
     let expected_video_frames = metadata
         .total_frames
         .map(|total_frames| total_frames / config.frame_step.max(1));
+    let need_mask_stream = config.write_mask_video || config.write_overlay_video;
+    let need_delta_norm_stream = config.write_heatmap_video;
     let mut mask_writer = None;
-    let mut overlay_writer = None;
-    let mut heat_writer = None;
-    if config.write_mask_video || config.write_overlay_video || config.write_heatmap_video {
+    let mut delta_norm_writer = None;
+    if need_mask_stream || need_delta_norm_stream {
         fs::create_dir_all(&raw_stream_dir)?;
-        if config.write_mask_video {
+        if need_mask_stream {
             mask_writer = Some(AsyncRawVideoWriter::open(
                 raw_stream_dir.join("mask.raw"),
                 metadata.fps,
@@ -444,24 +446,13 @@ where
                 32,
             )?);
         }
-        if config.write_overlay_video {
-            overlay_writer = Some(AsyncRawVideoWriter::open(
-                raw_stream_dir.join("overlay.raw"),
+        if need_delta_norm_stream {
+            delta_norm_writer = Some(AsyncRawVideoWriter::open(
+                raw_stream_dir.join("delta_norm.raw"),
                 metadata.fps,
                 metadata.width,
                 metadata.height,
-                RawPixelFormat::Bgr24,
-                expected_video_frames,
-                32,
-            )?);
-        }
-        if config.write_heatmap_video {
-            heat_writer = Some(AsyncRawVideoWriter::open(
-                raw_stream_dir.join("heatmap.raw"),
-                metadata.fps,
-                metadata.width,
-                metadata.height,
-                RawPixelFormat::Bgr24,
+                RawPixelFormat::Gray8,
                 expected_video_frames,
                 32,
             )?);
@@ -745,15 +736,14 @@ where
                 config.lock_frames,
                 lock_state.as_mut(),
             )?);
-            let write_overlay = config.write_overlay_pngs || config.write_overlay_video;
-            let write_heatmap = config.write_heatmap_pngs || config.write_heatmap_video;
-            let overlay = if write_overlay {
+            let delta_norm = Arc::new(detect.delta_norm);
+            let overlay = if config.write_overlay_pngs {
                 Some(Arc::new(create_overlay(&frame_bgr, &mask)?))
             } else {
                 None
             };
-            let heatmap = if write_heatmap {
-                Some(Arc::new(apply_turbo_colormap(&detect.delta_norm)?))
+            let heatmap = if config.write_heatmap_pngs {
+                Some(Arc::new(apply_turbo_colormap(&delta_norm)?))
             } else {
                 None
             };
@@ -793,11 +783,8 @@ where
             if let Some(writer) = mask_writer.as_mut() {
                 writer.write_gray(mask.clone())?;
             }
-            if let (Some(writer), Some(overlay)) = (overlay_writer.as_mut(), overlay.as_ref()) {
-                writer.write_bgr(overlay.clone())?;
-            }
-            if let (Some(writer), Some(heatmap)) = (heat_writer.as_mut(), heatmap.as_ref()) {
-                writer.write_bgr(heatmap.clone())?;
+            if let Some(writer) = delta_norm_writer.as_mut() {
+                writer.write_gray(delta_norm.clone())?;
             }
 
             if matches!(config.ref_mode, ReferenceMode::Dynamic) {
@@ -852,16 +839,16 @@ where
         }
     }
 
-    let mut raw_video_artifacts: Vec<(RawVideoArtifact, &'static str)> = Vec::new();
-    if let Some(writer) = mask_writer.take() {
-        raw_video_artifacts.push((writer.close()?, "mask.mp4"));
-    }
-    if let Some(writer) = overlay_writer.take() {
-        raw_video_artifacts.push((writer.close()?, "overlay.mp4"));
-    }
-    if let Some(writer) = heat_writer.take() {
-        raw_video_artifacts.push((writer.close()?, "heatmap.mp4"));
-    }
+    let mask_artifact = if let Some(writer) = mask_writer.take() {
+        Some(writer.close()?)
+    } else {
+        None
+    };
+    let delta_norm_artifact = if let Some(writer) = delta_norm_writer.take() {
+        Some(writer.close()?)
+    } else {
+        None
+    };
     if let Some(writer) = coco_image_writer.take() {
         writer.close()?;
     }
@@ -874,11 +861,44 @@ where
     if let Some(writer) = heatmap_png_writer.take() {
         writer.close()?;
     }
-    if options.ffmpeg_postprocess && !raw_video_artifacts.is_empty() {
+    if options.ffmpeg_postprocess {
         fs::create_dir_all(&video_dir)?;
         let ffmpeg_bin = env::var_os("FFMPEG_BIN").unwrap_or_else(|| OsString::from("ffmpeg"));
-        for (artifact, output_name) in &raw_video_artifacts {
-            finalize_raw_stream_to_mp4(&ffmpeg_bin, artifact, video_dir.join(output_name))?;
+        if let Some(artifact) = mask_artifact.as_ref() {
+            if config.write_mask_video {
+                finalize_raw_stream_to_mp4(&ffmpeg_bin, artifact, video_dir.join("mask.mp4"))?;
+            }
+            if config.write_overlay_video {
+                postprocess_overlay_video(
+                    &config,
+                    metadata.fps,
+                    metadata.width,
+                    metadata.height,
+                    artifact,
+                    &raw_stream_dir,
+                    &ffmpeg_bin,
+                    video_dir.join("overlay.mp4"),
+                )?;
+            }
+        }
+        if config.write_heatmap_video {
+            if let Some(artifact) = delta_norm_artifact.as_ref() {
+                postprocess_heatmap_video(
+                    metadata.fps,
+                    metadata.width,
+                    metadata.height,
+                    artifact,
+                    &raw_stream_dir,
+                    &ffmpeg_bin,
+                    video_dir.join("heatmap.mp4"),
+                )?;
+            }
+        }
+        if let Some(artifact) = mask_artifact.as_ref() {
+            let _ = fs::remove_file(&artifact.path);
+        }
+        if let Some(artifact) = delta_norm_artifact.as_ref() {
+            let _ = fs::remove_file(&artifact.path);
         }
     }
 
@@ -947,6 +967,84 @@ where
         config.output_dir.display(),
         config.output_dir.join("run_summary.yaml").display()
     );
+    Ok(())
+}
+
+fn postprocess_overlay_video(
+    config: &Config,
+    fps: f64,
+    width: usize,
+    height: usize,
+    mask_artifact: &RawVideoArtifact,
+    raw_stream_dir: &Path,
+    ffmpeg_bin: &OsStr,
+    output_path: PathBuf,
+) -> Result<()> {
+    if mask_artifact.frames_written == 0 {
+        return Ok(());
+    }
+    let overlay_raw_path = raw_stream_dir.join("overlay_post.raw");
+    let overlay_writer = AsyncRawVideoWriter::open(
+        &overlay_raw_path,
+        fps,
+        width,
+        height,
+        RawPixelFormat::Bgr24,
+        Some(mask_artifact.frames_written),
+        8,
+    )?;
+    let mut source_reader = VideoReader::open(&config.video_path)?;
+    let mut mask_reader = RawGrayFrameReader::open(mask_artifact)?;
+
+    while let Some((frame_index, frame_bgr)) = source_reader.read_next()? {
+        if frame_index % config.frame_step != 0 {
+            continue;
+        }
+        let mask = mask_reader.read_next()?.ok_or_else(|| {
+            anyhow!("mask raw stream ended before overlay video reconstruction completed")
+        })?;
+        overlay_writer.write_bgr(Arc::new(create_overlay(&frame_bgr, &mask)?))?;
+    }
+
+    if mask_reader.read_next()?.is_some() {
+        bail!("mask raw stream contains extra frames after overlay reconstruction");
+    }
+
+    let artifact = overlay_writer.close()?;
+    finalize_raw_stream_to_mp4(ffmpeg_bin, &artifact, &output_path)?;
+    let _ = fs::remove_file(&artifact.path);
+    Ok(())
+}
+
+fn postprocess_heatmap_video(
+    fps: f64,
+    width: usize,
+    height: usize,
+    delta_norm_artifact: &RawVideoArtifact,
+    raw_stream_dir: &Path,
+    ffmpeg_bin: &OsStr,
+    output_path: PathBuf,
+) -> Result<()> {
+    if delta_norm_artifact.frames_written == 0 {
+        return Ok(());
+    }
+    let heatmap_raw_path = raw_stream_dir.join("heatmap_post.raw");
+    let heatmap_writer = AsyncRawVideoWriter::open(
+        &heatmap_raw_path,
+        fps,
+        width,
+        height,
+        RawPixelFormat::Bgr24,
+        Some(delta_norm_artifact.frames_written),
+        8,
+    )?;
+    let mut delta_norm_reader = RawGrayFrameReader::open(delta_norm_artifact)?;
+    while let Some(delta_norm) = delta_norm_reader.read_next()? {
+        heatmap_writer.write_bgr(Arc::new(apply_turbo_colormap(&delta_norm)?))?;
+    }
+    let artifact = heatmap_writer.close()?;
+    finalize_raw_stream_to_mp4(ffmpeg_bin, &artifact, &output_path)?;
+    let _ = fs::remove_file(&artifact.path);
     Ok(())
 }
 

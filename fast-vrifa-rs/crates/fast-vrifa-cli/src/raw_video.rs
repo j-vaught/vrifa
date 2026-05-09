@@ -3,7 +3,7 @@ use memmap2::MmapMut;
 use ndarray::{Array2, Array3};
 use std::ffi::OsStr;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -50,6 +50,13 @@ pub struct RawVideoArtifact {
     pub height: usize,
     pub fps: f64,
     pub frames_written: usize,
+}
+
+pub struct RawGrayFrameReader {
+    reader: BufReader<File>,
+    width: usize,
+    height: usize,
+    frame_bytes: usize,
 }
 
 pub struct AsyncRawVideoWriter {
@@ -308,4 +315,36 @@ pub fn finalize_raw_stream_to_mp4(
         bail!("ffmpeg failed while encoding {}", output_path.display());
     }
     Ok(())
+}
+
+impl RawGrayFrameReader {
+    pub fn open(artifact: &RawVideoArtifact) -> Result<Self> {
+        if !matches!(artifact.format, RawPixelFormat::Gray8) {
+            bail!("raw gray-frame reader expects a Gray8 artifact");
+        }
+        let file = File::open(&artifact.path)
+            .with_context(|| format!("opening {}", artifact.path.display()))?;
+        Ok(Self {
+            reader: BufReader::new(file),
+            width: artifact.width,
+            height: artifact.height,
+            frame_bytes: artifact.width.checked_mul(artifact.height).ok_or_else(|| {
+                anyhow!(
+                    "raw gray frame byte size overflow for {}",
+                    artifact.path.display()
+                )
+            })?,
+        })
+    }
+
+    pub fn read_next(&mut self) -> Result<Option<Array2<u8>>> {
+        let mut bytes = vec![0u8; self.frame_bytes];
+        match self.reader.read_exact(&mut bytes) {
+            Ok(()) => Array2::from_shape_vec((self.height, self.width), bytes)
+                .context("reshaping raw gray frame")
+                .map(Some),
+            Err(err) if err.kind() == ErrorKind::UnexpectedEof => Ok(None),
+            Err(err) => Err(err).context("reading raw gray frame"),
+        }
+    }
 }
