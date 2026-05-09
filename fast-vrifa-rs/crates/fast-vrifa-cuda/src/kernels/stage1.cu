@@ -1,5 +1,5 @@
 extern "C" __global__ void bgr_to_lab_lut(
-    const unsigned int* input,
+    const unsigned char* input,
     const unsigned int* lut,
     unsigned int* output,
     int pixel_count
@@ -8,7 +8,12 @@ extern "C" __global__ void bgr_to_lab_lut(
     if (index >= pixel_count) {
         return;
     }
-    output[index] = lut[input[index] & 0x00ffffffu];
+    int base = index * 3;
+    unsigned int packed =
+        static_cast<unsigned int>(input[base]) |
+        (static_cast<unsigned int>(input[base + 1]) << 8) |
+        (static_cast<unsigned int>(input[base + 2]) << 16);
+    output[index] = lut[packed];
 }
 
 extern "C" __global__ void build_roi_mask(

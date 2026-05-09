@@ -20,7 +20,7 @@ const KERNELS: &str = include_str!("kernels/stage1.cu");
 
 #[derive(Clone)]
 pub struct CudaFrameBgr {
-    data: CudaSlice<u32>,
+    data: CudaSlice<u8>,
     width: usize,
     height: usize,
 }
@@ -179,10 +179,12 @@ impl ImageBackend for CudaBackend {
         let inner = self.inner()?;
         let (height, width, channels) = frame_bgr.dim();
         anyhow::ensure!(channels == 3, "expected a 3-channel BGR frame");
-        let packed = pack_bgr_pixels(frame_bgr)?;
+        let packed = frame_bgr
+            .as_slice_memory_order()
+            .ok_or_else(|| anyhow!("BGR frame must be contiguous"))?;
         let data = inner
             .stream
-            .clone_htod(&packed)
+            .clone_htod(packed)
             .context("uploading BGR frame to CUDA")?;
         Ok(CudaFrameBgr {
             data,
@@ -439,16 +441,6 @@ fn panic_message(payload: Box<dyn Any + Send>) -> String {
     }
 }
 
-fn pack_bgr_pixels(frame_bgr: &Array3<u8>) -> Result<Vec<u32>> {
-    let bytes = frame_bgr
-        .as_slice_memory_order()
-        .ok_or_else(|| anyhow!("BGR frame must be contiguous"))?;
-    Ok(bytes
-        .chunks_exact(3)
-        .map(|pixel| pixel[0] as u32 | ((pixel[1] as u32) << 8) | ((pixel[2] as u32) << 16))
-        .collect())
-}
-
 fn unpack_lab_pixels(packed: &[u32], height: usize, width: usize) -> Result<Array3<f32>> {
     let values = packed
         .iter()
@@ -518,7 +510,7 @@ fn load_or_build_lab_lut() -> Result<Vec<u32>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{pack_bgr_pixels, roi_bounds, CudaBackend};
+    use super::{roi_bounds, CudaBackend};
     use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
     use ndarray::array;
 
@@ -534,10 +526,15 @@ mod tests {
     }
 
     #[test]
-    fn bgr_packing_matches_expected_layout() {
+    fn upload_requires_contiguous_bgr_layout() {
         let frame = array![[[1u8, 2u8, 3u8], [4u8, 5u8, 6u8]]];
-        let packed = pack_bgr_pixels(&frame).unwrap();
-        assert_eq!(packed, vec![0x0003_0201, 0x0006_0504]);
+        let backend = CudaBackend::new();
+        if !matches!(backend.status(), BackendStatus::Ready) {
+            return;
+        }
+        let uploaded = backend.upload_frame_bgr(&frame).unwrap();
+        assert_eq!(uploaded.width, 2);
+        assert_eq!(uploaded.height, 1);
     }
 
     #[test]
