@@ -648,6 +648,7 @@ dependencies = [
  "memmap2",
  "ndarray",
  "opencv",
+ "rayon",
  "serde_yaml",
  "vrifa-annotations",
  "vrifa-cli",
