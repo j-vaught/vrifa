@@ -4,20 +4,26 @@ pub mod cvutil;
 pub mod delta;
 pub mod heatmap;
 pub mod lock;
+pub mod motion;
 pub mod morphology;
 pub mod overlay;
 pub mod peak;
+pub mod registration;
 pub mod reference;
 pub mod roi;
 pub mod sampling;
 pub mod threshold;
+pub mod warp;
 
 use ndarray::{Array2, Array3};
 use thiserror::Error;
 
 pub use colorspace::ColorSpace;
 pub use contours::AnnotationBox;
+pub use motion::MotionEstimate;
 pub use morphology::{MorphShape, MorphologyParams};
+pub use registration::MotionModel;
+pub use warp::AffineWarp;
 
 #[derive(Debug, Error)]
 pub enum VrifaError {

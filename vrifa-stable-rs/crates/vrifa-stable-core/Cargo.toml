@@ -6,7 +6,6 @@ license.workspace = true
 
 [dependencies]
 ndarray.workspace = true
-opencv = { workspace = true, features = ["imgproc"] }
+opencv = { workspace = true, features = ["imgproc", "video"] }
 serde.workspace = true
 thiserror.workspace = true
-
