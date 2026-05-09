@@ -59,7 +59,7 @@ impl BackendMode {
 
 struct ConvertedFrame<D> {
     device_lab: Option<D>,
-    host: Array3<f32>,
+    host: Option<Array3<f32>>,
 }
 
 pub fn run() -> Result<()> {
@@ -236,8 +236,12 @@ where
     let Some((_, first_frame_bgr)) = reader.read_next()? else {
         bail!("failed to read reference frame");
     };
-    let first_frame = convert_frame_with_backend(backend, &first_frame_bgr, config.colorspace)?;
-    let first_frame_converted = first_frame.host.clone();
+    let first_frame =
+        convert_frame_with_backend(backend, &first_frame_bgr, config.colorspace, true)?;
+    let first_frame_converted = first_frame
+        .host
+        .clone()
+        .ok_or_else(|| anyhow!("first-frame conversion unexpectedly omitted host data"))?;
 
     let absolute_index = match config.ref_mode {
         ReferenceMode::Absolute(index) => Some(index),
@@ -253,7 +257,9 @@ where
             .read_frame_at_zero_based(index)
             .with_context(|| format!("reading absolute reference frame {index}"))?
             .ok_or_else(|| anyhow!("unable to read absolute reference frame {index}"))?;
-        convert_frame_with_backend(backend, &frame, config.colorspace)?.host
+        convert_frame_with_backend(backend, &frame, config.colorspace, true)?
+            .host
+            .ok_or_else(|| anyhow!("absolute reference conversion unexpectedly omitted host data"))?
     } else {
         first_frame_converted.clone()
     };
@@ -388,10 +394,16 @@ where
     let mut processing_time_accum = 0.0f64;
     let run_start = Instant::now();
     let mut processed_records = Vec::new();
+    let need_host_current = !device_delta_eligible
+        || matches!(
+            config.ref_mode,
+            ReferenceMode::Running | ReferenceMode::Prev(_) | ReferenceMode::Dynamic
+        );
 
     while let Some((frame_index, frame_bgr)) = reader.read_next()? {
-        let current = convert_frame_with_backend(backend, &frame_bgr, config.colorspace)?;
-        let frame_converted = &current.host;
+        let current =
+            convert_frame_with_backend(backend, &frame_bgr, config.colorspace, need_host_current)?;
+        let frame_converted = current.host.as_ref();
         let mut reference_frame_index = 1usize;
         let reference_for_frame = match config.ref_mode {
             ReferenceMode::First => first_frame_converted.clone(),
@@ -457,7 +469,9 @@ where
                     )?);
                 } else {
                     peak_brightness_map = Some(update_peak_brightness(
-                        frame_converted,
+                        frame_converted.ok_or_else(|| {
+                            anyhow!("host peak path requires a converted host frame")
+                        })?,
                         peak_brightness_map.as_ref(),
                     )?);
                 }
@@ -486,7 +500,9 @@ where
                     backend.download_plane_f32(&device_delta)?
                 } else {
                     compute_delta(
-                        frame_converted,
+                        frame_converted.ok_or_else(|| {
+                            anyhow!("host delta path requires a converted host frame")
+                        })?,
                         &reference_for_frame,
                         &roi_mask,
                         &config.channel_weights,
@@ -498,7 +514,9 @@ where
                 }
             } else {
                 compute_delta(
-                    frame_converted,
+                    frame_converted.ok_or_else(|| {
+                        anyhow!("host delta path requires a converted host frame")
+                    })?,
                     &reference_for_frame,
                     &roi_mask,
                     &config.channel_weights,
@@ -603,11 +621,17 @@ where
                 if buffer.len() == offset {
                     buffer.pop_front();
                 }
-                buffer.push_back(frame_converted.clone());
+                buffer.push_back(
+                    frame_converted
+                        .ok_or_else(|| anyhow!("prev reference mode requires a converted host frame"))?
+                        .clone(),
+                );
             }
         }
         if matches!(config.ref_mode, ReferenceMode::Running) {
             let alpha = config.ref_running_alpha;
+            let frame_converted = frame_converted
+                .ok_or_else(|| anyhow!("running reference mode requires a converted host frame"))?;
             for (running, current) in running_reference.iter_mut().zip(frame_converted.iter()) {
                 *running = (1.0 - alpha) * *running + alpha * *current;
             }
@@ -708,6 +732,7 @@ fn convert_frame_with_backend<B>(
     backend: &B,
     frame_bgr: &Array3<u8>,
     colorspace: ColorSpace,
+    download_host: bool,
 ) -> Result<ConvertedFrame<B::DeviceFrameLab>>
 where
     B: ImageBackend,
@@ -715,7 +740,11 @@ where
     if matches!(colorspace, ColorSpace::Cielab) {
         let uploaded = backend.upload_frame_bgr(frame_bgr)?;
         let device_lab = backend.convert_bgr_to_lab(&uploaded)?;
-        let host = backend.download_frame_f32(&device_lab)?;
+        let host = if download_host {
+            Some(backend.download_frame_f32(&device_lab)?)
+        } else {
+            None
+        };
         Ok(ConvertedFrame {
             device_lab: Some(device_lab),
             host,
@@ -723,7 +752,7 @@ where
     } else {
         Ok(ConvertedFrame {
             device_lab: None,
-            host: convert_frame_to_colorspace(frame_bgr, colorspace)?.mapv(|value| value as f32),
+            host: Some(convert_frame_to_colorspace(frame_bgr, colorspace)?.mapv(|value| value as f32)),
         })
     }
 }
@@ -753,7 +782,9 @@ where
     let Some(frame) = reader.read_frame_at(index)? else {
         return Ok(first_frame_converted.clone());
     };
-    let converted = convert_frame_with_backend(backend, &frame, colorspace)?.host;
+    let converted = convert_frame_with_backend(backend, &frame, colorspace, true)?
+        .host
+        .ok_or_else(|| anyhow!("reference conversion unexpectedly omitted host data"))?;
     cache.insert(index, converted.clone());
     while cache.len() > cache_capacity {
         cache.shift_remove_index(0);
