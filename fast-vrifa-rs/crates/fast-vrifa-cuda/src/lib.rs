@@ -2,7 +2,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use bytemuck::cast_slice;
 use cudarc::{
     driver::{
-        CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, LaunchConfig, PushKernelArg,
+        CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, LaunchConfig,
+        PinnedHostSlice, PushKernelArg,
     },
     nvrtc::compile_ptx,
 };
@@ -13,7 +14,7 @@ use std::env;
 use std::fs;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 
 const KERNELS: &str = include_str!("kernels/stage1.cu");
@@ -55,6 +56,8 @@ struct CudaBackendInner {
     roi: CudaFunction,
     delta: CudaFunction,
     lab_lut: CudaSlice<u32>,
+    pinned_bgr_upload: Mutex<Option<PinnedHostSlice<u8>>>,
+    pinned_f32_download: Mutex<Option<PinnedHostSlice<f32>>>,
 }
 
 #[derive(Clone, Default)]
@@ -139,6 +142,8 @@ impl CudaBackendInner {
             roi,
             delta,
             lab_lut,
+            pinned_bgr_upload: Mutex::new(None),
+            pinned_f32_download: Mutex::new(None),
         })
     }
 }
@@ -182,9 +187,29 @@ impl ImageBackend for CudaBackend {
         let packed = frame_bgr
             .as_slice_memory_order()
             .ok_or_else(|| anyhow!("BGR frame must be contiguous"))?;
+        let mut pinned = inner
+            .pinned_bgr_upload
+            .lock()
+            .map_err(|_| anyhow!("pinned BGR upload buffer mutex was poisoned"))?;
+        if pinned.as_ref().map(|buffer| buffer.len()) != Some(packed.len()) {
+            *pinned = Some(
+                unsafe { inner.stream.context().alloc_pinned::<u8>(packed.len()) }
+                    .context("allocating pinned CUDA upload buffer")?,
+            );
+        }
+        pinned
+            .as_mut()
+            .ok_or_else(|| anyhow!("missing pinned BGR upload buffer"))?
+            .as_mut_slice()
+            .context("mapping pinned BGR upload buffer")?
+            .copy_from_slice(packed);
         let data = inner
             .stream
-            .clone_htod(packed)
+            .clone_htod(
+                pinned
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("missing pinned BGR upload buffer"))?,
+            )
             .context("uploading BGR frame to CUDA")?;
         Ok(CudaFrameBgr {
             data,
@@ -303,10 +328,31 @@ impl ImageBackend for CudaBackend {
 
     fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>> {
         let inner = self.inner()?;
-        let values = inner
+        let mut pinned = inner
+            .pinned_f32_download
+            .lock()
+            .map_err(|_| anyhow!("pinned f32 download buffer mutex was poisoned"))?;
+        if pinned.as_ref().map(|buffer| buffer.len()) != Some(plane.data.len()) {
+            *pinned = Some(
+                unsafe { inner.stream.context().alloc_pinned::<f32>(plane.data.len()) }
+                    .context("allocating pinned CUDA download buffer")?,
+            );
+        }
+        inner
             .stream
-            .clone_dtoh(&plane.data)
+            .memcpy_dtoh(
+                &plane.data,
+                pinned
+                    .as_mut()
+                    .ok_or_else(|| anyhow!("missing pinned f32 download buffer"))?,
+            )
             .context("downloading CUDA delta plane")?;
+        let values = pinned
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing pinned f32 download buffer"))?
+            .as_slice()
+            .context("mapping pinned CUDA download buffer")?
+            .to_vec();
         Array2::from_shape_vec((plane.height, plane.width), values)
             .context("reshaping downloaded delta plane")
     }
