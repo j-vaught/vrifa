@@ -110,18 +110,20 @@
     ("Clean",    horseshoe),
     ("Export",   warmgrey),
   )
-  let leg-spacing = 3.0
+  let swatch-w = 0.4
+  let label-pad = 0.08    // gap between swatch right edge and label left edge
+  let item-w = 1.3        // approximate full item width (swatch + pad + label)
+  let leg-spacing = 1.55  // distance between consecutive item starts
   let layout-w = cols * cell-w + (cols - 1) * gap
-  // Each item runs from its swatch-left to roughly +1.8 (label width); last item adds 1.0 trailing margin.
-  let legend-w = (families.len() - 1) * leg-spacing + 1.8
+  let legend-w = (families.len() - 1) * leg-spacing + item-w
   let leg-x0 = (layout-w - legend-w) / 2
-  // Move the legend up so it sits closer to the bottom row of cells.
   let leg-y = -2 * (cell-h + gap + row-pad) + 0.55
   for (i, (name, c)) in families.enumerate() {
     let x = leg-x0 + i * leg-spacing
-    rect((x, leg-y), (x + 0.5, leg-y - 0.35),
+    rect((x, leg-y), (x + swatch-w, leg-y - 0.32),
          fill: c.lighten(82%), stroke: 0.7pt + c)
-    content((x + 1.4, leg-y - 0.18),
-            text(size: 9pt, fill: b70)[#name])
+    content((x + swatch-w + label-pad, leg-y - 0.16),
+            text(size: 9pt, fill: b70)[#name],
+            anchor: "west")
   }
 })
