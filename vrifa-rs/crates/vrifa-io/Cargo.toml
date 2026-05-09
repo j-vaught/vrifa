@@ -6,7 +6,6 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-ffmpeg-next.workspace = true
 image.workspace = true
 ndarray.workspace = true
 opencv = { workspace = true, features = ["videoio", "imgcodecs", "imgproc"] }

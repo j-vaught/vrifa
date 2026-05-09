@@ -19,10 +19,6 @@ pub struct VideoMetadata {
     pub height: usize,
 }
 
-pub fn init_ffmpeg() {
-    let _ = ffmpeg_next::init();
-}
-
 pub struct VideoReader {
     capture: videoio::VideoCapture,
     metadata: VideoMetadata,
@@ -31,7 +27,6 @@ pub struct VideoReader {
 
 impl VideoReader {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        init_ffmpeg();
         let path = path.as_ref();
         let capture = videoio::VideoCapture::from_file_def(&path.to_string_lossy())
             .with_context(|| format!("opening video {}", path.display()))?;
