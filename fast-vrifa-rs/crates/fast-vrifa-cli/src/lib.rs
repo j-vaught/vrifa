@@ -209,9 +209,12 @@ fn run_wgpu_backend(config: Config) -> Result<()> {
 fn run_cuda_backend(config: Config) -> Result<()> {
     #[cfg(feature = "cuda")]
     {
-        let backend = CudaBackend::default();
+        let backend = CudaBackend::new();
         if !matches!(backend.status(), fast_vrifa_core::BackendStatus::Ready) {
-            bail!("--backend cuda is not implemented yet in this build");
+            let detail = backend
+                .init_error()
+                .unwrap_or("CUDA runtime initialization failed");
+            bail!("--backend cuda is unavailable on this machine: {detail}");
         }
         return run_hybrid_pipeline(config, &backend);
     }

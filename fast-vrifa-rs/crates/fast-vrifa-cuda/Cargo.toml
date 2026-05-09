@@ -6,5 +6,8 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+bytemuck.workspace = true
+cudarc = { version = "0.19.4", default-features = false, features = ["std", "driver", "nvrtc", "dynamic-loading", "cuda-12040"] }
 fast-vrifa-core = { path = "../fast-vrifa-core" }
 ndarray.workspace = true
+vrifa-core.workspace = true
