@@ -67,4 +67,14 @@ pub trait PeakImageBackend: ImageBackend {
         roi_mask: &Self::DeviceMaskU8,
         channel_weight: f32,
     ) -> Result<Self::DevicePlaneF32>;
+
+    fn blur_and_normalize_delta(
+        &self,
+        delta: &Self::DevicePlaneF32,
+        blur_kernel: usize,
+        blur_enabled: bool,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let _ = (delta, blur_kernel, blur_enabled);
+        Ok(None)
+    }
 }

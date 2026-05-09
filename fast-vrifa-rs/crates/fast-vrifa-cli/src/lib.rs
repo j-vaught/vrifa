@@ -512,6 +512,18 @@ where
 
         if frame_index % config.frame_step == 0 {
             let compute_start = Instant::now();
+            let morph_params = MorphologyParams {
+                blur_kernel: config.blur_kernel,
+                morph_kernel: config.morph_kernel,
+                min_area: config.min_area,
+                manual_threshold: config.contrast_threshold,
+                percentile_threshold: config.contrast_percentile,
+                threshold_offset: config.threshold_offset,
+                blur_enabled: !config.skip_blur,
+                morph_shape: config.morph_shape,
+                morph_close_iterations: config.morph_close_iterations,
+                morph_open_iterations: config.morph_open_iterations,
+            };
             if config.peak_reference {
                 if device_delta_eligible {
                     let device_lab = current.device_lab.as_ref().ok_or_else(|| {
@@ -531,7 +543,7 @@ where
                 }
             }
 
-            let delta = if let Some(device_lab) = current.device_lab.as_ref() {
+            let detect = if let Some(device_lab) = current.device_lab.as_ref() {
                 if device_delta_eligible {
                     let device_delta = if config.peak_reference {
                         backend.compute_delta_darken_only_device(
@@ -555,13 +567,30 @@ where
                             config.channel_weights[0],
                         )?
                     };
-                    backend.download_plane_f32(&device_delta)?
+                    if let Some(device_delta_norm) = backend.blur_and_normalize_delta(
+                        &device_delta,
+                        morph_params.blur_kernel,
+                        morph_params.blur_enabled,
+                    )? {
+                        let delta_norm = backend.download_mask_u8(&device_delta_norm)?;
+                        DetectionOutputs {
+                            mask: detect_mask_from_delta_norm(
+                                &delta_norm,
+                                &roi_mask,
+                                &morph_params,
+                            )?,
+                            delta_norm,
+                        }
+                    } else {
+                        let delta = backend.download_plane_f32(&device_delta)?;
+                        detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
+                    }
                 } else {
                     let host_reference = reference_for_frame
                         .as_ref()
                         .or((!reference_values_needed).then_some(&first_frame_converted))
                         .ok_or_else(|| anyhow!("missing reference frame for host delta"))?;
-                    compute_delta(
+                    let delta = compute_delta(
                         frame_converted.ok_or_else(|| {
                             anyhow!("host delta path requires a converted host frame")
                         })?,
@@ -572,14 +601,15 @@ where
                         peak_brightness_map
                             .as_ref()
                             .filter(|_| config.peak_reference),
-                    )?
+                    )?;
+                    detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
                 }
             } else {
                 let host_reference = reference_for_frame
                     .as_ref()
                     .or((!reference_values_needed).then_some(&first_frame_converted))
                     .ok_or_else(|| anyhow!("missing reference frame for host delta"))?;
-                compute_delta(
+                let delta = compute_delta(
                     frame_converted.ok_or_else(|| {
                         anyhow!("host delta path requires a converted host frame")
                     })?,
@@ -590,25 +620,9 @@ where
                     peak_brightness_map
                         .as_ref()
                         .filter(|_| config.peak_reference),
-                )?
+                )?;
+                detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
             };
-
-            let detect = detect_mask_and_delta_norm(
-                &delta,
-                &roi_mask,
-                &MorphologyParams {
-                    blur_kernel: config.blur_kernel,
-                    morph_kernel: config.morph_kernel,
-                    min_area: config.min_area,
-                    manual_threshold: config.contrast_threshold,
-                    percentile_threshold: config.contrast_percentile,
-                    threshold_offset: config.threshold_offset,
-                    blur_enabled: !config.skip_blur,
-                    morph_shape: config.morph_shape,
-                    morph_close_iterations: config.morph_close_iterations,
-                    morph_open_iterations: config.morph_open_iterations,
-                },
-            )?;
             let mask = Arc::new(apply_locking(
                 &detect.mask,
                 config.lock_frames,
@@ -830,6 +844,17 @@ fn detect_mask_and_delta_norm(
     };
 
     let delta_norm = normalize_minmax_to_u8(&delta_blur)?;
+    Ok(DetectionOutputs {
+        mask: detect_mask_from_delta_norm(&delta_norm, roi_mask, params)?,
+        delta_norm,
+    })
+}
+
+fn detect_mask_from_delta_norm(
+    delta_norm: &Array2<u8>,
+    roi_mask: &Array2<u8>,
+    params: &MorphologyParams,
+) -> Result<Array2<u8>> {
     let threshold_value = threshold::choose_threshold(
         &delta_norm,
         roi_mask,
@@ -890,10 +915,7 @@ fn detect_mask_and_delta_norm(
         binary = filter_min_area(&binary, params.min_area)?;
     }
 
-    Ok(DetectionOutputs {
-        delta_norm,
-        mask: cvutil::mat_to_array2_u8(&binary)?,
-    })
+    Ok(cvutil::mat_to_array2_u8(&binary)?)
 }
 
 fn normalize_minmax_to_u8(delta: &opencv::core::Mat) -> Result<Array2<u8>> {
