@@ -16,7 +16,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
@@ -152,7 +152,7 @@ impl OutputWorkerPool {
     fn new(context: OutputWorkerContext) -> Self {
         let (sender, receiver) = sync_channel::<OutputBundle>(OUTPUT_QUEUE);
         let receiver = Arc::new(Mutex::new(receiver));
-        let (record_sender, record_receiver) = sync_channel::<AnnotationFrame>(OUTPUT_QUEUE * 4);
+        let (record_sender, record_receiver) = channel::<AnnotationFrame>();
         let mut handles = Vec::with_capacity(OUTPUT_WORKERS);
         for _ in 0..OUTPUT_WORKERS {
             let receiver = Arc::clone(&receiver);
