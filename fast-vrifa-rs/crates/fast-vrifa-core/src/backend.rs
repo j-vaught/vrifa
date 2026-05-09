@@ -1,6 +1,7 @@
 use anyhow::Result;
 use ndarray::{Array2, Array3};
 use serde::{Deserialize, Serialize};
+use vrifa_core::morphology::MorphShape;
 use vrifa_core::roi::RoiMargins;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -75,6 +76,26 @@ pub trait PeakImageBackend: ImageBackend {
         blur_enabled: bool,
     ) -> Result<Option<Self::DeviceMaskU8>> {
         let _ = (delta, blur_kernel, blur_enabled);
+        Ok(None)
+    }
+
+    fn threshold_and_morph_mask(
+        &self,
+        delta_norm: &Self::DeviceMaskU8,
+        threshold_value: f32,
+        morph_shape: MorphShape,
+        morph_kernel: usize,
+        morph_close_iterations: usize,
+        morph_open_iterations: usize,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let _ = (
+            delta_norm,
+            threshold_value,
+            morph_shape,
+            morph_kernel,
+            morph_close_iterations,
+            morph_open_iterations,
+        );
         Ok(None)
     }
 }

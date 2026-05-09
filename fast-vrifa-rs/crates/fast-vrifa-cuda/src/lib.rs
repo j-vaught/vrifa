@@ -18,6 +18,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::Arc;
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
+use vrifa_core::morphology::MorphShape;
 
 const KERNELS: &str = include_str!("kernels/stage1.cu");
 
@@ -60,6 +61,9 @@ struct CudaBackendInner {
     blur_norm: CudaFunction,
     reduce_minmax: CudaFunction,
     normalize_u8: CudaFunction,
+    threshold_binary: CudaFunction,
+    dilate_binary: CudaFunction,
+    erode_binary: CudaFunction,
     lab_lut: CudaSlice<u32>,
 }
 
@@ -141,6 +145,15 @@ impl CudaBackendInner {
         let normalize_u8 = module
             .load_function("normalize_minmax_u8")
             .context("loading CUDA normalize kernel")?;
+        let threshold_binary = module
+            .load_function("threshold_binary_u8")
+            .context("loading CUDA threshold kernel")?;
+        let dilate_binary = module
+            .load_function("dilate_binary_u8")
+            .context("loading CUDA dilation kernel")?;
+        let erode_binary = module
+            .load_function("erode_binary_u8")
+            .context("loading CUDA erosion kernel")?;
         let host_lut = load_or_build_lab_lut()?;
         let lab_lut = stream
             .clone_htod(&host_lut)
@@ -156,6 +169,9 @@ impl CudaBackendInner {
             blur_norm,
             reduce_minmax,
             normalize_u8,
+            threshold_binary,
+            dilate_binary,
+            erode_binary,
             lab_lut,
         })
     }
@@ -531,6 +547,121 @@ impl PeakImageBackend for CudaBackend {
             height: source_height,
         }))
     }
+
+    fn threshold_and_morph_mask(
+        &self,
+        delta_norm: &Self::DeviceMaskU8,
+        threshold_value: f32,
+        morph_shape: MorphShape,
+        morph_kernel: usize,
+        morph_close_iterations: usize,
+        morph_open_iterations: usize,
+    ) -> Result<Option<Self::DeviceMaskU8>> {
+        let inner = self.inner()?;
+        let pixel_count = delta_norm.width * delta_norm.height;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let pixel_count_i32 = pixel_count as i32;
+
+        let mut current = inner
+            .stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA threshold output")?;
+        let mut threshold = inner.stream.launch_builder(&inner.threshold_binary);
+        threshold.arg(&delta_norm.data);
+        threshold.arg(&mut current);
+        threshold.arg(&threshold_value);
+        threshold.arg(&pixel_count_i32);
+        unsafe { threshold.launch(cfg) }.context("launching CUDA threshold kernel")?;
+
+        if morph_close_iterations == 0 && morph_open_iterations == 0 {
+            return Ok(Some(CudaMaskU8 {
+                data: current,
+                width: delta_norm.width,
+                height: delta_norm.height,
+            }));
+        }
+
+        let kernel_size = canonical_morph_kernel_size(morph_kernel);
+        let kernel_mask = structuring_element_mask(morph_shape, kernel_size)?;
+        let kernel_buffer = inner
+            .stream
+            .clone_htod(&kernel_mask)
+            .context("uploading CUDA morphology kernel mask")?;
+        let width_i32 = delta_norm.width as i32;
+        let height_i32 = delta_norm.height as i32;
+        let kernel_i32 = kernel_size as i32;
+        let mut scratch = inner
+            .stream
+            .alloc_zeros::<u8>(pixel_count)
+            .context("allocating CUDA morphology scratch buffer")?;
+
+        for _ in 0..morph_close_iterations {
+            launch_binary_morph(
+                inner,
+                &inner.dilate_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "dilation",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+            launch_binary_morph(
+                inner,
+                &inner.erode_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "erosion",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+        }
+        for _ in 0..morph_open_iterations {
+            launch_binary_morph(
+                inner,
+                &inner.erode_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "erosion",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+            launch_binary_morph(
+                inner,
+                &inner.dilate_binary,
+                &current,
+                &kernel_buffer,
+                &mut scratch,
+                width_i32,
+                height_i32,
+                kernel_i32,
+                pixel_count_i32,
+                cfg,
+                "dilation",
+            )?;
+            std::mem::swap(&mut current, &mut scratch);
+        }
+
+        Ok(Some(CudaMaskU8 {
+            data: current,
+            width: delta_norm.width,
+            height: delta_norm.height,
+        }))
+    }
 }
 
 fn cuda_device_ordinal() -> Result<usize> {
@@ -590,6 +721,11 @@ fn canonical_blur_kernel_size(blur_kernel: usize) -> usize {
     kernel.max(1)
 }
 
+fn canonical_morph_kernel_size(morph_kernel: usize) -> usize {
+    let kernel = morph_kernel + (1 - morph_kernel % 2);
+    kernel.max(1)
+}
+
 fn gaussian_kernel_weights(kernel_size: usize) -> Result<Vec<f32>> {
     let kernel_size = canonical_blur_kernel_size(kernel_size);
     let kernel = imgproc::get_gaussian_kernel(kernel_size as i32, 0.0, CV_32F)
@@ -600,6 +736,55 @@ fn gaussian_kernel_weights(kernel_size: usize) -> Result<Vec<f32>> {
         .iter()
         .copied()
         .collect())
+}
+
+fn structuring_element_mask(shape: MorphShape, kernel_size: usize) -> Result<Vec<u8>> {
+    let kernel_size = canonical_morph_kernel_size(kernel_size);
+    let kernel = imgproc::get_structuring_element_def(
+        morph_shape_code(shape),
+        opencv::core::Size::new(kernel_size as i32, kernel_size as i32),
+    )
+    .context("building morphology kernel for CUDA")?;
+    Ok(kernel
+        .data_typed::<u8>()
+        .context("reading morphology kernel bytes")?
+        .iter()
+        .map(|value| u8::from(*value > 0))
+        .collect())
+}
+
+fn morph_shape_code(shape: MorphShape) -> i32 {
+    match shape {
+        MorphShape::Ellipse => imgproc::MORPH_ELLIPSE,
+        MorphShape::Rect => imgproc::MORPH_RECT,
+        MorphShape::Cross => imgproc::MORPH_CROSS,
+    }
+}
+
+fn launch_binary_morph(
+    inner: &CudaBackendInner,
+    kernel: &CudaFunction,
+    input: &CudaSlice<u8>,
+    kernel_mask: &CudaSlice<u8>,
+    output: &mut CudaSlice<u8>,
+    width: i32,
+    height: i32,
+    kernel_size: i32,
+    pixel_count: i32,
+    cfg: LaunchConfig,
+    label: &str,
+) -> Result<()> {
+    let mut launch = inner.stream.launch_builder(kernel);
+    launch.arg(input);
+    launch.arg(kernel_mask);
+    launch.arg(output);
+    launch.arg(&width);
+    launch.arg(&height);
+    launch.arg(&kernel_size);
+    launch.arg(&pixel_count);
+    unsafe { launch.launch(cfg) }
+        .with_context(|| format!("launching CUDA morphology {label} kernel"))?;
+    Ok(())
 }
 
 fn lab_lut_cache_path() -> PathBuf {

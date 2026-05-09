@@ -573,14 +573,34 @@ where
                         morph_params.blur_enabled,
                     )? {
                         let delta_norm = backend.download_mask_u8(&device_delta_norm)?;
-                        DetectionOutputs {
-                            mask: detect_mask_from_delta_norm(
+                        let threshold_value = threshold::choose_threshold(
+                            &delta_norm,
+                            &roi_mask,
+                            morph_params.manual_threshold,
+                            morph_params.percentile_threshold,
+                            morph_params.threshold_offset,
+                        )?;
+                        let mask = if let Some(device_mask) = backend.threshold_and_morph_mask(
+                            &device_delta_norm,
+                            threshold_value,
+                            morph_params.morph_shape,
+                            morph_params.morph_kernel,
+                            morph_params.morph_close_iterations,
+                            morph_params.morph_open_iterations,
+                        )? {
+                            let mut mask = backend.download_mask_u8(&device_mask)?;
+                            if morph_params.min_area > 0 {
+                                mask = filter_min_area_array(&mask, morph_params.min_area)?;
+                            }
+                            mask
+                        } else {
+                            detect_mask_from_delta_norm_threshold(
                                 &delta_norm,
-                                &roi_mask,
+                                threshold_value,
                                 &morph_params,
-                            )?,
-                            delta_norm,
-                        }
+                            )?
+                        };
+                        DetectionOutputs { mask, delta_norm }
                     } else {
                         let delta = backend.download_plane_f32(&device_delta)?;
                         detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?
@@ -862,7 +882,23 @@ fn detect_mask_from_delta_norm(
         params.percentile_threshold,
         params.threshold_offset,
     )?;
+    detect_mask_from_delta_norm_threshold(delta_norm, threshold_value, params)
+}
 
+fn detect_mask_from_delta_norm_threshold(
+    delta_norm: &Array2<u8>,
+    threshold_value: f32,
+    params: &MorphologyParams,
+) -> Result<Array2<u8>> {
+    let mut binary = threshold_to_mat(delta_norm, threshold_value)?;
+    apply_morphology_in_place(&mut binary, params)?;
+    if params.min_area > 0 {
+        binary = filter_min_area(&binary, params.min_area)?;
+    }
+    Ok(cvutil::mat_to_array2_u8(&binary)?)
+}
+
+fn threshold_to_mat(delta_norm: &Array2<u8>, threshold_value: f32) -> Result<opencv::core::Mat> {
     let norm_mat = cvutil::array2_u8_to_mat(&delta_norm)?;
     let mut binary = opencv::core::Mat::default();
     imgproc::threshold(
@@ -872,7 +908,13 @@ fn detect_mask_from_delta_norm(
         255.0,
         imgproc::THRESH_BINARY,
     )?;
+    Ok(binary)
+}
 
+fn apply_morphology_in_place(
+    binary: &mut opencv::core::Mat,
+    params: &MorphologyParams,
+) -> Result<()> {
     let mut kernel_size = params.morph_kernel + (1 - params.morph_kernel % 2);
     if kernel_size == 0 {
         kernel_size = 1;
@@ -885,7 +927,7 @@ fn detect_mask_from_delta_norm(
     for _ in 0..params.morph_close_iterations {
         let mut next = opencv::core::Mat::default();
         imgproc::morphology_ex(
-            &binary,
+            binary,
             &mut next,
             imgproc::MORPH_CLOSE,
             &kernel,
@@ -894,12 +936,12 @@ fn detect_mask_from_delta_norm(
             core::BORDER_CONSTANT,
             imgproc::morphology_default_border_value()?,
         )?;
-        binary = next;
+        *binary = next;
     }
     for _ in 0..params.morph_open_iterations {
         let mut next = opencv::core::Mat::default();
         imgproc::morphology_ex(
-            &binary,
+            binary,
             &mut next,
             imgproc::MORPH_OPEN,
             &kernel,
@@ -908,14 +950,16 @@ fn detect_mask_from_delta_norm(
             core::BORDER_CONSTANT,
             imgproc::morphology_default_border_value()?,
         )?;
-        binary = next;
+        *binary = next;
     }
+    Ok(())
+}
 
-    if params.min_area > 0 {
-        binary = filter_min_area(&binary, params.min_area)?;
-    }
-
-    Ok(cvutil::mat_to_array2_u8(&binary)?)
+fn filter_min_area_array(binary: &Array2<u8>, min_area: usize) -> Result<Array2<u8>> {
+    let binary = cvutil::array2_u8_to_mat(binary)?;
+    Ok(cvutil::mat_to_array2_u8(&filter_min_area(
+        &binary, min_area,
+    )?)?)
 }
 
 fn normalize_minmax_to_u8(delta: &opencv::core::Mat) -> Result<Array2<u8>> {

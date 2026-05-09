@@ -164,3 +164,88 @@ extern "C" __global__ void normalize_minmax_u8(
     }
     output[index] = static_cast<unsigned char>(normalized);
 }
+
+extern "C" __global__ void threshold_binary_u8(
+    const unsigned char* input,
+    unsigned char* output,
+    float threshold_value,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    output[index] = static_cast<float>(input[index]) > threshold_value ? 255u : 0u;
+}
+
+extern "C" __global__ void dilate_binary_u8(
+    const unsigned char* input,
+    const unsigned char* kernel_mask,
+    unsigned char* output,
+    int width,
+    int height,
+    int kernel_size,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    int radius = kernel_size / 2;
+    int y = index / width;
+    int x = index - (y * width);
+    unsigned char result = 0u;
+    for (int ky = 0; ky < kernel_size && result == 0u; ++ky) {
+        int yy = y + ky - radius;
+        if (yy < 0 || yy >= height) {
+            continue;
+        }
+        for (int kx = 0; kx < kernel_size; ++kx) {
+            if (!kernel_mask[ky * kernel_size + kx]) {
+                continue;
+            }
+            int xx = x + kx - radius;
+            if (xx < 0 || xx >= width) {
+                continue;
+            }
+            if (input[yy * width + xx] > 0u) {
+                result = 255u;
+                break;
+            }
+        }
+    }
+    output[index] = result;
+}
+
+extern "C" __global__ void erode_binary_u8(
+    const unsigned char* input,
+    const unsigned char* kernel_mask,
+    unsigned char* output,
+    int width,
+    int height,
+    int kernel_size,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    int radius = kernel_size / 2;
+    int y = index / width;
+    int x = index - (y * width);
+    unsigned char result = 255u;
+    for (int ky = 0; ky < kernel_size && result == 255u; ++ky) {
+        int yy = y + ky - radius;
+        for (int kx = 0; kx < kernel_size; ++kx) {
+            if (!kernel_mask[ky * kernel_size + kx]) {
+                continue;
+            }
+            int xx = x + kx - radius;
+            if (yy < 0 || yy >= height || xx < 0 || xx >= width || input[yy * width + xx] == 0u) {
+                result = 0u;
+                break;
+            }
+        }
+    }
+    output[index] = result;
+}
