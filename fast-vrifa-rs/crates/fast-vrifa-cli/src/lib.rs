@@ -265,6 +265,8 @@ where
         _ => None,
     };
     let reference_values_needed = !(config.peak_reference && config.darken_only);
+    let device_delta_eligible =
+        config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
     let absolute_reference = if reference_values_needed {
         if let Some(index) = absolute_index {
             if let Some(total) = metadata.total_frames {
@@ -286,6 +288,19 @@ where
         } else {
             Some(first_frame_converted.clone())
         }
+    } else {
+        None
+    };
+    let first_reference_device = if device_delta_eligible && reference_values_needed {
+        Some(backend.upload_plane_f32(&first_frame_converted.slice(s![.., .., 0]).to_owned())?)
+    } else {
+        None
+    };
+    let absolute_reference_device = if device_delta_eligible {
+        absolute_reference
+            .as_ref()
+            .map(|reference| backend.upload_plane_f32(&reference.slice(s![.., .., 0]).to_owned()))
+            .transpose()?
     } else {
         None
     };
@@ -326,8 +341,6 @@ where
     let roi_mask = backend.download_mask_u8(&device_roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
-    let device_delta_eligible =
-        config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
     let mut peak_brightness_map = if config.peak_reference && !device_delta_eligible {
         Some(first_frame_converted.slice(s![.., .., 0]).to_owned())
     } else {
@@ -562,6 +575,19 @@ where
                             peak_brightness_device.as_ref().ok_or_else(|| {
                                 anyhow!("peak reference was enabled without a device peak map")
                             })?,
+                            &device_roi_mask,
+                            config.channel_weights[0],
+                        )?
+                    } else if let Some(device_reference_plane) = match config.ref_mode {
+                        ReferenceMode::First => first_reference_device.as_ref(),
+                        ReferenceMode::Absolute(_) => absolute_reference_device
+                            .as_ref()
+                            .or(first_reference_device.as_ref()),
+                        _ => None,
+                    } {
+                        backend.compute_delta_darken_only_device(
+                            device_lab,
+                            device_reference_plane,
                             &device_roi_mask,
                             config.channel_weights[0],
                         )?

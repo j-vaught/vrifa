@@ -77,6 +77,12 @@ impl ImageBackend for CpuBackend {
         Ok(mask.data.clone())
     }
 
+    fn upload_plane_f32(&self, plane: &Array2<f32>) -> Result<Self::DevicePlaneF32> {
+        Ok(CpuPlaneF32 {
+            data: plane.clone(),
+        })
+    }
+
     fn compute_delta_darken_only(
         &self,
         frame_lab: &Self::DeviceFrameLab,
@@ -128,10 +134,7 @@ impl PeakImageBackend for CpuBackend {
         previous_peak: Option<&Self::DevicePlaneF32>,
     ) -> Result<Self::DevicePlaneF32> {
         Ok(CpuPlaneF32 {
-            data: update_peak_brightness(
-                &frame_lab.data,
-                previous_peak.map(|plane| &plane.data),
-            )?,
+            data: update_peak_brightness(&frame_lab.data, previous_peak.map(|plane| &plane.data))?,
         })
     }
 

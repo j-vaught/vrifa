@@ -1,13 +1,13 @@
 use anyhow::{anyhow, bail, Context, Result};
 use bytemuck::cast_slice;
+#[cfg(target_os = "linux")]
+use cudarc::driver::{DevicePtr, DevicePtrMut};
 use cudarc::{
     driver::{
         CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, LaunchConfig, PushKernelArg,
     },
     nvrtc::compile_ptx,
 };
-#[cfg(target_os = "linux")]
-use cudarc::driver::{DevicePtr, DevicePtrMut};
 use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
 use ndarray::{Array2, Array3};
 use opencv::core::CV_32F;
@@ -321,6 +321,21 @@ impl ImageBackend for CudaBackend {
             .context("reshaping downloaded ROI mask")
     }
 
+    fn upload_plane_f32(&self, plane: &Array2<f32>) -> Result<Self::DevicePlaneF32> {
+        let inner = self.inner()?;
+        let values = plane
+            .as_slice_memory_order()
+            .ok_or_else(|| anyhow!("reference plane must be contiguous"))?;
+        Ok(CudaPlaneF32 {
+            data: inner
+                .stream
+                .clone_htod(values)
+                .context("uploading reference plane to CUDA")?,
+            width: plane.dim().1,
+            height: plane.dim().0,
+        })
+    }
+
     fn compute_delta_darken_only(
         &self,
         frame_lab: &Self::DeviceFrameLab,
@@ -328,7 +343,6 @@ impl ImageBackend for CudaBackend {
         roi_mask: &Self::DeviceMaskU8,
         channel_weight: f32,
     ) -> Result<Self::DevicePlaneF32> {
-        let inner = self.inner()?;
         anyhow::ensure!(
             reference_plane.dim() == (frame_lab.height, frame_lab.width),
             "reference plane shape does not match frame"
@@ -338,17 +352,7 @@ impl ImageBackend for CudaBackend {
             "ROI mask shape does not match frame"
         );
 
-        let reference = reference_plane
-            .as_slice_memory_order()
-            .ok_or_else(|| anyhow!("reference plane must be contiguous"))?;
-        let reference_buffer = CudaPlaneF32 {
-            data: inner
-                .stream
-                .clone_htod(reference)
-                .context("uploading reference plane to CUDA")?,
-            width: frame_lab.width,
-            height: frame_lab.height,
-        };
+        let reference_buffer = self.upload_plane_f32(reference_plane)?;
         self.compute_delta_darken_only_device(
             frame_lab,
             &reference_buffer,

@@ -438,6 +438,17 @@ impl ImageBackend for WgpuBackend {
         Array2::from_shape_vec((mask.height, mask.width), values).context("reshaping ROI mask")
     }
 
+    fn upload_plane_f32(&self, plane: &Array2<f32>) -> Result<Self::DevicePlaneF32> {
+        let values = plane
+            .as_slice_memory_order()
+            .ok_or_else(|| anyhow!("reference plane must be contiguous"))?;
+        Ok(WgpuPlaneF32 {
+            buffer: self.upload_f32_plane_buffer("fast-vrifa-reference-plane", values),
+            width: plane.dim().1,
+            height: plane.dim().0,
+        })
+    }
+
     fn compute_delta_darken_only(
         &self,
         frame_lab: &Self::DeviceFrameLab,
@@ -454,15 +465,13 @@ impl ImageBackend for WgpuBackend {
             "ROI mask shape does not match frame"
         );
 
-        let reference = reference_plane
-            .as_slice_memory_order()
-            .ok_or_else(|| anyhow!("reference plane must be contiguous"))?;
-        let reference_buffer = WgpuPlaneF32 {
-            buffer: self.upload_f32_plane_buffer("fast-vrifa-reference-plane", reference),
-            width: frame_lab.width,
-            height: frame_lab.height,
-        };
-        self.compute_delta_darken_only_device(frame_lab, &reference_buffer, roi_mask, channel_weight)
+        let reference_buffer = self.upload_plane_f32(reference_plane)?;
+        self.compute_delta_darken_only_device(
+            frame_lab,
+            &reference_buffer,
+            roi_mask,
+            channel_weight,
+        )
     }
 
     fn download_plane_f32(&self, plane: &Self::DevicePlaneF32) -> Result<Array2<f32>> {
@@ -565,7 +574,8 @@ impl PeakImageBackend for WgpuBackend {
             });
         };
 
-        let output = self.create_storage_buffer("fast-vrifa-peak-plane", byte_len_for_f32(pixel_count));
+        let output =
+            self.create_storage_buffer("fast-vrifa-peak-plane", byte_len_for_f32(pixel_count));
         let uniform = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
