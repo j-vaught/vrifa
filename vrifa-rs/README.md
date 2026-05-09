@@ -9,7 +9,6 @@ This directory contains the Rust workspace that builds the VRIFA CLI, core algor
 - `crates/vrifa-annotations` contains COCO, YOLOv5, and Darknet exporters.
 - `crates/vrifa-cli` contains the binary entrypoint, configuration parsing, and end-to-end orchestration.
 - `crates/vrifa-py` contains the optional binding crate layered over the Rust pipeline.
-- `python/vrifa` contains the package wrapper used by the binding build.
 - `tests/fixtures` contains frozen test assets and stage goldens.
 - `docs/archive` contains closed investigation notes that are not required for day-to-day work.
 
@@ -48,7 +47,7 @@ cargo build --release
 
 ```bash
 cargo test --workspace --release
-python3 ../_dev/validation/compare_runs.py /tmp/py_run /tmp/rs_run
+../_dev/validation/compare_runs.py /tmp/py_run /tmp/rs_run
 cargo bench -p vrifa-cli --bench perf_gate
 ```
 

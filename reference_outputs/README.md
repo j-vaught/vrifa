@@ -1,0 +1,1 @@
+Reference outputs produced by VRIFA on the bundled sample videos. These directories serve as ground-truth artifacts for regression checks and contain the serialized run summary and annotation output for the canonical `input_1` and `input_2` sample runs.

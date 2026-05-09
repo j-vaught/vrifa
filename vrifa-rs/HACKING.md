@@ -17,7 +17,7 @@ The matching `crates/vrifa-core/tests/<stage>_parity.rs` test will compare the s
 Edit the Rust stage, then regenerate only the affected fixtures and commit the code and goldens together. The one-line entrypoint is:
 
 ```bash
-python3 ../_dev/validation/generate_stage_fixtures.py
+../_dev/validation/generate_stage_fixtures.py
 ```
 
 After refreshing the fixtures, rerun:

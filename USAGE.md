@@ -340,7 +340,7 @@ cargo test --workspace --release
 For artifact-level validation against the frozen sample runs, use the internal harness in `_dev/`:
 
 ```bash
-python3 _dev/validation/compare_runs.py /tmp/py_run /tmp/rs_run
+./_dev/validation/compare_runs.py /tmp/py_run /tmp/rs_run
 ```
 
 The fixture generator and stage-dump tools that refresh validation assets also live under `_dev/validation/`.
