@@ -70,11 +70,19 @@ def trim_one(
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(str(out_path), fourcc, fps, (width, height))
-    if not writer.isOpened():
+    # H.264 (avc1) so the trimmed mp4s preview inline in VS Code / Finder.
+    # Fall back to mp4v if the OpenCV build was not compiled with H.264.
+    writer = None
+    for codec in ("avc1", "H264", "mp4v"):
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        candidate = cv2.VideoWriter(str(out_path), fourcc, fps, (width, height))
+        if candidate.isOpened():
+            writer = candidate
+            break
+        candidate.release()
+    if writer is None:
         cap.release()
-        raise RuntimeError(f"unable to open writer for {out_path}")
+        raise RuntimeError(f"unable to open any video writer for {out_path}")
 
     new_index_for_orig: dict[int, int] = {}
     new_index = 0
