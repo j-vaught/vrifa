@@ -151,24 +151,6 @@ Each row of Table~@tab:ablation holds the integrated configuration of Table~@tab
   ],
 ) <fig:component_bars>
 
-== Hyperparameter sensitivity around the operating point
-
-The component-removal table reports the cost of disabling each named primitive completely. A separate set of single-axis sweeps reports the IoU response inside the neighborhood of the values held fixed in Table~@tab:defaults, so a reader can judge how flat the operating point is and how steep the cliffs are along each axis. Figure~@fig:ablation_curves shows the response on the high-resolution canonical reference video for the threshold offset $delta_tau$, the minimum component area $a_"min"$, the morphology kernel $k_m$, the delta-blur kernel $k_b$, the lock window $n_"lock"$, and a categorical panel for colorspace, darken-only, peak-reference, blur, and reference-mode. The curves are not the headline numbers, which average over all eleven samples, but they show how each axis behaves around the operating point on a single sample where the response is well isolated.
-
-#figure(
-  image("/typst/figures/ablation_curves.pdf", width: 95%),
-  caption: [
-    Single-axis IoU response on the canonical reference video as each
-    parameter is varied with all other parameters held at the values
-    in Table~@tab:defaults. Dashed grey marks the IoU at the held-
-    fixed operating point; dotted green marks the joint optimum
-    located by the wider sweep. The categorical panel reports IoU
-    when each of the named binary or discrete components is toggled
-    individually. Joint multi-component effects are reported in the
-    component-removal ablation in Table~@tab:ablation.
-  ],
-) <fig:ablation_curves>
-
 == Qualitative montage
 
 #figure(
