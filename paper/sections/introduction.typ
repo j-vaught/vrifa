@@ -25,30 +25,6 @@ The work is hard for three concrete reasons that have to be addressed by anythin
 
 This paper presents an integrated classical-computer-vision pipeline that combines, in one configuration, the visual primitives the prior systems use in isolation. The pipeline restricts the comparison to a region of interest, projects the working frame into the lightness channel of CIELAB, accumulates a per-pixel peak-brightness reference that absorbs lighting drift, computes a darken-only difference that rejects specular highlights, dynamically lags the reference frame against fill rate, thresholds the response with Otsu, cleans the mask with morphological closing and opening followed by connected-components filtering, and locks pixels whose wet label has persisted for several consecutive frames. On a 55-frame hand-labeled subset spanning eleven distinct VARTM infusion runs, the integrated configuration reaches mean mask Intersection-over-Union (IoU) of $0.921$ with a 95 % bootstrap confidence interval of $[0.889, 0.943]$ and mean boundary $F_1$ of $0.433$ with confidence interval $[0.396, 0.473]$. A per-sample component-removal ablation on the same subset reports the marginal IoU effect of disabling each named primitive in turn. The reported effects are not uniform in sign or magnitude across the eleven samples, which is the empirical content of the ablation rather than a defect, since a primitive that helps a long operator-view recording can be neutral or counterproductive on a high-frame-rate clip whose dynamics it was not tuned for. The pipeline runs at $30$ frames per second on a single central-processing-unit (CPU) thread, and a CUDA implementation reaches $K$ frames per second on the same eleven samples.
 
-
-#figure(
-  // image("/typst/figures/problem_motivation.pdf", width: 95%),
-  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
-    _Problem-motivation placeholder._ Two-column comparison.
-    Left: schematic of an embedded SMARTweave grid bonded into the
-    lay-up, showing the per-cell wetness samples a dielectric grid
-    can recover at its own pitch and the perturbation it introduces
-    into the laminate. Right: single webcam looking down through
-    the transparent vacuum bag, with the per-pixel front geometry
-    the camera recovers and zero perturbation of the part. Numbers
-    along the bottom note approximate hardware costs (\$10--50 for
-    the camera, \$100s--\$50k for the embedded sensor stack).
-  ],
-  caption: [
-    Why a camera. Embedded sensor grids alter the local
-    permeability they measure and quantize the front to their own
-    pitch; a camera through the transparent bag is non-perturbative
-    and pixel-resolved at one to three orders of magnitude lower
-    hardware cost.
-  ],
-) <fig:problem_motivation>
-
-
 The contributions of this paper are the following.
 
 + An integrated VARTM flow-front segmentation pipeline that combines peak-brightness reference, darken-only difference, ROI restriction, dynamic-lag reference selection, Otsu-plus-offset thresholding, morphological cleanup, persistence-based temporal locking, and run-time camera-shift registration in one configuration, with mean IoU $0.921$ and mean boundary $F_1$ $0.433$ reported with 95 % bootstrap confidence intervals on a 55-frame hand-labeled subset spanning eleven distinct infusion runs.
