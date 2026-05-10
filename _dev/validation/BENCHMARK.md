@@ -28,43 +28,54 @@ exercise documented elsewhere.
 
 ## 2. Phase architecture
 
-Nine phases, one per primitive. **Phases are sequential** because each
-phase reads the previous phase's per-video winner JSON as its baseline
-configuration. **Within a phase, all (video, trial) combinations run in
-parallel** through a worker pool. The 112-core server is the assumed
-host; with 14 concurrent vrifa-rs processes (each ~8 threads), wall-clock
-per phase is dominated by the longest video × the per-video trial count.
+Ten phases. **Phases are sequential** because each phase reads the
+previous phase's per-video winner JSON as its baseline configuration.
+**Within a phase, all (video, trial) combinations run in parallel**
+through a worker pool. The 112-core server (`comech-2422`) is the
+assumed host; the worker pool is sized at **10 concurrent vrifa-rs
+processes**. Each vrifa process uses Rayon's default thread count
+(~98 cores). At N=10 the box reaches ~97 cores total in use without
+oversubscription, and a measured 9.5x speedup vs sequential. N=20 was
+tested and is **catastrophically worse** (1.3x speedup, 7x worse than
+N=10) because of cache thrashing and CPU oversubscription, so do not
+push the worker count up without re-measuring.
 
 ```
-Phase 1  rough per-video baseline               (gating)
+Phase 1   rough per-video baseline              (gating)
    |
    v
-Phase 2  colorspace + channel weights           (per-video, uses Phase-1 winners)
+Phase 2   colorspace + channel-weights deep     (per-video, uses Phase-1 winners)
    |
    v
-Phase 3  reference selection                    (per-video, uses Phase-1+2 winners)
+Phase 3   reference selection                   (per-video, uses Phase-1+2 winners)
    |
    v
-Phase 4  threshold mode                         (per-video, uses Phase-1+2+3 winners)
+Phase 4   threshold mode (finer grids)          (per-video, uses Phase-1..3 winners)
    |
    v
-Phase 5  pre-delta blur                         (per-video, uses Phase-1..4 winners)
+Phase 5   pre-delta blur (finer grids)          (per-video, uses Phase-1..4 winners)
    |
    v
-Phase 6  post-delta blur                        (per-video, uses Phase-1..5 winners)
+Phase 6   post-delta blur (finer grids)         (per-video, uses Phase-1..5 winners)
    |
    v
-Phase 7  morphology (kernel/shape/iters)        (per-video, uses Phase-1..6 winners)
+Phase 7   morphology (finer kernel grid)        (per-video, uses Phase-1..6 winners)
    |
    v
-Phase 8  lock fine sweep                        (per-video, uses Phase-1..7 winners)
+Phase 8   lock fine sweep                       (per-video, uses Phase-1..7 winners)
    |
    v
-Phase 9  stabilization                          (input_1 only, uses Phase-1..8 winners for input_1)
+Phase 10  joint perturbation around chained     (per-video, uses Phase-1..8 winners)
+   |       best (sanity check on chained-greedy)
+   v
+Phase 9   stabilization                         (input_1 only, uses Phase-1..8 winners)
 ```
+
+(Phase 9 is numbered last in the order it executes; the digit is
+preserved from the original design for traceability.)
 
 Phase 9 is technically independent of Phases 2-8 (it only needs Phase-1
-winner for input_1) but is run last so the entire integrated chain is
+winner for input_1) but is run after Phase 10 so the entire integrated chain is
 honest end-to-end. If Phase 9 needs to be moved earlier for time
 reasons, the script supports a `--start-phase` flag.
 
@@ -112,19 +123,21 @@ prior-stage per-video winner (or the integrated default for Phase 1).
 3⁴ = **81 trials per video × 11 videos = 891 trials.** Output:
 `data/ablation/phase1_per_video_best.json`.
 
-### Phase 2 — Colorspace + channel weights
+### Phase 2 — Colorspace + channel weights (deep, per-Option-C)
 
-At Phase-1 best per video.
+At Phase-1 best per video. Substantially expanded grid for the 3-channel
+colorspaces so the per-mold colorspace recommendation has weight-vector
+detail.
 
 | `--colorspace` | `--channel-weights` (parsed as `w1,w2,w3`) |
 |---|---|
-| CIELAB | (1,0,0) (1,0.5,0.5) (1,1,1) (0.5,1,1) (0,1,1) |
-| RGB | (1,1,1) (1,0,0) (0,1,0) (0,0,1) (0.299,0.587,0.114) |
-| HSV | (0,0,1) (0,1,0) (0,1,1) (1,1,1) |
+| CIELAB | (1,0,0) (1,0.5,0) (1,0,0.5) (1,0.5,0.5) (1,1,0) (1,0,1) (1,1,1) (0.5,1,1) (0,1,1) (0.7,0.7,0.3) (0.3,0.7,0.7) (0.7,0.3,0.7) |
+| RGB | (1,1,1) (1,0,0) (0,1,0) (0,0,1) (0.299,0.587,0.114) (0.5,0.5,0) (0.5,0,0.5) (0,0.5,0.5) (0.7,0.2,0.1) (0.2,0.7,0.1) (0.1,0.2,0.7) (0.4,0.4,0.2) |
+| HSV | (0,0,1) (0,1,0) (1,0,0) (0,1,1) (1,0,1) (1,1,0) (1,1,1) (0.3,0.3,0.4) |
 | GRAYSCALE | (1) |
 
-× `--darken-only` ∈ {on, off} = (5 + 5 + 4 + 1) × 2 = **30 trials × 11
-videos = 330 trials.**
+× `--darken-only` ∈ {on, off} = (12 + 12 + 8 + 1) × 2 = **66 trials × 11
+videos = 726 trials.**
 
 ### Phase 3 — Reference selection
 
@@ -142,56 +155,56 @@ At Phase-2 best per video.
 
 = 1 + 5 + 4 + 12 = **22 trials × 11 = 242 trials.**
 
-### Phase 4 — Threshold mode
+### Phase 4 — Threshold mode (finer grids, per-Option-C)
 
 At Phase-3 best per video.
 
 | `--threshold` | sweep |
 |---|---|
-| `otsu` | `--threshold-offset` ∈ {-60, -50, -40, -30, -20, -10, 0, +10} |
-| `triangle` | `--threshold-offset` ∈ {-30, -20, -10, 0, +10, +20, +30} |
-| `manual:V` | V ∈ {30, 50, 70, 90, 110, 130, 150} |
-| `percentile:P` | P ∈ {50, 70, 80, 90, 95} |
-| `adaptive-mean:B:C` | B ∈ {11, 21, 31, 51} × C ∈ {-5, 0, 5, 10} |
-| `adaptive-gaussian:B:C` | B ∈ {11, 21, 31, 51} × C ∈ {-5, 0, 5, 10} |
+| `otsu` | `--threshold-offset` ∈ {-60, -55, -50, -45, -40, -35, -30, -25, -20, -15, -10, -5, 0, +5, +10} |
+| `triangle` | `--threshold-offset` ∈ {-30, -25, -20, -15, -10, -5, 0, +5, +10, +15, +20, +25, +30} |
+| `manual:V` | V ∈ {20, 40, 60, 80, 100, 120, 140, 160, 180} |
+| `percentile:P` | P ∈ {40, 50, 60, 70, 80, 85, 90, 95, 98} |
+| `adaptive-mean:B:C` | B ∈ {7, 11, 21, 31, 51, 71} × C ∈ {-10, -5, 0, 5, 10, 15} |
+| `adaptive-gaussian:B:C` | B ∈ {7, 11, 21, 31, 51, 71} × C ∈ {-10, -5, 0, 5, 10, 15} |
 
-= 8 + 7 + 7 + 5 + 16 + 16 = **59 trials × 11 = 649 trials.**
+= 15 + 13 + 9 + 9 + 36 + 36 = **118 trials × 11 = 1,298 trials.**
 
-### Phase 5 — Pre-delta blur
+### Phase 5 — Pre-delta blur (finer grids, per-Option-C)
 
 At Phase-4 best per video.
 
 | `--pre-delta-blur` | sweep |
 |---|---|
 | `none` | (1 trial) |
-| `flat:S` | S ∈ {3, 5, 7, 9, 11, 15} |
+| `flat:S` | S ∈ {3, 5, 7, 9, 11, 13, 15, 17, 21} |
 | `gaussian:S` | same |
 | `triangle:S` | same |
 
-= 1 + 3 × 6 = **19 trials × 11 = 209 trials.**
+= 1 + 3 × 9 = **28 trials × 11 = 308 trials.**
 
-### Phase 6 — Post-delta blur
+### Phase 6 — Post-delta blur (finer grids, per-Option-C)
 
 At Phase-5 best per video.
 
 | `--blur` | sweep |
 |---|---|
 | `none` | (1 trial) |
-| `flat:S` | S ∈ {3, 5, 7, 9, 11, 13, 15, 19} |
+| `flat:S` | S ∈ {3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 25} |
 | `gaussian:S` | same |
 | `triangle:S` | same |
 
-= 1 + 3 × 8 = **25 trials × 11 = 275 trials.**
+= 1 + 3 × 11 = **34 trials × 11 = 374 trials.**
 
-### Phase 7 — Morphology
+### Phase 7 — Morphology (finer kernel grid, per-Option-C)
 
 At Phase-6 best per video. Two sub-sweeps to keep the matrix small.
 
 7a. Kernel × shape, iters fixed at (1, 1):
-- `--morph-kernel` ∈ {3, 5, 7, 9, 11, 13, 17, 21, 25, 31, 41, 51, 71, 101}
+- `--morph-kernel` ∈ {3, 5, 7, 9, 11, 13, 15, 17, 21, 25, 31, 41, 51, 71, 101, 151}
 - `--morph-shape` ∈ {ellipse, rect, cross}
 
-= 14 × 3 = 42 trials.
+= 16 × 3 = 48 trials.
 
 7b. Iterations × kernel, shape fixed at the 7a winner:
 - `--morph-close-iterations` × `--morph-open-iterations` ∈ {1, 2, 3} × {1, 2, 3}
@@ -199,15 +212,27 @@ At Phase-6 best per video. Two sub-sweeps to keep the matrix small.
 
 = 9 × 5 = 45 trials.
 
-= 87 trials × 11 = **957 trials.**
+= 93 trials × 11 = **1,023 trials.**
 
-### Phase 8 — Lock fine sweep
+### Phase 8 — Lock fine sweep (per-Option-C)
 
 At Phase-7 best per video.
 
-| `--lock-frames` | 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 60 |
+| `--lock-frames` | 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 60, 90 |
 
-= **17 trials × 11 = 187 trials.**
+= **19 trials × 11 = 209 trials.**
+
+### Phase 10 — Joint perturbation (Option-C addition)
+
+At each video's chained best from Phases 1-8, perturb the three
+highest-leverage knobs simultaneously by ±1 step on each axis. Tests
+whether the chained-greedy winner is actually a local optimum in the
+joint space, or whether knob-i and knob-j interact in a way the
+single-axis sweeps missed. Knobs perturbed: `threshold-offset`,
+`morph-kernel`, `lock-frames`. Each axis takes 3 values: {-1 step,
+0 (the chained best), +1 step}.
+
+= 3³ = 27 trials per video × 11 = **297 trials.**
 
 ### Phase 9 — Stabilization (input_1 only)
 
@@ -230,7 +255,17 @@ is the cross-product of motion-model × per-frame × cumulative = 2 × 5 × 5 = 
 | Phase | Trials | Notes |
 |---|---:|---|
 | 1 | 891 | All 11 videos |
-| 2 | 330 | All 11 videos |
+| 2 | 726 | All 11 videos (Option-C deep weight grid) |
+| 3 | 242 | All 11 videos |
+| 4 | 1,298 | All 11 videos (Option-C finer threshold grid) |
+| 5 | 308 | All 11 videos (Option-C finer pre-blur grid) |
+| 6 | 374 | All 11 videos (Option-C finer post-blur grid) |
+| 7 | 1,023 | All 11 videos (Option-C finer morph grid) |
+| 8 | 209 | All 11 videos (Option-C finer lock grid) |
+| 10 | 297 | All 11 videos (Option-C joint perturbation) |
+| 9 | 51 | input_1 only (run last) |
+| **Total** | **~5,419** | (drop the original §5 row totals; superseded by this row) |
+
 | 3 | 242 | All 11 videos |
 | 4 | 649 | All 11 videos |
 | 5 | 209 | All 11 videos |
@@ -247,13 +282,22 @@ RTX-host server:
 - input_4–11 (large, 8k–15k frames): ~30–60 s
 
 Mean across 11 videos ≈ 30 s. With 14 concurrent workers:
-- 3,791 trials × 30 s / 14 ≈ **2.3 hours pure compute**
-- With process spawn overhead, agreement.py serialization, and
-  occasional retry: **estimate 4–6 hours wall-clock end-to-end.**
+Per-trial wall on the trimmed videos was measured at ~4 s effective
+under N=10 (input_11 trimmed batch of 10 finished in 40.6 s wall-clock,
+matching ideal scaling on the 112-core box). The full ablation budget
+under Option C and N=10 workers projects to:
 
-Disk peak: 14 concurrent × ~30 MB of mask PNGs = ~500 MB transient.
-Cleaned per trial; total persistent on-disk after run ≈ 30 MB of JSON
-plus 5 MB of CSV.
+- 5,419 trials × ~4 s effective / 10 workers ≈ **~36 min pure compute**
+- With process spawn overhead, agreement.py serialization, and
+  occasional retry: **estimate 1.5-3 hours wall-clock end-to-end.**
+
+The wall budget is now generous enough that the run is no longer the
+constraint; we'd rather report fewer trials with high CIs than push
+to N=20 and lose 7x in throughput from oversubscription.
+
+Disk peak: 10 concurrent × ~3 MB of trimmed-video mask PNGs ≈ 30 MB
+transient. Cleaned per trial; total persistent on-disk after the run
+≈ 30 MB of JSON plus 5 MB of CSV.
 
 ## 6. Where things live on disk
 
@@ -307,7 +351,7 @@ export LD_LIBRARY_PATH=$HOME/cuda-12.4/lib64:$HOME/miniforge3/envs/fastvrifa/lib
 
 # 1. start the run inside a tmux session so SSH disconnect doesn't kill it
 tmux new -d -s ablation \
-  "python3 _dev/validation/ablation_v2/run.py --workers 14 \
+  "python3 _dev/validation/ablation_v2/run.py --workers 10 \
    2>&1 | tee /tmp/vrifa_ablation/log/run.log"
 
 # 2. detach (Ctrl-b d if attached). Then reconnect any time:
@@ -315,7 +359,7 @@ tmux attach -t ablation
 
 # 3. resume after a crash / kill / power loss
 tmux new -d -s ablation \
-  "python3 _dev/validation/ablation_v2/run.py --workers 14 --resume \
+  "python3 _dev/validation/ablation_v2/run.py --workers 10 --resume \
    2>&1 | tee -a /tmp/vrifa_ablation/log/run.log"
 ```
 
@@ -341,7 +385,8 @@ that prevents it.
 | SSH disconnects mid-run | Run lives inside `tmux`. Survives the disconnect. |
 | Server reboots | Resume reads `state.json` and skips trial_ids in `trials_done`. |
 | Single trial crashes (vrifa segfault, OpenCV exception) | Caught per-worker; trial is logged as `failed` with stderr captured. Pool keeps going. |
-| Single trial hangs forever | Each subprocess has a per-trial timeout (default 600 s). On timeout the worker SIGKILLs the subprocess and marks the trial failed. |
+| Single trial hangs forever | Each subprocess has a per-trial timeout (default **1200 s**). On timeout the worker SIGKILLs the subprocess and marks the trial failed. The 1200 s budget is conservative versus the measured input_11 trimmed cost of ~40 s under N=10. |
+| Failed trial loses its diagnostic | Every failed trial dumps `$TMPDIR/vrifa_ablation/log/failed/<trial_id>/{cli.txt, stderr.txt, stdout.txt, env.txt, exit_code}`. The harness's `--resume` flag reruns failed trials only when `--retry-failed` is also passed, so the diagnostic stays intact for review even after a successful retry. |
 | Disk fills with mask PNGs | Mask cleanup is the last step inside the worker, in a `try`/`finally` that always runs. Worker fails closed (cleans even on exception). |
 | Two workers race on the same `runs/` directory | Each worker creates a UUID-suffixed runs subdir; no two workers ever share a path. |
 | Process pool dies | Driver detects worker pool exit; if `state.json` shows < 100% complete, exits with error 1 so the user sees a non-zero shell prompt instead of a silent stop. |
@@ -355,14 +400,25 @@ that prevents it.
 
 The run is complete when:
 
-1. `state.json` reports `phases_done == [1, 2, 3, 4, 5, 6, 7, 8, 9]` and
-   `trials_failed.length == 0` (or the user has reviewed the failures).
+1. `state.json` reports `phases_done == [1, 2, 3, 4, 5, 6, 7, 8, 10, 9]`
+   (note ordering: Phase 10 runs after 8, Phase 9 last) and
+   `trials_failed.length` is within the **failure budget (default 50)**.
 2. `data/ablation/summary.md` exists with one row per phase.
 3. Each `phase<N>_per_video_best.json` contains 11 entries (or 1 for
    Phase 9), each with `mean_iou`, `ci_low`, `ci_high`, and the winning
    config.
 4. Each `phase<N>_all_trials.csv` row count matches the phase's
-   declared trial count to within the failure budget (default 0).
+   declared trial count to within the failure budget.
+5. `$TMPDIR/vrifa_ablation/log/failed/` is reviewed and either
+   `--retry-failed` cleared the failures or each failure has a comment
+   from the operator marking it understood (a `*.understood` sibling
+   file).
+
+The default budget of **50** is intentionally tolerant: the harness is
+designed to keep going through pathological-config crashes (e.g. some
+combinations of huge morph kernel × small ROI on a particular video).
+Each failure is logged with full diagnostic so it can be reviewed
+post-hoc, but a single failure does not block the run.
 
 ## 10. Final experiments table
 
@@ -370,19 +426,20 @@ The full experiment matrix the harness will execute, ordered by phase.
 Read this top-to-bottom and check that every cell matches what you
 asked for.
 
-| Phase | Subject | Sweep dims | Per-video trials | Videos | Total trials | Output (relative to paper/) |
+| Phase | Subject | Sweep dims | Per-video trials | Videos | Total trials | Output |
 |---:|---|---|---:|---:|---:|---|
 | 1 | Rough baseline | thr-offset × min-area × morph-kernel × lock | 81 | 11 | 891 | data/ablation/phase1_*.{json,csv} |
-| 2 | Colorspace + channel weights | colorspace × weights × darken | 30 | 11 | 330 | data/ablation/phase2_*.{json,csv} |
+| 2 | Colorspace + channel weights (deep, Option-C) | colorspace × weights × darken | 66 | 11 | 726 | data/ablation/phase2_*.{json,csv} |
 | 3 | Reference selection | mode + mode-specific params | 22 | 11 | 242 | data/ablation/phase3_*.{json,csv} |
-| 4 | Threshold mode | otsu/triangle offsets, manual, percentile, adaptive-mean B×C, adaptive-gaussian B×C | 59 | 11 | 649 | data/ablation/phase4_*.{json,csv} |
-| 5 | Pre-delta blur | kind × size, plus none | 19 | 11 | 209 | data/ablation/phase5_*.{json,csv} |
-| 6 | Post-delta blur | kind × size, plus none | 25 | 11 | 275 | data/ablation/phase6_*.{json,csv} |
-| 7a | Morphology kernel × shape | 14 kernels × 3 shapes | 42 | 11 | 462 | data/ablation/phase7a_*.{json,csv} |
+| 4 | Threshold mode (finer grids, Option-C) | otsu/triangle offsets, manual, percentile, adaptive-mean B×C, adaptive-gaussian B×C | 118 | 11 | 1,298 | data/ablation/phase4_*.{json,csv} |
+| 5 | Pre-delta blur (finer grids, Option-C) | kind × size, plus none | 28 | 11 | 308 | data/ablation/phase5_*.{json,csv} |
+| 6 | Post-delta blur (finer grids, Option-C) | kind × size, plus none | 34 | 11 | 374 | data/ablation/phase6_*.{json,csv} |
+| 7a | Morphology kernel × shape (Option-C) | 16 kernels × 3 shapes | 48 | 11 | 528 | data/ablation/phase7a_*.{json,csv} |
 | 7b | Morphology iterations × top-5 kernel | 9 iters × 5 kernels | 45 | 11 | 495 | data/ablation/phase7b_*.{json,csv} |
-| 8 | Lock fine sweep | 17 lock-frame values | 17 | 11 | 187 | data/ablation/phase8_*.{json,csv} |
+| 8 | Lock fine sweep (Option-C) | 19 lock-frame values | 19 | 11 | 209 | data/ablation/phase8_*.{json,csv} |
+| 10 | Joint perturbation (Option-C) | 3 axes × 3 values around chained best | 27 | 11 | 297 | data/ablation/phase10_*.{json,csv} |
 | 9 | Stabilization | camera-stable + motion-model × per-frame × cumulative | 51 | 1 (input_1) | 51 | data/ablation/phase9_*.{json,csv} |
-| **all** | | | | | **3,791** | data/ablation/summary.md |
+| **all** | | | | | **5,419** | data/ablation/summary.md |
 
 ## 11. What lands in the paper
 
@@ -404,10 +461,11 @@ After the run finishes, the paper sections that get filled in are:
   three-binary comparison (python / vrifa-rs / fast-vrifa) at a single
   chosen config, not in this ablation. The two are kept apart so neither
   contaminates the other.
-- **Does not search the joint config space.** Each phase varies one
-  primitive's knobs while holding everything else at the prior winner.
-  Joint optima are not chased; the cost of chained-greedy is reported in
-  the discussion.
+- **Does not search the full joint config space.** Each phase varies one
+  primitive's knobs while holding everything else at the prior winner;
+  Phase 10 perturbs three knobs jointly around the chained best as a
+  sanity check, but a full 3⁸ joint grid (6,561 per video) is out of
+  scope.
 - **Does not retune defaults.** The integrated configuration is the
   shipped defaults, frozen for the paper. The ablation reports what the
   per-video best is for each primitive without changing the defaults.
@@ -415,18 +473,15 @@ After the run finishes, the paper sections that get filled in are:
   read these JSON / CSV files; the figures themselves recompile when
   the paper compiles. No image generation is part of this run.
 
-## 13. Open decisions before kickoff
+## 13. Locked decisions
 
-1. **Failure budget.** Default is 0 (any failed trial blocks the
-   "complete" check). Acceptable to set to e.g. 5 (skip up to 5
-   pathological configs)?
-2. **Per-trial timeout.** Default 600 s. Big videos at extreme morph
-   kernels could plausibly approach this. Raise to 1200 s for safety?
-3. **Resume-from-where checkpoint granularity.** Per-trial (current
-   design) vs per-phase. Per-trial is more conservative and recommended.
-4. **Phase 9 timing.** Run last (current design) or earlier so input_1
-   stabilization data is available before the long-running phases?
-5. **Workers.** 14 is conservative for a 112-core box. Push to 20 or
-   24? The constraint is OpenCV's thread pool overlap.
+| Decision | Value | Rationale |
+|---|---|---|
+| Failure budget | **50** | High tolerance so pathological configs do not block the run. Each failure is logged with full diagnostic. |
+| Per-trial timeout | **1200 s** | Conservative versus the measured input_11 trimmed cost of ~40 s under N=10. Catches genuine hangs without false-killing slow-but-progressing trials. |
+| Resume granularity | **per-trial** | `state.json` records every completed trial_id. Restart skips done trials and re-runs only what is missing. |
+| Phase 9 timing | **last (after Phase 10)** | Keeps the chained-honest narrative; input_1 stabilization data is the final stage. |
+| Workers | **10** | Measured 9.5x speedup vs sequential at N=10 (input_11 trimmed batch finished in 40.6 s). N=20 was tested and is 7x worse than N=10 due to oversubscription on the 112-core box. |
 
-Once these are answered the harness gets written and we kick off.
+Harness implementation follows. Ready to write when this document is
+signed off.
