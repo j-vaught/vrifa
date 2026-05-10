@@ -49,29 +49,32 @@
     ),
   ),
   abstract: [
-    Our work presents four contributions to the real-time tracking
+    Our work presents four contributions towards the real-time tracking
     and control of VARTM processes. The first is an integrated
     classical computer-vision pipeline that combines a peak-brightness
     reference, a darken-only difference, region-of-interest
     restriction, dynamic-lag reference selection, morphological
     cleanup, persistence-based temporal locking, and run-time
     camera-shift registration, reaching mean mask
-    Intersection-over-Union of $0.921$ (95 % bootstrap confidence
-    interval $[0.889, 0.943]$) and mean boundary $F_1$ of $0.433$
-    (CI $[0.396, 0.473]$) on the benchmark introduced below. The
-    second is a per-sample component-removal ablation that
-    characterizes the marginal IoU effect of each named primitive,
-    broken down per sample so primitives whose contribution depends
-    on infusion regime are visible rather than averaged away. The
-    third is a regime-indexed configuration lookup, derived from
-    the per-sample ablation, that recommends preprocessing settings
-    as a function of run circumstances so a practitioner
+    Intersection-over-Union of $0.921$ (95 % CI $[0.889, 0.943]$) and mean boundary $F_1$ of $0.433$
+    (CI $[0.396, 0.473]$) on the benchmark introduced below. On the
+    same benchmark, the two prior published classical-CV pipelines
+    for VARTM flow-front segmentation, reimplemented from their
+    source papers, reach mean boundary $F_1$ of $0.116$
+    (Lekanidis and Vosniakos 2020) and $0.187$ (Almazán-Lázaro
+    2022); their outputs lock onto distribution-medium pattern and
+    bag-wrinkle artifacts rather than the resin front. The second
+    is a component-removal ablation that characterizes the marginal
+    IoU effect of each named primitive. The third is a
+    regime-indexed configuration lookup that recommends preprocessing
+    settings as a function of run circumstances so a practitioner
     can select an empirically-grounded starting point. The fourth
     is the benchmark itself, namely a 55-frame hand-labeled subset
-    spanning 11 distinct VARTM infusion runs with per-sample
+    spanning 11 VARTM infusion runs with per-sample
     region-of-interest masks and a documented labeling protocol,
-    against which any future flow-front segmentation method can be
-    evaluated. The pipeline runs at 30 frames per second on a single
+    against which the two prior pipelines above are evaluated as
+    reference points and any future flow-front segmentation method
+    can be evaluated identically. The pipeline runs at 30 frames per second on a single
     CPU and at 67 frames per second on a CUDA implementation for a
     $1920 times 1080$ input.
   ],
