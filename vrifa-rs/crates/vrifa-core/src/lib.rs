@@ -1,3 +1,4 @@
+pub mod blur;
 pub mod colorspace;
 pub mod contours;
 pub mod cvutil;
@@ -18,6 +19,7 @@ pub mod warp;
 use ndarray::{Array2, Array3};
 use thiserror::Error;
 
+pub use blur::{BlurKind, BlurSpec};
 pub use colorspace::ColorSpace;
 pub use contours::AnnotationBox;
 pub use morphology::{MorphShape, MorphologyParams};
@@ -39,15 +41,14 @@ pub type Result<T> = std::result::Result<T, VrifaError>;
 
 #[derive(Clone, Debug)]
 pub struct DetectFrontParams {
-    pub pre_delta_blur_kernel: usize,
-    pub blur_kernel: usize,
+    pub pre_delta_blur: BlurSpec,
+    pub post_blur: BlurSpec,
     pub morph_kernel: usize,
     pub min_area: usize,
     pub manual_threshold: Option<f32>,
     pub percentile_threshold: Option<f32>,
     pub threshold_offset: f32,
     pub channel_weights: Vec<f32>,
-    pub blur_enabled: bool,
     pub morph_shape: MorphShape,
     pub morph_close_iterations: usize,
     pub morph_open_iterations: usize,
@@ -67,15 +68,14 @@ pub struct DetectFrontDebug {
 impl Default for DetectFrontParams {
     fn default() -> Self {
         Self {
-            pre_delta_blur_kernel: 0,
-            blur_kernel: 9,
+            pre_delta_blur: BlurSpec::none(),
+            post_blur: BlurSpec::gaussian(9),
             morph_kernel: 13,
             min_area: 400,
             manual_threshold: None,
             percentile_threshold: None,
             threshold_offset: -30.0,
             channel_weights: vec![1.0, 1.0, 1.0],
-            blur_enabled: true,
             morph_shape: MorphShape::Ellipse,
             morph_close_iterations: 1,
             morph_open_iterations: 1,
@@ -110,14 +110,14 @@ pub fn detect_front_debug(
 ) -> Result<DetectFrontDebug> {
     let frame_preblur;
     let reference_preblur;
-    let frame_for_delta = if params.pre_delta_blur_kernel > 1 {
-        frame_preblur = delta::blur_frame(frame_converted, params.pre_delta_blur_kernel)?;
+    let frame_for_delta = if !params.pre_delta_blur.is_no_op() {
+        frame_preblur = blur::blur_frame(frame_converted, params.pre_delta_blur)?;
         &frame_preblur
     } else {
         frame_converted
     };
-    let reference_for_delta = if params.pre_delta_blur_kernel > 1 {
-        reference_preblur = delta::blur_frame(reference_converted, params.pre_delta_blur_kernel)?;
+    let reference_for_delta = if !params.pre_delta_blur.is_no_op() {
+        reference_preblur = blur::blur_frame(reference_converted, params.pre_delta_blur)?;
         &reference_preblur
     } else {
         reference_converted
@@ -134,13 +134,12 @@ pub fn detect_front_debug(
         &delta,
         roi_mask,
         &MorphologyParams {
-            blur_kernel: params.blur_kernel,
+            post_blur: params.post_blur,
             morph_kernel: params.morph_kernel,
             min_area: params.min_area,
             manual_threshold: params.manual_threshold,
             percentile_threshold: params.percentile_threshold,
             threshold_offset: params.threshold_offset,
-            blur_enabled: params.blur_enabled,
             morph_shape: params.morph_shape,
             morph_close_iterations: params.morph_close_iterations,
             morph_open_iterations: params.morph_open_iterations,

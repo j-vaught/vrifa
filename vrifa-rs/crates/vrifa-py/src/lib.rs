@@ -124,14 +124,14 @@ fn convert_frame_to_colorspace_py<'py>(
     frame_converted,
     reference_converted,
     roi_mask,
-    blur_kernel = 9,
+    blur = "gaussian:9",
+    pre_delta_blur = "none",
     morph_kernel = 13,
     min_area = 400,
     manual_threshold = None,
     percentile_threshold = None,
     threshold_offset = -30.0,
     channel_weights = None,
-    blur_enabled = true,
     morph_shape = "ellipse",
     morph_close_iterations = 1,
     morph_open_iterations = 1,
@@ -143,14 +143,14 @@ fn detect_front_py<'py>(
     frame_converted: PyReadonlyArray3<'py, f32>,
     reference_converted: PyReadonlyArray3<'py, f32>,
     roi_mask: PyReadonlyArray2<'py, u8>,
-    blur_kernel: usize,
+    blur: &str,
+    pre_delta_blur: &str,
     morph_kernel: usize,
     min_area: usize,
     manual_threshold: Option<f32>,
     percentile_threshold: Option<f32>,
     threshold_offset: f32,
     channel_weights: Option<Vec<f32>>,
-    blur_enabled: bool,
     morph_shape: &str,
     morph_close_iterations: usize,
     morph_open_iterations: usize,
@@ -163,15 +163,19 @@ fn detect_front_py<'py>(
     let peak = peak_brightness_map
         .as_ref()
         .map(|array| array.as_array().to_owned());
+    let post_blur = vrifa_core::BlurSpec::parse(blur)
+        .map_err(|err| PyValueError::new_err(format!("invalid blur: {err}")))?;
+    let pre_delta_blur = vrifa_core::BlurSpec::parse(pre_delta_blur)
+        .map_err(|err| PyValueError::new_err(format!("invalid pre_delta_blur: {err}")))?;
     let params = DetectFrontParams {
-        blur_kernel,
+        post_blur,
+        pre_delta_blur,
         morph_kernel,
         min_area,
         manual_threshold,
         percentile_threshold,
         threshold_offset,
         channel_weights: channel_weights.unwrap_or_else(|| vec![1.0; frame.dim().2]),
-        blur_enabled,
         morph_shape: MorphShape::parse(morph_shape),
         morph_close_iterations,
         morph_open_iterations,

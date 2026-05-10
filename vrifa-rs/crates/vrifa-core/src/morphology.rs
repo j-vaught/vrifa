@@ -1,4 +1,4 @@
-use crate::{cvutil, threshold, Result};
+use crate::{blur, cvutil, threshold, BlurSpec, Result};
 use ndarray::Array2;
 use opencv::core::{self, Point, Scalar, Size};
 use opencv::imgproc;
@@ -39,13 +39,12 @@ impl MorphShape {
 
 #[derive(Clone, Debug)]
 pub struct MorphologyParams {
-    pub blur_kernel: usize,
+    pub post_blur: BlurSpec,
     pub morph_kernel: usize,
     pub min_area: usize,
     pub manual_threshold: Option<f32>,
     pub percentile_threshold: Option<f32>,
     pub threshold_offset: f32,
-    pub blur_enabled: bool,
     pub morph_shape: MorphShape,
     pub morph_close_iterations: usize,
     pub morph_open_iterations: usize,
@@ -73,18 +72,7 @@ pub fn detect_mask_from_delta_debug(
     roi_mask: &Array2<u8>,
     params: &MorphologyParams,
 ) -> Result<MorphologyDebug> {
-    let delta_blur = if params.blur_enabled {
-        let mut kernel = params.blur_kernel;
-        if kernel % 2 == 0 {
-            kernel += 1;
-        }
-        let src = cvutil::array2_f32_to_mat(delta)?;
-        let mut dst = opencv::core::Mat::default();
-        imgproc::gaussian_blur_def(&src, &mut dst, Size::new(kernel as i32, kernel as i32), 0.0)?;
-        cvutil::mat_to_array2_f32(&dst)?
-    } else {
-        delta.clone()
-    };
+    let delta_blur = blur::blur_plane(delta, params.post_blur)?;
 
     let delta_norm = normalize_minmax_to_u8(&delta_blur)?;
     let threshold_value = threshold::choose_threshold(

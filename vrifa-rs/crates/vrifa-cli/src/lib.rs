@@ -12,9 +12,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use vrifa_annotations::AnnotationFrame;
+use vrifa_core::blur::{self, BlurSpec};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_core::contours::extract_bounding_boxes;
-use vrifa_core::delta::blur_plane;
 use vrifa_core::lock::{apply_locking, LockState};
 use vrifa_core::morphology::MorphShape;
 use vrifa_core::motion::estimate_translation;
@@ -49,12 +49,16 @@ pub struct CliArgs {
     roi_margin_left: Option<f32>,
     #[arg(long)]
     roi_margin_right: Option<f32>,
-    #[arg(long, default_value_t = 9)]
-    blur_kernel: usize,
-    #[arg(long, default_value_t = 0)]
-    pre_delta_blur_kernel: usize,
-    #[arg(long, action = ArgAction::SetTrue)]
-    skip_blur: bool,
+    /// Post-delta blur, applied to the delta field before threshold.
+    /// Format: KIND[:SIZE]. KIND is one of none, flat, gaussian, triangle,
+    /// median (size <= 5 only), bilateral. SIZE required when KIND != none.
+    /// Example: --blur gaussian:9
+    #[arg(long, default_value = "gaussian:9")]
+    blur: String,
+    /// Pre-delta blur, applied to the working frame and reference before
+    /// peak update and delta. Same syntax as --blur. Default: none.
+    #[arg(long, default_value = "none")]
+    pre_delta_blur: String,
     #[arg(long, default_value_t = 13)]
     morph_kernel: usize,
     #[arg(long, default_value = "ellipse")]
@@ -208,9 +212,8 @@ pub struct Config {
     pub roi_margin_bottom: Option<f32>,
     pub roi_margin_left: Option<f32>,
     pub roi_margin_right: Option<f32>,
-    pub pre_delta_blur_kernel: usize,
-    pub blur_kernel: usize,
-    pub skip_blur: bool,
+    pub pre_delta_blur: BlurSpec,
+    pub post_blur: BlurSpec,
     pub morph_kernel: usize,
     pub morph_shape: MorphShape,
     pub morph_close_iterations: usize,
@@ -266,9 +269,8 @@ impl Default for Config {
             roi_margin_bottom: None,
             roi_margin_left: None,
             roi_margin_right: None,
-            pre_delta_blur_kernel: 0,
-            blur_kernel: 9,
-            skip_blur: false,
+            pre_delta_blur: BlurSpec::none(),
+            post_blur: BlurSpec::gaussian(9),
             morph_kernel: 13,
             morph_shape: MorphShape::Ellipse,
             morph_close_iterations: 1,
@@ -359,6 +361,10 @@ impl TryFrom<CliArgs> for Config {
         let ref_mode = parse_ref_mode(&args.ref_mode)?;
         let motion_model = MotionModel::parse(&args.motion_model)?;
         let peak_on_shift = PeakOnShift::parse(&args.peak_on_shift)?;
+        let post_blur = BlurSpec::parse(&args.blur)
+            .map_err(|e| anyhow!("invalid --blur: {e}"))?;
+        let pre_delta_blur = BlurSpec::parse(&args.pre_delta_blur)
+            .map_err(|e| anyhow!("invalid --pre-delta-blur: {e}"))?;
         Ok(Self {
             video_path: args.video_path,
             output_dir: args.output_dir,
@@ -368,9 +374,8 @@ impl TryFrom<CliArgs> for Config {
             roi_margin_bottom: args.roi_margin_bottom,
             roi_margin_left: args.roi_margin_left,
             roi_margin_right: args.roi_margin_right,
-            pre_delta_blur_kernel: args.pre_delta_blur_kernel,
-            blur_kernel: args.blur_kernel,
-            skip_blur: args.skip_blur,
+            pre_delta_blur,
+            post_blur,
             morph_kernel: args.morph_kernel,
             morph_shape: MorphShape::parse(&args.morph_shape),
             morph_close_iterations: args.morph_close_iterations,
@@ -578,13 +583,13 @@ fn build_frame_border_mask(shape: (usize, usize), border_fraction: f32) -> Array
 
 fn peak_frame_plane(
     frame_converted: &Array3<f32>,
-    pre_delta_blur_kernel: usize,
+    pre_delta_blur: BlurSpec,
 ) -> Result<Array2<f32>> {
     let frame_l = frame_converted.slice(ndarray::s![.., .., 0]).to_owned();
-    if pre_delta_blur_kernel > 1 {
-        blur_plane(&frame_l, pre_delta_blur_kernel).map_err(Into::into)
-    } else {
+    if pre_delta_blur.is_no_op() {
         Ok(frame_l)
+    } else {
+        blur::blur_plane(&frame_l, pre_delta_blur).map_err(Into::into)
     }
 }
 
@@ -788,7 +793,7 @@ fn prepare_camera_stable(
         reference_for_frame.clone()
     };
     let peak_map = if config.peak_reference {
-        let peak_frame = peak_frame_plane(frame_converted, config.pre_delta_blur_kernel)?;
+        let peak_frame = peak_frame_plane(frame_converted, config.pre_delta_blur)?;
         Some(update_peak_brightness_plane(
             &peak_frame,
             peak_base.as_ref(),
@@ -865,7 +870,7 @@ pub fn run_config(config: Config) -> Result<()> {
     let mut peak_brightness_map = if config.peak_reference {
         Some(peak_frame_plane(
             &first_frame_converted,
-            config.pre_delta_blur_kernel,
+            config.pre_delta_blur,
         )?)
     } else {
         None
@@ -1022,15 +1027,14 @@ pub fn run_config(config: Config) -> Result<()> {
             )?;
             peak_brightness_map = camera_stable.peak_map;
             let params = DetectFrontParams {
-                pre_delta_blur_kernel: config.pre_delta_blur_kernel,
-                blur_kernel: config.blur_kernel,
+                pre_delta_blur: config.pre_delta_blur,
+                post_blur: config.post_blur,
                 morph_kernel: config.morph_kernel,
                 min_area: config.min_area,
                 manual_threshold: config.contrast_threshold,
                 percentile_threshold: config.contrast_percentile,
                 threshold_offset: config.threshold_offset,
                 channel_weights: config.channel_weights.clone(),
-                blur_enabled: !config.skip_blur,
                 morph_shape: config.morph_shape,
                 morph_close_iterations: config.morph_close_iterations,
                 morph_open_iterations: config.morph_open_iterations,
@@ -1304,7 +1308,7 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
     let mut peak_brightness_map = if config.peak_reference {
         Some(peak_frame_plane(
             &first_frame_converted,
-            config.pre_delta_blur_kernel,
+            config.pre_delta_blur,
         )?)
     } else {
         None
@@ -1312,15 +1316,14 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
     let mut camera_stable_state = CameraStableState::new();
 
     let params = DetectFrontParams {
-        pre_delta_blur_kernel: config.pre_delta_blur_kernel,
-        blur_kernel: config.blur_kernel,
+        pre_delta_blur: config.pre_delta_blur,
+        post_blur: config.post_blur,
         morph_kernel: config.morph_kernel,
         min_area: config.min_area,
         manual_threshold: config.contrast_threshold,
         percentile_threshold: config.contrast_percentile,
         threshold_offset: config.threshold_offset,
         channel_weights: config.channel_weights.clone(),
-        blur_enabled: !config.skip_blur,
         morph_shape: config.morph_shape,
         morph_close_iterations: config.morph_close_iterations,
         morph_open_iterations: config.morph_open_iterations,
@@ -1822,9 +1825,8 @@ fn write_run_summary(
     put!("roi_margin_bottom", config.roi_margin_bottom.map(yaml_f32));
     put!("roi_margin_left", config.roi_margin_left.map(yaml_f32));
     put!("roi_margin_right", config.roi_margin_right.map(yaml_f32));
-    put!("pre_delta_blur_kernel", config.pre_delta_blur_kernel);
-    put!("blur_kernel", config.blur_kernel);
-    put!("skip_blur", config.skip_blur);
+    put!("pre_delta_blur", config.pre_delta_blur.to_string());
+    put!("blur", config.post_blur.to_string());
     put!("morph_kernel", config.morph_kernel);
     put!("morph_shape", config.morph_shape.name());
     put!("morph_close_iterations", config.morph_close_iterations);

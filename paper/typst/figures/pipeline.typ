@@ -1,4 +1,4 @@
-// Pipeline diagram — 14-stage VRIFA detection pipeline.
+// Pipeline diagram — 16-stage VRIFA detection pipeline.
 //
 // Compile:
 //   typst compile paper/typst/figures/pipeline.typ paper/typst/figures/pipeline.pdf
@@ -23,30 +23,32 @@
 
 // Four families: ingest (atlantic), detect (garnet), clean (horseshoe), export (warmgrey).
 #let stages = (
-  stage("Colorspace",   "colorspace.rs",  atlantic),
-  stage("ROI",          "roi.rs",         atlantic),
-  stage("Stabilize",    "registration.rs", atlantic),
-  stage("Pre-blur",     "delta::blur_frame", atlantic),
-  stage("Reference",    "reference.rs",   atlantic),
-  stage("Peak track",   "peak.rs",        atlantic),
+  stage("Colorspace",   "colorspace.rs",       atlantic),
+  stage("ROI",          "roi.rs",              atlantic),
+  stage("Stabilize",    "registration.rs",     atlantic),
+  stage("Pre-blur",     "blur::blur_frame",    atlantic),
+  stage("Reference",    "reference.rs",        atlantic),
+  stage("Peak track",   "peak.rs",             atlantic),
   stage("Delta",        "delta::compute_delta", garnet),
-  stage("Threshold",    "threshold.rs",   garnet),
-  stage("Morphology",   "morphology.rs",  horseshoe),
-  stage("Lock",         "lock.rs",        horseshoe),
-  stage("Overlay",      "overlay.rs",     warmgrey),
-  stage("Heatmap",      "heatmap.rs",     warmgrey),
-  stage("Contours",     "contours.rs",    warmgrey),
-  stage("Sampling",     "sampling.rs",    warmgrey),
+  stage("Post-blur",    "blur::blur_plane",    garnet),
+  stage("Threshold",    "threshold.rs",        garnet),
+  stage("Morph close",  "morphology.rs",       horseshoe),
+  stage("Morph open",   "morphology.rs",       horseshoe),
+  stage("Lock",         "lock.rs",             horseshoe),
+  stage("Overlay",      "overlay.rs",          warmgrey),
+  stage("Heatmap",      "heatmap.rs",          warmgrey),
+  stage("Contours",     "contours.rs",         warmgrey),
+  stage("Sampling",     "sampling.rs",         warmgrey),
 )
 
 #cetz.canvas({
   import cetz.draw: *
 
-  let cell-w = 2.4
+  let cell-w = 2.2
   let cell-h = 0.95
-  let gap = 0.45
+  let gap = 0.4
   let row-pad = 0.6
-  let cols = 7
+  let cols = 8
   let rows = 2
 
   // Black-filled stealth arrowhead, reused on every connector.

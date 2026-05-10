@@ -4,18 +4,18 @@
 
 The integrated pipeline is built from primitives that each prior camera-based VARTM and LCM system uses in some subset. None of the primitives is novel in isolation. The empirical question this paper supplies evidence for is what each primitive contributes to the joint result on a labeled multi-mold subset, and the method described below is the configuration that supports that question.
 
-The detection algorithm treats each video frame as a comparison against a reference image of the dry preform. Where resin has wetted the fabric, the local appearance darkens, and the absolute change is largest near the advancing flow front. The pipeline first checks for camera motion against the previous frame and, when motion crosses a configured threshold, registers the live frame back into the reference coordinate system before any difference is computed. The registered frame is optionally smoothed with a pre-delta blur whose output feeds both the running peak map and the difference computation, so the reference and the comparison see the same bandwidth-limited input. The pipeline computes the per-pixel difference inside a rectangular region of interest, clips it to admit only darkening so that specular highlights from the vacuum bag are rejected, normalizes the resulting field, thresholds it into a binary candidate mask, cleans the mask with morphological closing and opening, removes small connected components, and finally locks pixels whose wet label has persisted for several consecutive frames. The locked mask is the canonical output, the optional heatmap renders the underlying delta field for visual diagnosis, and the optional overlay draws the mask boundary onto the original Vacuum-Assisted Resin Transfer Molding (VARTM) frame for human review. Figure~@fig:pipeline shows the fourteen stages in order.
+The detection algorithm treats each video frame as a comparison against a reference image of the dry preform. Where resin has wetted the fabric, the local appearance darkens, and the absolute change is largest near the advancing flow front. The pipeline first checks for camera motion against the previous frame and, when motion crosses a configured threshold, registers the live frame back into the reference coordinate system before any difference is computed. The registered frame is optionally smoothed with a pre-delta blur whose output feeds both the running peak map and the difference computation, so the reference and the comparison see the same bandwidth-limited input. The pipeline computes the per-pixel difference inside a rectangular region of interest, clips it to admit only darkening so that specular highlights from the vacuum bag are rejected, normalizes the resulting field, thresholds it into a binary candidate mask, cleans the mask with morphological closing and opening, removes small connected components, and finally locks pixels whose wet label has persisted for several consecutive frames. The locked mask is the canonical output, the optional heatmap renders the underlying delta field for visual diagnosis, and the optional overlay draws the mask boundary onto the original Vacuum-Assisted Resin Transfer Molding (VARTM) frame for human review. Figure~@fig:pipeline shows the sixteen stages in order.
 
 #figure(
   image("/typst/figures/pipeline.pdf", width: 95%),
   caption: [
-    Fourteen-stage integrated pipeline. Each frame flows from decode
+    Sixteen-stage integrated pipeline. Each frame flows from decode
     through an optional camera-shift registration and pre-delta
     blur, then through an appearance-difference comparison against
-    a chosen reference, into a thresholded and morphologically
-    cleaned mask, and finally through a temporal lock that
-    stabilizes the boundary across frames. The same mask drives
-    the binary, heatmap, and overlay renderers.
+    a chosen reference, a post-delta blur, a threshold, paired
+    morphological closing and opening passes, and finally a
+    temporal lock that stabilizes the boundary across frames. The
+    same mask drives the binary, heatmap, and overlay renderers.
   ],
 ) <fig:pipeline>
 
@@ -80,7 +80,7 @@ clipped to be non-negative and scaled by a user lag factor $lambda$ (default $1.
 
 == Delta computation
 
-Stage eight produces the per-pixel scalar field $D_t$ that drives all downstream decisions. The integrated configuration's darken-only mode operates on the working (first) channel and records how much darker the frame is than its reference,
+Stage seven produces the per-pixel scalar field $D_t$ that drives all downstream decisions. The integrated configuration's darken-only mode operates on the working (first) channel and records how much darker the frame is than its reference,
 
 $ D_t (y, x) = R(y, x) dot.c max(0, w_0 dot.c (G_t^star (y, x) - F_t (y, x, 0))), $ <eq:delta_darken>
 
@@ -98,15 +98,21 @@ where $G_t^star$ equals the peak map $P_t$ when the peak-reference mode is enabl
   ],
 ) <fig:darken_only>
 
-== Smoothing, normalization, and threshold
+== Post-delta blur
 
-The delta field is smoothed with a separable Gaussian kernel of size $k_b times k_b$ pixels (default $9$, forced odd at runtime) so that the dynamic range of the downstream normalized image is set by structure rather than by isolated speckle. The smoothed field is then rescaled to the byte range using a min-max linear rescaling, producing a $tilde(D)_t$ that fits in eight bits and feeds both the threshold-selection stage and the heatmap renderer.
+The delta field is smoothed by the post-delta blur stage, which is a single function exposed by the `blur.rs` module and shared with the optional pre-delta blur of stage four. The user selects a kernel kind from {flat, gaussian, triangle, median, bilateral, none} together with a kernel size, written as a single specification of the form KIND[:SIZE]. The integrated configuration uses `gaussian:9`, a separable Gaussian of size $k_b = 9$ pixels (forced odd at runtime). Gaussian is appropriate when speckle is approximately white noise around the underlying response field; flat and triangle are exposed because some camera-and-bag combinations produce structured noise that the corresponding box or tent filter handles with less bias. Routing both the pre- and post-delta blurs through the same module keeps their behavior identical at matched specifications and ensures that the bandwidth-limited input the peak map sees in stage four is the same kind of bandwidth-limited input the threshold sees in stage nine.
 
-Three thresholding modes share a single offset. If the user passes a manual value $tau_"man"$, the algorithm uses $tau = tau_"man" + delta_tau$. If the user passes a percentile $p in [0, 100]$, the algorithm sorts the region-of-interest pixels of $tilde(D)_t$, recovers the $p$-th percentile by linear interpolation between adjacent ranks, and adds $delta_tau$. Otherwise, Otsu's between-class variance method recovers an automatic threshold $tau_"otsu"$ over the full $tilde(D)_t$ histogram, and the offset is again added. In all three cases the final threshold is clipped to the byte range. The integrated configuration uses Otsu with $delta_tau = -30$, which biases the threshold toward the wet class on infusions where the partially-wetted halo around the front sits below the bimodal split that Otsu finds. The bias is appropriate for the early-fill regime of the eleven labeled samples and not appropriate for every infusion. The threshold-offset axis of Figure~@fig:ablation_curves shows that on the canonical reference video the IoU response is monotone in $|delta_tau|$, which is the regime-specific evidence behind the value. Manual and percentile modes are not used for the headline numbers reported in this paper.
+== Normalization and threshold
 
-== Mask cleanup
+The smoothed field is rescaled to the byte range using a min-max linear rescaling, producing a $tilde(D)_t$ that fits in eight bits and feeds both the threshold-selection stage and the heatmap renderer. Three thresholding modes share a single offset. If the user passes a manual value $tau_"man"$, the algorithm uses $tau = tau_"man" + delta_tau$. If the user passes a percentile $p in [0, 100]$, the algorithm sorts the region-of-interest pixels of $tilde(D)_t$, recovers the $p$-th percentile by linear interpolation between adjacent ranks, and adds $delta_tau$. Otherwise, Otsu's between-class variance method recovers an automatic threshold $tau_"otsu"$ over the full $tilde(D)_t$ histogram, and the offset is again added. In all three cases the final threshold is clipped to the byte range. The integrated configuration uses Otsu with $delta_tau = -30$, which biases the threshold toward the wet class on infusions where the partially-wetted halo around the front sits below the bimodal split that Otsu finds. The bias is appropriate for the early-fill regime of the eleven labeled samples and not appropriate for every infusion. The threshold-offset axis of Figure~@fig:ablation_curves shows that on the canonical reference video the IoU response is monotone in $|delta_tau|$, which is the regime-specific evidence behind the value. Manual and percentile modes are not used for the headline numbers reported in this paper.
 
-The binary mask leaving the threshold stage is rough. It contains gaps where transient bag wrinkles muted the local response, isolated specks where the threshold caught a single noisy pixel, and components small enough that they are obviously noise rather than wetted fabric. The morphological cleanup and the connected-components filter remove those artefacts in a fixed sequence. Morphological closing with an elliptical structuring element of size $k_m$ (default thirteen pixels) fills the gaps and welds neighbouring patches into one front. Morphological opening with the same kernel removes specks below the kernel size. Connected-components labelling discards any region whose pixel area is below $a_"min"$ pixels (default $400$). Figure~@fig:cleanup shows the same frame at every step of that sequence.
+== Morphological close
+
+Stage ten passes the binary mask through morphological closing with an elliptical structuring element of size $k_m$ (default thirteen pixels). Closing welds neighbouring wet patches into a single front and fills small gaps where transient bag wrinkles muted the local response. The kernel size is the parameter that sets the spatial scale at which gaps are considered noise rather than real disconnections in the front; on the resolutions in the eleven labeled samples a $13 times 13$ ellipse is large enough to bridge bag-wrinkle gaps and small enough to leave genuinely separate wet regions separate.
+
+== Morphological open and area filter
+
+Stage eleven passes the closed mask through morphological opening with the same kernel and shape, removing specks below the kernel size that survived the closing pass. A connected-components labelling pass then discards any region whose pixel area is below $a_"min"$ pixels (default $400$), which removes the small islands that the morphology kernels are too small to suppress. Figure~@fig:cleanup shows the same frame at every step of stages nine through eleven.
 
 #figure(
   image("/typst/figures/mask_cleanup.pdf", width: 100%),
@@ -126,7 +132,7 @@ The kernel parities are forced odd at runtime so that anchor handling is symmetr
 
 == Temporal locking
 
-Stage thirteen imposes hysteresis along the time axis. Each pixel keeps a small per-pixel counter that increments while the cleaned mask reports the pixel as wet and resets to zero on any frame where the cleaned mask says dry. Once the counter reaches the threshold $n_"lock"$ frames, a sticky locked-pixel map is set true at that location and never resets. The output of the stage is the elementwise OR of the cleaned mask with the sticky locked map, so a pixel that has ever been wet for $n_"lock"$ consecutive frames stays wet for the remainder of the run. Figure~@fig:lock illustrates the bookkeeping with a twelve-frame example for $n_"lock" = 3$.
+Stage twelve imposes hysteresis along the time axis. Each pixel keeps a small per-pixel counter that increments while the cleaned mask reports the pixel as wet and resets to zero on any frame where the cleaned mask says dry. Once the counter reaches the threshold $n_"lock"$ frames, a sticky locked-pixel map is set true at that location and never resets. The output of the stage is the elementwise OR of the cleaned mask with the sticky locked map, so a pixel that has ever been wet for $n_"lock"$ consecutive frames stays wet for the remainder of the run. Figure~@fig:lock illustrates the bookkeeping with a twelve-frame example for $n_"lock" = 3$.
 
 #figure(
   image("/typst/figures/lock_timeline.pdf", width: 95%),
@@ -170,8 +176,8 @@ Table~@tab:defaults lists the configuration values held fixed across every exper
     [cumulative-motion-threshold], [3], [Accumulated drift, in pixels, that triggers a registration.],
     [motion-model], [affine], [Warp model fit on a static-edge mask when a shift is detected.],
     [peak-on-shift], [reset], [How the peak map is treated when a shift is registered.],
-    [pre-delta-blur-kernel, $k_p$], [0], [Gaussian blur applied to the working frame before peak update and delta. Disabled when zero.],
-    [blur-kernel, $k_b$], [9], [Gaussian blur kernel size in pixels, applied to the delta field.],
+    [pre-delta-blur], [none], [Pre-delta blur spec, KIND[:SIZE]. Applied to the working frame before peak update and delta.],
+    [blur, $k_b$], [gaussian:9], [Post-delta blur spec, KIND[:SIZE]. Applied to the delta field before threshold.],
     [threshold-offset, $delta_tau$], [-30], [Offset added to Otsu/percentile/manual threshold.],
     [morph-kernel, $k_m$], [13], [Morphology structuring-element size.],
     [morph-shape], [ellipse], [Structuring-element shape.],
