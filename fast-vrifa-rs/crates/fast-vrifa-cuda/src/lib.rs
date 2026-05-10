@@ -1,5 +1,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use bytemuck::cast_slice;
+#[cfg(target_os = "linux")]
+use cudarc::driver::DevicePtrMut;
 use cudarc::{
     driver::{
         CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, CudaView, DevicePtr,
@@ -7,8 +9,6 @@ use cudarc::{
     },
     nvrtc::compile_ptx,
 };
-#[cfg(target_os = "linux")]
-use cudarc::driver::DevicePtrMut;
 use fast_vrifa_core::{BackendKind, BackendStatus, ImageBackend, PeakImageBackend, RoiMargins};
 use ndarray::{Array2, Array3};
 use opencv::core::CV_32F;
@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_core::morphology::MorphShape;
+use vrifa_core::warp::AffineWarp;
 
 mod npp;
 
@@ -102,9 +103,12 @@ struct CudaBackendInner {
     colorspace: CudaFunction,
     extract_l: CudaFunction,
     peak: CudaFunction,
+    peak_plane: CudaFunction,
     roi: CudaFunction,
     delta: CudaFunction,
+    delta_plane: CudaFunction,
     blur_norm: CudaFunction,
+    warp_affine: CudaFunction,
     reduce_minmax: CudaFunction,
     normalize_u8: CudaFunction,
     threshold_binary: CudaFunction,
@@ -253,7 +257,8 @@ impl CudaBackend {
             host_bgr.len()
         );
 
-        let batch_lab = self.upload_and_convert_batch_bytes(host_bgr, frame_count, width, height)?;
+        let batch_lab =
+            self.upload_and_convert_batch_bytes(host_bgr, frame_count, width, height)?;
         let frame_pixels = width * height;
         let mut outputs = Vec::with_capacity(batch_lab.frames);
         for batch_index in 0..batch_lab.frames {
@@ -310,7 +315,13 @@ impl CudaBackend {
             }
             outputs.push(CudaBatchFrameOutput {
                 mask: if options.need_host_mask {
-                    Some(download_mask_ptr(inner, &mask.data, height, width, "downloading CUDA batch mask")?)
+                    Some(download_mask_ptr(
+                        inner,
+                        &mask.data,
+                        height,
+                        width,
+                        "downloading CUDA batch mask",
+                    )?)
                 } else {
                     None
                 },
@@ -404,15 +415,24 @@ impl CudaBackendInner {
         let peak = module
             .load_function("update_peak_brightness")
             .context("loading CUDA peak kernel")?;
+        let peak_plane = module
+            .load_function("update_peak_brightness_plane")
+            .context("loading CUDA peak-plane kernel")?;
         let roi = module
             .load_function("build_roi_mask")
             .context("loading CUDA ROI kernel")?;
         let delta = module
             .load_function("compute_delta_darken_only")
             .context("loading CUDA delta kernel")?;
+        let delta_plane = module
+            .load_function("compute_delta_darken_only_plane")
+            .context("loading CUDA delta-plane kernel")?;
         let blur_norm = module
             .load_function("gaussian_blur_f32")
             .context("loading CUDA blur kernel")?;
+        let warp_affine = module
+            .load_function("warp_affine_f32")
+            .context("loading CUDA warp kernel")?;
         let reduce_minmax = module
             .load_function("reduce_minmax_nonnegative")
             .context("loading CUDA min/max kernel")?;
@@ -459,9 +479,12 @@ impl CudaBackendInner {
             colorspace,
             extract_l,
             peak,
+            peak_plane,
             roi,
             delta,
+            delta_plane,
             blur_norm,
+            warp_affine,
             reduce_minmax,
             normalize_u8,
             threshold_binary,
@@ -698,6 +721,24 @@ impl PeakImageBackend for CudaBackend {
         })
     }
 
+    fn blur_plane_f32_device(
+        &self,
+        plane: &Self::DevicePlaneF32,
+        kernel: usize,
+    ) -> Result<Self::DevicePlaneF32> {
+        let inner = self.inner()?;
+        blur_plane_on_device(inner, plane, kernel)
+    }
+
+    fn warp_plane_f32_device(
+        &self,
+        plane: &Self::DevicePlaneF32,
+        matrix: &AffineWarp,
+    ) -> Result<Self::DevicePlaneF32> {
+        let inner = self.inner()?;
+        warp_plane_on_device(inner, plane, matrix)
+    }
+
     fn update_peak_brightness_device(
         &self,
         frame_lab: &Self::DeviceFrameLab,
@@ -745,6 +786,15 @@ impl PeakImageBackend for CudaBackend {
         })
     }
 
+    fn update_peak_brightness_plane_device(
+        &self,
+        frame_l: &Self::DevicePlaneF32,
+        previous_peak: Option<&Self::DevicePlaneF32>,
+    ) -> Result<Self::DevicePlaneF32> {
+        let inner = self.inner()?;
+        update_peak_from_plane(inner, frame_l, previous_peak)
+    }
+
     fn compute_delta_darken_only_device(
         &self,
         frame_lab: &Self::DeviceFrameLab,
@@ -782,6 +832,17 @@ impl PeakImageBackend for CudaBackend {
             width: frame_lab.width,
             height: frame_lab.height,
         })
+    }
+
+    fn compute_delta_darken_only_planes_device(
+        &self,
+        frame_l: &Self::DevicePlaneF32,
+        reference_plane: &Self::DevicePlaneF32,
+        roi_mask: &Self::DeviceMaskU8,
+        channel_weight: f32,
+    ) -> Result<Self::DevicePlaneF32> {
+        let inner = self.inner()?;
+        compute_delta_from_plane(inner, frame_l, reference_plane, roi_mask, channel_weight)
     }
 
     fn blur_and_normalize_delta(
@@ -1487,7 +1548,184 @@ fn compute_delta_from_lab_view(
     })
 }
 
-fn download_mask_ptr<Src>(inner: &CudaBackendInner, src: &Src, height: usize, width: usize, context: &str) -> Result<Array2<u8>>
+fn blur_plane_on_device(
+    inner: &CudaBackendInner,
+    plane: &CudaPlaneF32,
+    kernel: usize,
+) -> Result<CudaPlaneF32> {
+    let pixel_count = plane.width * plane.height;
+    let output = if kernel > 1 {
+        let kernel = canonical_blur_kernel_size(kernel);
+        let weights_buffer = cached_gaussian_kernel(inner, kernel)?;
+        let mut output = inner
+            .compute_stream
+            .alloc_zeros::<f32>(pixel_count)
+            .context("allocating CUDA blurred plane")?;
+        let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+        let width_i32 = plane.width as i32;
+        let height_i32 = plane.height as i32;
+        let kernel_i32 = kernel as i32;
+        let pixel_count_i32 = pixel_count as i32;
+        let mut launch = inner.compute_stream.launch_builder(&inner.blur_norm);
+        launch.arg(&plane.data);
+        launch.arg(&weights_buffer);
+        launch.arg(&mut output);
+        launch.arg(&width_i32);
+        launch.arg(&height_i32);
+        launch.arg(&kernel_i32);
+        launch.arg(&pixel_count_i32);
+        unsafe { launch.launch(cfg) }.context("launching CUDA plane blur kernel")?;
+        output
+    } else {
+        inner
+            .compute_stream
+            .clone_dtod(&plane.data.as_view())
+            .context("copying CUDA plane without blur")?
+    };
+    Ok(CudaPlaneF32 {
+        data: output,
+        width: plane.width,
+        height: plane.height,
+    })
+}
+
+fn update_peak_from_plane(
+    inner: &CudaBackendInner,
+    frame_l: &CudaPlaneF32,
+    previous_peak: Option<&CudaPlaneF32>,
+) -> Result<CudaPlaneF32> {
+    let pixel_count = frame_l.width * frame_l.height;
+    let zero_buffer = if previous_peak.is_none() {
+        Some(
+            inner
+                .compute_stream
+                .alloc_zeros::<f32>(pixel_count)
+                .context("allocating initial CUDA peak plane")?,
+        )
+    } else {
+        None
+    };
+    if let Some(previous_peak) = previous_peak {
+        anyhow::ensure!(
+            (previous_peak.height, previous_peak.width) == (frame_l.height, frame_l.width),
+            "previous peak shape does not match frame"
+        );
+    }
+    let previous_view = previous_peak.map(|peak| peak.data.as_view());
+    let mut output = inner
+        .compute_stream
+        .alloc_zeros::<f32>(pixel_count)
+        .context("allocating CUDA peak plane")?;
+    let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+    let pixel_count_i32 = pixel_count as i32;
+    let mut launch = inner.compute_stream.launch_builder(&inner.peak_plane);
+    launch.arg(&frame_l.data);
+    if let Some(previous_view) = previous_view.as_ref() {
+        launch.arg(previous_view);
+    } else if let Some(zero_buffer) = zero_buffer.as_ref() {
+        launch.arg(zero_buffer);
+    }
+    launch.arg(&mut output);
+    launch.arg(&pixel_count_i32);
+    unsafe { launch.launch(cfg) }.context("launching CUDA plane-peak kernel")?;
+    Ok(CudaPlaneF32 {
+        data: output,
+        width: frame_l.width,
+        height: frame_l.height,
+    })
+}
+
+fn compute_delta_from_plane(
+    inner: &CudaBackendInner,
+    frame_l: &CudaPlaneF32,
+    reference_plane: &CudaPlaneF32,
+    roi_mask: &CudaMaskU8,
+    channel_weight: f32,
+) -> Result<CudaPlaneF32> {
+    anyhow::ensure!(
+        (reference_plane.height, reference_plane.width) == (frame_l.height, frame_l.width),
+        "reference plane shape does not match frame"
+    );
+    anyhow::ensure!(
+        (roi_mask.height, roi_mask.width) == (frame_l.height, frame_l.width),
+        "ROI mask shape does not match frame"
+    );
+    let pixel_count = frame_l.width * frame_l.height;
+    let mut output = inner
+        .compute_stream
+        .alloc_zeros::<f32>(pixel_count)
+        .context("allocating CUDA delta plane")?;
+    let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+    let pixel_count_i32 = pixel_count as i32;
+    let mut launch = inner.compute_stream.launch_builder(&inner.delta_plane);
+    launch.arg(&frame_l.data);
+    launch.arg(&reference_plane.data);
+    launch.arg(&roi_mask.data);
+    launch.arg(&mut output);
+    launch.arg(&channel_weight);
+    launch.arg(&pixel_count_i32);
+    unsafe { launch.launch(cfg) }.context("launching CUDA plane-delta kernel")?;
+    Ok(CudaPlaneF32 {
+        data: output,
+        width: frame_l.width,
+        height: frame_l.height,
+    })
+}
+
+fn warp_plane_on_device(
+    inner: &CudaBackendInner,
+    plane: &CudaPlaneF32,
+    matrix: &AffineWarp,
+) -> Result<CudaPlaneF32> {
+    if matrix.is_identityish(1e-6) {
+        return Ok(CudaPlaneF32 {
+            data: inner
+                .compute_stream
+                .clone_dtod(&plane.data.as_view())
+                .context("copying CUDA plane without warp")?,
+            width: plane.width,
+            height: plane.height,
+        });
+    }
+
+    let inverse = matrix.invert()?;
+    let pixel_count = plane.width * plane.height;
+    let mut output = inner
+        .compute_stream
+        .alloc_zeros::<f32>(pixel_count)
+        .context("allocating CUDA warped plane")?;
+    let cfg = LaunchConfig::for_num_elems(pixel_count as u32);
+    let width_i32 = plane.width as i32;
+    let height_i32 = plane.height as i32;
+    let pixel_count_i32 = pixel_count as i32;
+    let [row0, row1] = inverse.rows;
+    let mut launch = inner.compute_stream.launch_builder(&inner.warp_affine);
+    launch.arg(&plane.data);
+    launch.arg(&mut output);
+    launch.arg(&width_i32);
+    launch.arg(&height_i32);
+    launch.arg(&row0[0]);
+    launch.arg(&row0[1]);
+    launch.arg(&row0[2]);
+    launch.arg(&row1[0]);
+    launch.arg(&row1[1]);
+    launch.arg(&row1[2]);
+    launch.arg(&pixel_count_i32);
+    unsafe { launch.launch(cfg) }.context("launching CUDA warp kernel")?;
+    Ok(CudaPlaneF32 {
+        data: output,
+        width: plane.width,
+        height: plane.height,
+    })
+}
+
+fn download_mask_ptr<Src>(
+    inner: &CudaBackendInner,
+    src: &Src,
+    height: usize,
+    width: usize,
+    context: &str,
+) -> Result<Array2<u8>>
 where
     Src: DevicePtr<u8>,
 {

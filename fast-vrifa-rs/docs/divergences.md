@@ -15,3 +15,15 @@ The JSON still preserves the image filenames it would have used and adds `images
 ## WGPU colorspace lookup
 
 The `wgpu` milestone uses an exact BGR->CIELAB lookup table generated from the locked CPU conversion to keep stage-1 parity exact.
+
+## CUDA pre-delta blur
+
+When the CUDA darken-only fast path runs with `--pre-delta-blur-kernel > 1`, `fast-vrifa` blurs the extracted `L*` plane on device before both the peak update and the delta stage.
+
+The CPU reference blurs the full converted frame and then consumes the blurred `L*` channel. For darken-only CIELAB runs these are mathematically equivalent, but the CUDA path still records this as a GPU-stage divergence because the blur is implemented by the shared device Gaussian kernel rather than OpenCV.
+
+## CUDA stabilization warp
+
+When `--camera-stable` is enabled on the CUDA darken-only fast path, `fast-vrifa` keeps motion estimation and ECC fitting on the host, then applies the fitted warp to the device-side `L*` or peak plane before the delta stage consumes it.
+
+The CPU reference uses OpenCV `warpAffine` on host arrays. The CUDA path uses a device bicubic plane warp with replicated borders, so stage dumps can differ slightly within the existing GPU tolerance even though final masks are expected to match the CPU reference.

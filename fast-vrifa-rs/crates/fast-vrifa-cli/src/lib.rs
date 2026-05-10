@@ -7,6 +7,7 @@ use ndarray::{s, Array2, Array3};
 use opencv::core::{self, Point, Scalar, Size};
 use opencv::imgproc;
 use opencv::prelude::*;
+#[cfg(feature = "cuda")]
 use opencv::videoio;
 use serde_yaml::Value;
 use std::collections::VecDeque;
@@ -20,22 +21,27 @@ use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
-use vrifa_annotations::{AnnotationExportOptions, AnnotationFrame};
+use vrifa_annotations::AnnotationFrame;
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_core::contours::extract_bounding_boxes;
 use vrifa_core::cvutil;
-use vrifa_core::delta::compute_delta;
+use vrifa_core::delta::{blur_frame, blur_plane, compute_delta};
 use vrifa_core::heatmap::apply_turbo_colormap;
 use vrifa_core::lock::{apply_locking, LockState};
 use vrifa_core::morphology::{MorphShape, MorphologyParams};
+use vrifa_core::motion::estimate_translation;
 use vrifa_core::overlay::create_overlay;
-use vrifa_core::peak::update_peak_brightness;
+use vrifa_core::peak::update_peak_brightness_plane;
 use vrifa_core::reference::{
     compute_dynamic_factor, select_dynamic_reference_index, DynamicReferenceParams,
 };
-use vrifa_core::roi::{clip_mask_to_roi, is_rectangular_roi_mask};
+use vrifa_core::registration::{fit_affine_warp, strong_gradient_mask, MotionModel};
+use vrifa_core::roi::{build_roi_mask, resolve_roi_margins};
 use vrifa_core::threshold;
-use vrifa_io::{write_bgr_png, write_gray_png, VideoMetadata, VideoReader};
+use vrifa_core::warp::{apply_warp, AffineWarp};
+#[cfg(feature = "cuda")]
+use vrifa_io::VideoMetadata;
+use vrifa_io::{write_bgr_png, write_gray_png, VideoReader};
 
 mod raw_video;
 use raw_video::{
@@ -49,8 +55,9 @@ use fast_vrifa_cuda::{CudaBackend, CudaBatchDetectorOptions};
 use fast_vrifa_wgpu::WgpuBackend;
 
 pub use vrifa_cli::Config;
-use vrifa_cli::ReferenceMode;
+use vrifa_cli::{PeakOnShift, ReferenceMode};
 
+#[cfg(feature = "cuda")]
 const CUDA_BATCH_SIZE: usize = 32;
 const OUTPUT_WORKERS: usize = 16;
 const OUTPUT_QUEUE: usize = 96;
@@ -114,6 +121,433 @@ impl FastCliOptions {
     fn has_fast_only_flags(&self) -> bool {
         self.mask_only || self.coco_bbox_only || self.ffmpeg_postprocess
     }
+}
+
+#[derive(Clone, Debug)]
+struct MotionTraceRow {
+    frame_index: usize,
+    dx: f32,
+    dy: f32,
+    confidence: f32,
+    cumulative_dx: f32,
+    cumulative_dy: f32,
+    per_frame_magnitude: f32,
+    cumulative_magnitude: f32,
+    recent_window_magnitude: f32,
+    warp_dx: f32,
+    warp_dy: f32,
+    warp_error: f32,
+    fit_applied: bool,
+    fit_model: Option<MotionModel>,
+    fit_score: Option<f32>,
+    warp_active: bool,
+}
+
+const CAMERA_STABLE_RECENT_WINDOW: usize = 5;
+
+#[derive(Clone, Debug)]
+struct CameraStableState {
+    prev_motion_frame: Option<Array3<f32>>,
+    prev_registration_mask: Option<Array2<u8>>,
+    reference_token: Option<usize>,
+    cumulative_dx: f32,
+    cumulative_dy: f32,
+    recent_motion: VecDeque<(f32, f32)>,
+    cached_warp: AffineWarp,
+    warp_active: bool,
+    shift_event_active: bool,
+    shift_event_stable_frames: usize,
+    motion_trace: Vec<MotionTraceRow>,
+}
+
+impl CameraStableState {
+    fn new() -> Self {
+        Self {
+            prev_motion_frame: None,
+            prev_registration_mask: None,
+            reference_token: None,
+            cumulative_dx: 0.0,
+            cumulative_dy: 0.0,
+            recent_motion: VecDeque::new(),
+            cached_warp: AffineWarp::identity(),
+            warp_active: false,
+            shift_event_active: false,
+            shift_event_stable_frames: 0,
+            motion_trace: Vec::new(),
+        }
+    }
+
+    fn reset(&mut self, reference_token: usize) {
+        self.prev_motion_frame = None;
+        self.prev_registration_mask = None;
+        self.reference_token = Some(reference_token);
+        self.cumulative_dx = 0.0;
+        self.cumulative_dy = 0.0;
+        self.recent_motion.clear();
+        self.cached_warp = AffineWarp::identity();
+        self.warp_active = false;
+        self.shift_event_active = false;
+        self.shift_event_stable_frames = 0;
+    }
+}
+
+#[derive(Clone, Debug)]
+enum PeakShiftAction {
+    Keep,
+    Reset,
+    Warp(AffineWarp),
+}
+
+#[derive(Clone, Debug)]
+struct CameraStableActions {
+    warp: Option<AffineWarp>,
+    peak_shift: PeakShiftAction,
+}
+
+fn build_registration_mask(prev_mask: Option<&Array2<u8>>) -> Option<Array2<u8>> {
+    const MIN_DRY_FRACTION: f32 = 0.05;
+
+    let prev_mask = prev_mask?;
+    let (height, width) = prev_mask.dim();
+    let total_pixels = height.saturating_mul(width);
+    if total_pixels == 0 {
+        return None;
+    }
+
+    let mut dry_pixels = 0usize;
+    let dry_mask = prev_mask.mapv(|value| {
+        if value == 0 {
+            dry_pixels += 1;
+            255
+        } else {
+            0
+        }
+    });
+    let dry_fraction = dry_pixels as f32 / total_pixels as f32;
+    (dry_fraction >= MIN_DRY_FRACTION).then_some(dry_mask)
+}
+
+fn build_static_registration_mask(
+    prev_mask: Option<&Array2<u8>>,
+    reference_for_frame: &Array3<f32>,
+    roi_mask: &Array2<u8>,
+) -> Result<Option<Array2<u8>>> {
+    const STRONG_EDGE_PERCENTILE: f32 = 0.90;
+    const BORDER_FRACTION: f32 = 0.08;
+    const MIN_MASK_FRACTION: f32 = 0.02;
+
+    let (height, width, _) = reference_for_frame.dim();
+    let total_pixels = height.saturating_mul(width);
+    if total_pixels == 0 {
+        return Ok(None);
+    }
+
+    let dry_mask = build_registration_mask(prev_mask);
+    let edge_mask = strong_gradient_mask(reference_for_frame, STRONG_EDGE_PERCENTILE)?;
+    let border_mask = build_frame_border_mask((height, width), BORDER_FRACTION);
+
+    let mut combined = Array2::<u8>::zeros((height, width));
+    let mut combined_pixels = 0usize;
+    for y in 0..height {
+        for x in 0..width {
+            let is_dry = dry_mask
+                .as_ref()
+                .map(|mask| mask[(y, x)] > 0)
+                .unwrap_or(true);
+            let outside_roi = roi_mask[(y, x)] == 0;
+            let is_static = border_mask[(y, x)] > 0 || outside_roi || edge_mask[(y, x)] > 0;
+            if is_dry && is_static {
+                combined[(y, x)] = 255;
+                combined_pixels += 1;
+            }
+        }
+    }
+
+    if combined_pixels as f32 / total_pixels as f32 >= MIN_MASK_FRACTION {
+        return Ok(Some(combined));
+    }
+    Ok(dry_mask)
+}
+
+fn build_frame_border_mask(shape: (usize, usize), border_fraction: f32) -> Array2<u8> {
+    let (height, width) = shape;
+    let border_y = ((height as f32 * border_fraction).round() as usize).clamp(1, height.max(1));
+    let border_x = ((width as f32 * border_fraction).round() as usize).clamp(1, width.max(1));
+    let mut mask = Array2::<u8>::zeros((height, width));
+    for y in 0..height {
+        for x in 0..width {
+            if y < border_y
+                || y >= height.saturating_sub(border_y)
+                || x < border_x
+                || x >= width.saturating_sub(border_x)
+            {
+                mask[(y, x)] = 255;
+            }
+        }
+    }
+    mask
+}
+
+fn peak_frame_plane(
+    frame_converted: &Array3<f32>,
+    pre_delta_blur_kernel: usize,
+) -> Result<Array2<f32>> {
+    let frame_l = frame_converted.slice(s![.., .., 0]).to_owned();
+    if pre_delta_blur_kernel > 1 {
+        Ok(blur_plane(&frame_l, pre_delta_blur_kernel)?)
+    } else {
+        Ok(frame_l)
+    }
+}
+
+fn reference_token_for_frame(
+    ref_mode: &ReferenceMode,
+    frame_index: usize,
+    reference_frame_index: usize,
+) -> usize {
+    match ref_mode {
+        ReferenceMode::Running => frame_index,
+        _ => reference_frame_index.max(1),
+    }
+}
+
+fn prepare_camera_stable_actions(
+    frame_index: usize,
+    frame_converted: &Array3<f32>,
+    reference_for_frame: &Array3<f32>,
+    roi_mask: &Array2<u8>,
+    reference_token: usize,
+    config: &Config,
+    state: &mut CameraStableState,
+) -> Result<CameraStableActions> {
+    if state.reference_token != Some(reference_token) {
+        state.reset(reference_token);
+    }
+
+    let mut peak_shift = PeakShiftAction::Keep;
+
+    if config.camera_stable {
+        let (height, width, _) = frame_converted.dim();
+        if let Some(prev_frame) = state.prev_motion_frame.as_ref() {
+            let motion = estimate_translation(frame_converted, prev_frame)?;
+            state.cumulative_dx -= motion.dx;
+            state.cumulative_dy -= motion.dy;
+            state.recent_motion.push_back((-motion.dx, -motion.dy));
+            while state.recent_motion.len() > CAMERA_STABLE_RECENT_WINDOW {
+                state.recent_motion.pop_front();
+            }
+
+            let per_frame_magnitude = motion.dx.hypot(motion.dy);
+            let cumulative_magnitude = state.cumulative_dx.hypot(state.cumulative_dy);
+            let (recent_window_dx, recent_window_dy) = state
+                .recent_motion
+                .iter()
+                .fold((0.0f32, 0.0f32), |(sum_dx, sum_dy), (dx, dy)| {
+                    (sum_dx + *dx, sum_dy + *dy)
+                });
+            let recent_window_magnitude = recent_window_dx.hypot(recent_window_dy);
+            let (cached_warp_dx, cached_warp_dy) = if state.warp_active {
+                state.cached_warp.center_displacement(width, height)
+            } else {
+                (0.0, 0.0)
+            };
+            let cached_translation_error = if state.warp_active {
+                (state.cumulative_dx - cached_warp_dx).hypot(state.cumulative_dy - cached_warp_dy)
+            } else {
+                f32::INFINITY
+            };
+            let per_frame_trigger = per_frame_magnitude > config.motion_per_frame_threshold;
+            if per_frame_trigger {
+                state.shift_event_active = true;
+                state.shift_event_stable_frames = 0;
+            }
+            if recent_window_magnitude > config.cumulative_motion_threshold {
+                state.shift_event_active = true;
+                state.shift_event_stable_frames = 0;
+            }
+            let drift_trigger =
+                state.warp_active && cached_translation_error > config.cumulative_motion_threshold;
+            let needs_fit = state.shift_event_active || drift_trigger;
+
+            let mut fit_applied = false;
+            let mut fit_model = None;
+            let mut fit_score = None;
+            if needs_fit {
+                let registration_mask = build_static_registration_mask(
+                    state.prev_registration_mask.as_ref(),
+                    reference_for_frame,
+                    roi_mask,
+                )?;
+                let init_warp = if state.warp_active {
+                    let residual_dx = state.cumulative_dx - cached_warp_dx;
+                    let residual_dy = state.cumulative_dy - cached_warp_dy;
+                    AffineWarp::from_translation(residual_dx, residual_dy)
+                        .compose(&state.cached_warp)
+                } else {
+                    AffineWarp::from_translation(state.cumulative_dx, state.cumulative_dy)
+                };
+                match fit_affine_warp(
+                    frame_converted,
+                    reference_for_frame,
+                    &init_warp,
+                    config.motion_model,
+                    registration_mask.as_ref(),
+                ) {
+                    Ok(fit) => {
+                        state.cached_warp = fit.warp;
+                        let (fitted_dx, fitted_dy) =
+                            state.cached_warp.center_displacement(width, height);
+                        state.cumulative_dx = fitted_dx;
+                        state.cumulative_dy = fitted_dy;
+                        state.warp_active = !state.cached_warp.is_identityish(0.25);
+                        fit_applied = true;
+                        fit_model = Some(fit.model);
+                        fit_score = Some(fit.score);
+                        peak_shift = match config.peak_on_shift {
+                            PeakOnShift::Reset => PeakShiftAction::Reset,
+                            PeakOnShift::Warp => PeakShiftAction::Warp(state.cached_warp.clone()),
+                        };
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "warning: camera-stable registration failed on frame {frame_index}: {err}"
+                        );
+                    }
+                }
+            }
+
+            let (warp_dx, warp_dy, warp_error) = if state.warp_active {
+                let (warp_dx, warp_dy) = state.cached_warp.center_displacement(width, height);
+                let warp_error =
+                    (state.cumulative_dx - warp_dx).hypot(state.cumulative_dy - warp_dy);
+                (warp_dx, warp_dy, warp_error)
+            } else {
+                (0.0, 0.0, 0.0)
+            };
+
+            if state.shift_event_active {
+                if per_frame_magnitude <= config.motion_per_frame_threshold {
+                    state.shift_event_stable_frames += 1;
+                    if state.shift_event_stable_frames >= 3 {
+                        state.shift_event_active = false;
+                        state.shift_event_stable_frames = 0;
+                    }
+                } else {
+                    state.shift_event_stable_frames = 0;
+                }
+            }
+
+            state.motion_trace.push(MotionTraceRow {
+                frame_index,
+                dx: motion.dx,
+                dy: motion.dy,
+                confidence: motion.confidence,
+                cumulative_dx: state.cumulative_dx,
+                cumulative_dy: state.cumulative_dy,
+                per_frame_magnitude,
+                cumulative_magnitude,
+                recent_window_magnitude,
+                warp_dx,
+                warp_dy,
+                warp_error,
+                fit_applied,
+                fit_model,
+                fit_score,
+                warp_active: state.warp_active,
+            });
+        } else {
+            state.motion_trace.push(MotionTraceRow {
+                frame_index,
+                dx: 0.0,
+                dy: 0.0,
+                confidence: 0.0,
+                cumulative_dx: 0.0,
+                cumulative_dy: 0.0,
+                per_frame_magnitude: 0.0,
+                cumulative_magnitude: 0.0,
+                recent_window_magnitude: 0.0,
+                warp_dx: 0.0,
+                warp_dy: 0.0,
+                warp_error: 0.0,
+                fit_applied: false,
+                fit_model: None,
+                fit_score: None,
+                warp_active: false,
+            });
+        }
+    }
+
+    state.prev_motion_frame = Some(frame_converted.clone());
+    Ok(CameraStableActions {
+        warp: (config.camera_stable && state.warp_active).then(|| state.cached_warp.clone()),
+        peak_shift,
+    })
+}
+
+fn apply_peak_shift_host(
+    previous_peak: Option<&Array2<f32>>,
+    action: &PeakShiftAction,
+) -> Result<Option<Array2<f32>>> {
+    match action {
+        PeakShiftAction::Keep => Ok(previous_peak.cloned()),
+        PeakShiftAction::Reset => Ok(None),
+        PeakShiftAction::Warp(matrix) => previous_peak
+            .map(|peak| vrifa_core::warp::apply_warp_plane(peak, matrix))
+            .transpose()
+            .map_err(Into::into),
+    }
+}
+
+fn apply_peak_shift_device<B: PeakImageBackend>(
+    backend: &B,
+    previous_peak: Option<&B::DevicePlaneF32>,
+    action: &PeakShiftAction,
+) -> Result<Option<B::DevicePlaneF32>> {
+    match action {
+        PeakShiftAction::Keep => previous_peak
+            .map(|peak| backend.blur_plane_f32_device(peak, 1))
+            .transpose(),
+        PeakShiftAction::Reset => Ok(None),
+        PeakShiftAction::Warp(matrix) => previous_peak
+            .map(|peak| backend.warp_plane_f32_device(peak, matrix))
+            .transpose(),
+    }
+}
+
+fn write_motion_trace(path: &Path, rows: &[MotionTraceRow]) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut file = File::create(path).with_context(|| format!("creating {}", path.display()))?;
+    writeln!(
+        file,
+        "frame,dx,dy,confidence,cumulative_dx,cumulative_dy,per_frame_magnitude,cumulative_magnitude,recent_window_magnitude,warp_dx,warp_dy,warp_error,fit_applied,fit_model,fit_score,warp_active"
+    )?;
+    for row in rows {
+        writeln!(
+            file,
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{}",
+            row.frame_index,
+            row.dx,
+            row.dy,
+            row.confidence,
+            row.cumulative_dx,
+            row.cumulative_dy,
+            row.per_frame_magnitude,
+            row.cumulative_magnitude,
+            row.recent_window_magnitude,
+            row.warp_dx,
+            row.warp_dy,
+            row.warp_error,
+            row.fit_applied,
+            row.fit_model.map(MotionModel::name).unwrap_or(""),
+            row.fit_score
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_default(),
+            row.warp_active,
+        )?;
+    }
+    Ok(())
 }
 
 struct ConvertedFrame<D> {
@@ -508,6 +942,19 @@ fn parse_fast_bool_flag(raw: &str, flag: &str) -> Result<bool> {
     }
 }
 
+fn resolve_configured_roi_mask(config: &Config, shape: (usize, usize)) -> Array2<u8> {
+    build_roi_mask(
+        shape,
+        resolve_roi_margins(
+            config.roi_margin,
+            config.roi_margin_top,
+            config.roi_margin_bottom,
+            config.roi_margin_left,
+            config.roi_margin_right,
+        ),
+    )
+}
+
 fn run_cpu_backend(config: Config, options: &FastCliOptions) -> Result<()> {
     let backend = CpuBackend;
     run_hybrid_pipeline(config, &backend, options)
@@ -550,10 +997,13 @@ fn run_cuda_backend(config: Config, options: &FastCliOptions) -> Result<()> {
     }
 }
 
+#[cfg(feature = "cuda")]
 fn can_use_cuda_batched_peak_fast_path(config: &Config) -> bool {
     matches!(config.colorspace, ColorSpace::Cielab)
         && config.darken_only
         && config.peak_reference
+        && !config.camera_stable
+        && config.pre_delta_blur_kernel <= 1
         && matches!(config.ref_mode, ReferenceMode::First)
         && config.contrast_threshold.is_none()
         && config.contrast_percentile.is_none()
@@ -580,8 +1030,7 @@ fn run_cuda_batched_peak_pipeline(
         height: capture.get(videoio::CAP_PROP_FRAME_HEIGHT)? as usize,
     };
 
-    let roi_mask =
-        vrifa_cli::resolve_configured_roi_mask(&config, (metadata.height, metadata.width))?;
+    let roi_mask = resolve_configured_roi_mask(&config, (metadata.height, metadata.width));
     let device_roi_mask = backend.upload_mask_u8(&roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
 
@@ -738,14 +1187,9 @@ fn run_cuda_batched_peak_pipeline(
                 .ok_or_else(|| anyhow!("CUDA streamed path requires device locking"))?;
         }
 
-        let mut host_mask = need_host_mask
+        let host_mask = need_host_mask
             .then(|| backend.download_mask_u8(&mask))
             .transpose()?;
-        if config.roi_mask.is_some() && !is_rectangular_roi_mask(&roi_mask) {
-            if let Some(mask) = host_mask.as_mut() {
-                clip_mask_to_roi(mask, &roi_mask);
-            }
-        }
         let host_delta_norm = need_host_delta_norm
             .then(|| backend.download_mask_u8(&delta_norm))
             .transpose()?;
@@ -853,12 +1297,6 @@ fn run_cuda_batched_peak_pipeline(
             metadata.width,
             metadata.height,
             &config.annotation_formats,
-            &AnnotationExportOptions {
-                coco_bbox_only: options.effective_coco_bbox_only(),
-                coco_source_video: options
-                    .effective_coco_bbox_only()
-                    .then(|| config.video_path.to_string_lossy().to_string()),
-            },
         )?;
     }
 
@@ -916,9 +1354,12 @@ where
         ReferenceMode::Absolute(index) => Some(index),
         _ => None,
     };
-    let reference_values_needed = !(config.peak_reference && config.darken_only);
+    let reference_values_needed =
+        config.camera_stable || !(config.peak_reference && config.darken_only);
     let device_delta_eligible =
         config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
+    let use_device_plane_path =
+        device_delta_eligible && (config.camera_stable || config.pre_delta_blur_kernel > 1);
     let absolute_reference = if reference_values_needed {
         if let Some(index) = absolute_index {
             if let Some(total) = metadata.total_frames {
@@ -979,27 +1420,39 @@ where
     let mut dynamic_first_lag: Option<usize> = None;
     let mut dynamic_last_lag: Option<usize> = None;
 
-    let roi_mask = vrifa_cli::resolve_configured_roi_mask(
+    let roi_mask = resolve_configured_roi_mask(
         &config,
         (first_frame_converted.dim().0, first_frame_converted.dim().1),
-    )?;
+    );
     let device_roi_mask = backend.upload_mask_u8(&roi_mask)?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let mut peak_brightness_map = if config.peak_reference && !device_delta_eligible {
-        Some(first_frame_converted.slice(s![.., .., 0]).to_owned())
+        Some(peak_frame_plane(
+            &first_frame_converted,
+            config.pre_delta_blur_kernel,
+        )?)
     } else {
         None
     };
     let mut peak_brightness_device = if config.peak_reference && device_delta_eligible {
-        first_frame
+        let first_l = first_frame
             .device_lab
             .as_ref()
             .map(|frame| backend.extract_l_plane(frame))
             .transpose()?
+            .ok_or_else(|| anyhow!("device peak path requires a device CIELAB frame"))?;
+        Some(
+            if use_device_plane_path && config.pre_delta_blur_kernel > 1 {
+                backend.blur_plane_f32_device(&first_l, config.pre_delta_blur_kernel)?
+            } else {
+                first_l
+            },
+        )
     } else {
         None
     };
+    let mut camera_stable_state = CameraStableState::new();
 
     let write_heatmap_pngs = options.effective_write_heatmap_pngs(&config);
     let write_overlay_video = options.effective_write_overlay_video(&config);
@@ -1086,7 +1539,8 @@ where
     let run_start = Instant::now();
     let mut processed_records = Vec::new();
     let mut output_pool = output_pool;
-    let need_host_current = !device_delta_eligible
+    let need_host_current = config.camera_stable
+        || !device_delta_eligible
         || (reference_values_needed
             && matches!(
                 config.ref_mode,
@@ -1191,29 +1645,210 @@ where
                 morph_close_iterations: config.morph_close_iterations,
                 morph_open_iterations: config.morph_open_iterations,
             };
-            if config.peak_reference {
-                if device_delta_eligible {
-                    let device_lab = current.device_lab.as_ref().ok_or_else(|| {
-                        anyhow!("device peak path requires a device CIELAB frame")
-                    })?;
-                    peak_brightness_device = Some(backend.update_peak_brightness_device(
-                        device_lab,
-                        peak_brightness_device.as_ref(),
-                    )?);
-                } else {
-                    peak_brightness_map = Some(update_peak_brightness(
-                        frame_converted.ok_or_else(|| {
-                            anyhow!("host peak path requires a converted host frame")
-                        })?,
-                        peak_brightness_map.as_ref(),
-                    )?);
+            let camera_actions = if config.camera_stable {
+                prepare_camera_stable_actions(
+                    frame_index,
+                    frame_converted.ok_or_else(|| {
+                        anyhow!("camera-stable path requires a converted host frame")
+                    })?,
+                    reference_for_frame.as_ref().ok_or_else(|| {
+                        anyhow!("camera-stable path requires a host reference frame")
+                    })?,
+                    &roi_mask,
+                    reference_token_for_frame(&config.ref_mode, frame_index, reference_frame_index),
+                    &config,
+                    &mut camera_stable_state,
+                )?
+            } else {
+                CameraStableActions {
+                    warp: None,
+                    peak_shift: PeakShiftAction::Keep,
                 }
-            }
+            };
 
             let mut host_mask: Option<Array2<u8>> = None;
             let mut host_delta_norm: Option<Array2<u8>> = None;
             if let Some(device_lab) = current.device_lab.as_ref() {
-                if device_delta_eligible {
+                if device_delta_eligible && use_device_plane_path {
+                    let mut frame_l = backend.extract_l_plane(device_lab)?;
+                    if config.pre_delta_blur_kernel > 1 {
+                        frame_l = backend
+                            .blur_plane_f32_device(&frame_l, config.pre_delta_blur_kernel)?;
+                    }
+                    if config.peak_reference {
+                        let peak_base = apply_peak_shift_device(
+                            backend,
+                            peak_brightness_device.as_ref(),
+                            &camera_actions.peak_shift,
+                        )?;
+                        peak_brightness_device =
+                            Some(backend.update_peak_brightness_plane_device(
+                                &frame_l,
+                                peak_base.as_ref(),
+                            )?);
+                    }
+
+                    let device_delta = if config.peak_reference {
+                        backend.compute_delta_darken_only_planes_device(
+                            &frame_l,
+                            peak_brightness_device.as_ref().ok_or_else(|| {
+                                anyhow!("peak reference was enabled without a device peak map")
+                            })?,
+                            &device_roi_mask,
+                            config.channel_weights[0],
+                        )?
+                    } else {
+                        let reference_host = reference_for_frame
+                            .as_ref()
+                            .or((!reference_values_needed).then_some(&first_frame_converted))
+                            .ok_or_else(|| anyhow!("missing reference frame for device delta"))?;
+                        let mut reference_plane = backend
+                            .upload_plane_f32(&reference_host.slice(s![.., .., 0]).to_owned())?;
+                        if let Some(warp) = camera_actions.warp.as_ref() {
+                            reference_plane =
+                                backend.warp_plane_f32_device(&reference_plane, warp)?;
+                        }
+                        if config.pre_delta_blur_kernel > 1 {
+                            reference_plane = backend.blur_plane_f32_device(
+                                &reference_plane,
+                                config.pre_delta_blur_kernel,
+                            )?;
+                        }
+                        backend.compute_delta_darken_only_planes_device(
+                            &frame_l,
+                            &reference_plane,
+                            &device_roi_mask,
+                            config.channel_weights[0],
+                        )?
+                    };
+                    if let Some(device_delta_norm) = backend.blur_and_normalize_delta(
+                        &device_delta,
+                        morph_params.blur_kernel,
+                        morph_params.blur_enabled,
+                    )? {
+                        let mut device_mask = if supports_device_auto_threshold {
+                            backend.threshold_and_morph_mask_auto(
+                                &device_delta_norm,
+                                morph_params.threshold_offset,
+                                morph_params.morph_shape,
+                                morph_params.morph_kernel,
+                                morph_params.morph_close_iterations,
+                                morph_params.morph_open_iterations,
+                            )?
+                        } else {
+                            None
+                        };
+
+                        if device_mask.is_none() {
+                            let delta_norm = backend.download_mask_u8(&device_delta_norm)?;
+                            let threshold_value = threshold::choose_threshold(
+                                &delta_norm,
+                                &roi_mask,
+                                morph_params.manual_threshold,
+                                morph_params.percentile_threshold,
+                                morph_params.threshold_offset,
+                            )?;
+                            host_delta_norm = Some(delta_norm.clone());
+                            if let Some(mask) = backend.threshold_and_morph_mask(
+                                &device_delta_norm,
+                                threshold_value,
+                                morph_params.morph_shape,
+                                morph_params.morph_kernel,
+                                morph_params.morph_close_iterations,
+                                morph_params.morph_open_iterations,
+                            )? {
+                                device_mask = Some(mask);
+                            } else {
+                                let unlocked = detect_mask_from_delta_norm_threshold(
+                                    &delta_norm,
+                                    threshold_value,
+                                    &morph_params,
+                                )?;
+                                host_mask = Some(apply_locking(
+                                    &unlocked,
+                                    config.lock_frames,
+                                    lock_state.as_mut(),
+                                )?);
+                            }
+                        }
+
+                        if let Some(mask) = device_mask.take() {
+                            let mask = if morph_params.min_area > 0 {
+                                if let Some(filtered_mask) =
+                                    backend.filter_min_area_mask(&mask, morph_params.min_area)?
+                                {
+                                    filtered_mask
+                                } else {
+                                    let filtered = filter_min_area_array(
+                                        &backend.download_mask_u8(&mask)?,
+                                        morph_params.min_area,
+                                    )?;
+                                    host_mask = Some(apply_locking(
+                                        &filtered,
+                                        config.lock_frames,
+                                        lock_state.as_mut(),
+                                    )?);
+                                    mask
+                                }
+                            } else {
+                                mask
+                            };
+
+                            if host_mask.is_none() {
+                                let mask = if config.lock_frames > 0 {
+                                    if let Some(state) = device_lock_state.as_mut() {
+                                        if let Some(locked_mask) = backend.apply_locking_device(
+                                            &mask,
+                                            config.lock_frames,
+                                            state,
+                                        )? {
+                                            locked_mask
+                                        } else {
+                                            host_mask = Some(apply_locking(
+                                                &backend.download_mask_u8(&mask)?,
+                                                config.lock_frames,
+                                                lock_state.as_mut(),
+                                            )?);
+                                            mask
+                                        }
+                                    } else {
+                                        host_mask = Some(apply_locking(
+                                            &backend.download_mask_u8(&mask)?,
+                                            config.lock_frames,
+                                            lock_state.as_mut(),
+                                        )?);
+                                        mask
+                                    }
+                                } else {
+                                    mask
+                                };
+
+                                if need_host_mask && host_mask.is_none() {
+                                    host_mask = Some(backend.download_mask_u8(&mask)?);
+                                }
+                            }
+                        }
+
+                        if need_host_delta_norm && host_delta_norm.is_none() {
+                            host_delta_norm = Some(backend.download_mask_u8(&device_delta_norm)?);
+                        }
+                    } else {
+                        let delta = backend.download_plane_f32(&device_delta)?;
+                        let detect = detect_mask_and_delta_norm(&delta, &roi_mask, &morph_params)?;
+                        host_mask = Some(apply_locking(
+                            &detect.mask,
+                            config.lock_frames,
+                            lock_state.as_mut(),
+                        )?);
+                        host_delta_norm = Some(detect.delta_norm);
+                    }
+                } else if device_delta_eligible {
+                    if config.peak_reference {
+                        peak_brightness_device = Some(backend.update_peak_brightness_device(
+                            device_lab,
+                            peak_brightness_device.as_ref(),
+                        )?);
+                    }
                     let device_delta = if config.peak_reference {
                         backend.compute_delta_darken_only_device(
                             device_lab,
@@ -1371,15 +2006,43 @@ where
                         host_delta_norm = Some(detect.delta_norm);
                     }
                 } else {
+                    let frame_host = frame_converted.ok_or_else(|| {
+                        anyhow!("host delta path requires a converted host frame")
+                    })?;
                     let host_reference = reference_for_frame
                         .as_ref()
                         .or((!reference_values_needed).then_some(&first_frame_converted))
                         .ok_or_else(|| anyhow!("missing reference frame for host delta"))?;
+                    let aligned_reference = if let Some(warp) = camera_actions.warp.as_ref() {
+                        apply_warp(host_reference, warp)?
+                    } else {
+                        host_reference.clone()
+                    };
+                    if config.peak_reference {
+                        let peak_base = apply_peak_shift_host(
+                            peak_brightness_map.as_ref(),
+                            &camera_actions.peak_shift,
+                        )?;
+                        let peak_frame =
+                            peak_frame_plane(frame_host, config.pre_delta_blur_kernel)?;
+                        peak_brightness_map = Some(update_peak_brightness_plane(
+                            &peak_frame,
+                            peak_base.as_ref(),
+                        )?);
+                    }
+                    let frame_for_delta = if config.pre_delta_blur_kernel > 1 {
+                        blur_frame(frame_host, config.pre_delta_blur_kernel)?
+                    } else {
+                        frame_host.clone()
+                    };
+                    let reference_for_delta = if config.pre_delta_blur_kernel > 1 {
+                        blur_frame(&aligned_reference, config.pre_delta_blur_kernel)?
+                    } else {
+                        aligned_reference
+                    };
                     let delta = compute_delta(
-                        frame_converted.ok_or_else(|| {
-                            anyhow!("host delta path requires a converted host frame")
-                        })?,
-                        host_reference,
+                        &frame_for_delta,
+                        &reference_for_delta,
                         &roi_mask,
                         &config.channel_weights,
                         config.darken_only,
@@ -1396,15 +2059,41 @@ where
                     host_delta_norm = Some(detect.delta_norm);
                 }
             } else {
+                let frame_host = frame_converted
+                    .ok_or_else(|| anyhow!("host delta path requires a converted host frame"))?;
                 let host_reference = reference_for_frame
                     .as_ref()
                     .or((!reference_values_needed).then_some(&first_frame_converted))
                     .ok_or_else(|| anyhow!("missing reference frame for host delta"))?;
+                let aligned_reference = if let Some(warp) = camera_actions.warp.as_ref() {
+                    apply_warp(host_reference, warp)?
+                } else {
+                    host_reference.clone()
+                };
+                if config.peak_reference {
+                    let peak_base = apply_peak_shift_host(
+                        peak_brightness_map.as_ref(),
+                        &camera_actions.peak_shift,
+                    )?;
+                    let peak_frame = peak_frame_plane(frame_host, config.pre_delta_blur_kernel)?;
+                    peak_brightness_map = Some(update_peak_brightness_plane(
+                        &peak_frame,
+                        peak_base.as_ref(),
+                    )?);
+                }
+                let frame_for_delta = if config.pre_delta_blur_kernel > 1 {
+                    blur_frame(frame_host, config.pre_delta_blur_kernel)?
+                } else {
+                    frame_host.clone()
+                };
+                let reference_for_delta = if config.pre_delta_blur_kernel > 1 {
+                    blur_frame(&aligned_reference, config.pre_delta_blur_kernel)?
+                } else {
+                    aligned_reference
+                };
                 let delta = compute_delta(
-                    frame_converted.ok_or_else(|| {
-                        anyhow!("host delta path requires a converted host frame")
-                    })?,
-                    host_reference,
+                    &frame_for_delta,
+                    &reference_for_delta,
                     &roi_mask,
                     &config.channel_weights,
                     config.darken_only,
@@ -1420,9 +2109,9 @@ where
                 )?);
                 host_delta_norm = Some(detect.delta_norm);
             }
-            if config.roi_mask.is_some() && !is_rectangular_roi_mask(&roi_mask) {
-                if let Some(mask) = host_mask.as_mut() {
-                    clip_mask_to_roi(mask, &roi_mask);
+            if config.camera_stable {
+                if let Some(mask) = host_mask.as_ref() {
+                    camera_stable_state.prev_registration_mask = Some(mask.clone());
                 }
             }
             let mask = host_mask.map(Arc::new);
@@ -1512,6 +2201,13 @@ where
         }
     }
 
+    if config.camera_stable && !camera_stable_state.motion_trace.is_empty() {
+        write_motion_trace(
+            &config.output_dir.join("motion_trace.csv"),
+            &camera_stable_state.motion_trace,
+        )?;
+    }
+
     let mask_artifact = if let Some(writer) = mask_writer.take() {
         Some(writer.close()?)
     } else {
@@ -1584,12 +2280,6 @@ where
             metadata.width,
             metadata.height,
             &config.annotation_formats,
-            &AnnotationExportOptions {
-                coco_bbox_only: options.effective_coco_bbox_only(),
-                coco_source_video: options
-                    .effective_coco_bbox_only()
-                    .then(|| config.video_path.to_string_lossy().to_string()),
-            },
         )?;
     }
 
@@ -2078,52 +2768,12 @@ fn write_run_summary(
             .collect::<Vec<_>>()
     );
     put!("lock_frames", config.lock_frames);
-    put!(
-        "roi_mask",
-        config
-            .roi_mask
-            .as_ref()
-            .map(|path| path.to_string_lossy().to_string())
-    );
-    put!(
-        "roi_margin",
-        config
-            .roi_mask
-            .is_none()
-            .then_some(yaml_f32(config.roi_margin))
-    );
-    put!(
-        "roi_margin_top",
-        config
-            .roi_mask
-            .is_none()
-            .then(|| config.roi_margin_top.map(yaml_f32))
-            .flatten()
-    );
-    put!(
-        "roi_margin_bottom",
-        config
-            .roi_mask
-            .is_none()
-            .then(|| config.roi_margin_bottom.map(yaml_f32))
-            .flatten()
-    );
-    put!(
-        "roi_margin_left",
-        config
-            .roi_mask
-            .is_none()
-            .then(|| config.roi_margin_left.map(yaml_f32))
-            .flatten()
-    );
-    put!(
-        "roi_margin_right",
-        config
-            .roi_mask
-            .is_none()
-            .then(|| config.roi_margin_right.map(yaml_f32))
-            .flatten()
-    );
+    put!("roi_margin", yaml_f32(config.roi_margin));
+    put!("roi_margin_top", config.roi_margin_top.map(yaml_f32));
+    put!("roi_margin_bottom", config.roi_margin_bottom.map(yaml_f32));
+    put!("roi_margin_left", config.roi_margin_left.map(yaml_f32));
+    put!("roi_margin_right", config.roi_margin_right.map(yaml_f32));
+    put!("pre_delta_blur_kernel", config.pre_delta_blur_kernel);
     put!("blur_kernel", config.blur_kernel);
     put!("skip_blur", config.skip_blur);
     put!("morph_kernel", config.morph_kernel);
@@ -2142,6 +2792,29 @@ fn write_run_summary(
     put!("threshold_offset", yaml_f32(config.threshold_offset));
     put!("darken_only", config.darken_only);
     put!("peak_reference", config.peak_reference);
+    put!("camera_stable", config.camera_stable);
+    put!(
+        "motion_per_frame_threshold",
+        config
+            .camera_stable
+            .then_some(yaml_f32(config.motion_per_frame_threshold))
+    );
+    put!(
+        "cumulative_motion_threshold",
+        config
+            .camera_stable
+            .then_some(yaml_f32(config.cumulative_motion_threshold))
+    );
+    put!(
+        "motion_model",
+        config.camera_stable.then_some(config.motion_model.name())
+    );
+    put!(
+        "peak_on_shift",
+        config
+            .camera_stable
+            .then_some(peak_on_shift_name(config.peak_on_shift))
+    );
     put!("write_mask_pngs", config.write_mask_pngs);
     put!("write_overlay_pngs", config.write_overlay_pngs);
     put!("write_heatmap_pngs", config.write_heatmap_pngs);
@@ -2169,6 +2842,13 @@ fn reference_mode_name(mode: &ReferenceMode) -> &'static str {
         ReferenceMode::Prev(_) => "prev",
         ReferenceMode::Absolute(_) => "absolute",
         ReferenceMode::Dynamic => "dynamic",
+    }
+}
+
+fn peak_on_shift_name(mode: PeakOnShift) -> &'static str {
+    match mode {
+        PeakOnShift::Reset => "reset",
+        PeakOnShift::Warp => "warp",
     }
 }
 
