@@ -131,13 +131,13 @@ detail.
 
 | `--colorspace` | `--channel-weights` (parsed as `w1,w2,w3`) |
 |---|---|
-| CIELAB | (1,0,0) (1,0.5,0) (1,0,0.5) (1,0.5,0.5) (1,1,0) (1,0,1) (1,1,1) (0.5,1,1) (0,1,1) (0.7,0.7,0.3) (0.3,0.7,0.7) (0.7,0.3,0.7) |
-| RGB | (1,1,1) (1,0,0) (0,1,0) (0,0,1) (0.299,0.587,0.114) (0.5,0.5,0) (0.5,0,0.5) (0,0.5,0.5) (0.7,0.2,0.1) (0.2,0.7,0.1) (0.1,0.2,0.7) (0.4,0.4,0.2) |
-| HSV | (0,0,1) (0,1,0) (1,0,0) (0,1,1) (1,0,1) (1,1,0) (1,1,1) (0.3,0.3,0.4) |
+| CIELAB | (1,0,0) (0,1,0) (0,0,1) (1,0.5,0) (1,0,0.5) (1,0.5,0.5) (1,1,0) (1,0,1) (0,1,1) (1,1,1) (0.5,1,1) (0.7,0.7,0.3) (0.3,0.7,0.7) (0.7,0.3,0.7) (0.5,0.7,0.3) (0.3,0.5,0.7) (0.6,0.2,0.2) |
+| RGB | (1,1,1) (1,0,0) (0,1,0) (0,0,1) (0.299,0.587,0.114) (0.5,0.5,0) (0.5,0,0.5) (0,0.5,0.5) (0.7,0.2,0.1) (0.2,0.7,0.1) (0.1,0.2,0.7) (0.4,0.4,0.2) (0.6,0.3,0.1) (0.3,0.6,0.1) (0.1,0.3,0.6) (0.33,0.34,0.33) (0.5,0.3,0.2) |
+| HSV | (0,0,1) (0,1,0) (1,0,0) (0,1,1) (1,0,1) (1,1,0) (1,1,1) (0.3,0.3,0.4) (0.2,0.4,0.4) |
 | GRAYSCALE | (1) |
 
-× `--darken-only` ∈ {on, off} = (12 + 12 + 8 + 1) × 2 = **66 trials × 11
-videos = 726 trials.**
+× `--darken-only` ∈ {on, off} = (17 + 17 + 9 + 1) × 2 = **88 trials × 11
+videos = 968 trials.**
 
 ### Phase 3 — Reference selection
 
@@ -170,9 +170,10 @@ At Phase-3 best per video.
 
 = 15 + 13 + 9 + 9 + 36 + 36 = **118 trials × 11 = 1,298 trials.**
 
-### Phase 5 — Pre-delta blur (finer grids, per-Option-C)
+### Phase 5 — Pre-delta blur (finer grids + all kinds, per-Option-C)
 
-At Phase-4 best per video.
+At Phase-4 best per video. Adds median and bilateral kinds that the
+blur module supports.
 
 | `--pre-delta-blur` | sweep |
 |---|---|
@@ -180,12 +181,14 @@ At Phase-4 best per video.
 | `flat:S` | S ∈ {3, 5, 7, 9, 11, 13, 15, 17, 21} |
 | `gaussian:S` | same |
 | `triangle:S` | same |
+| `median:S` | S ∈ {3, 5} (OpenCV restricts f32 median to these) |
+| `bilateral:S` | S ∈ {5, 9, 15} |
 
-= 1 + 3 × 9 = **28 trials × 11 = 308 trials.**
+= 1 + 3 × 9 + 2 + 3 = **33 trials × 11 = 363 trials.**
 
-### Phase 6 — Post-delta blur (finer grids, per-Option-C)
+### Phase 6 — Post-delta blur (finer grids + all kinds, per-Option-C)
 
-At Phase-5 best per video.
+At Phase-5 best per video. Same kind menu as Phase 5.
 
 | `--blur` | sweep |
 |---|---|
@@ -193,8 +196,10 @@ At Phase-5 best per video.
 | `flat:S` | S ∈ {3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 25} |
 | `gaussian:S` | same |
 | `triangle:S` | same |
+| `median:S` | S ∈ {3, 5} |
+| `bilateral:S` | S ∈ {5, 9, 15} |
 
-= 1 + 3 × 11 = **34 trials × 11 = 374 trials.**
+= 1 + 3 × 11 + 2 + 3 = **39 trials × 11 = 429 trials.**
 
 ### Phase 7 — Morphology (finer kernel grid, per-Option-C)
 
@@ -222,17 +227,17 @@ At Phase-7 best per video.
 
 = **19 trials × 11 = 209 trials.**
 
-### Phase 10 — Joint perturbation (Option-C addition)
+### Phase 10 — Joint perturbation (Option-C addition, expanded)
 
 At each video's chained best from Phases 1-8, perturb the three
-highest-leverage knobs simultaneously by ±1 step on each axis. Tests
+highest-leverage knobs simultaneously by ±2 steps on each axis. Tests
 whether the chained-greedy winner is actually a local optimum in the
 joint space, or whether knob-i and knob-j interact in a way the
 single-axis sweeps missed. Knobs perturbed: `threshold-offset`,
-`morph-kernel`, `lock-frames`. Each axis takes 3 values: {-1 step,
-0 (the chained best), +1 step}.
+`morph-kernel`, `lock-frames`. Each axis takes 5 values: {-2 step,
+-1 step, 0 (the chained best), +1 step, +2 step}.
 
-= 3³ = 27 trials per video × 11 = **297 trials.**
+= 5³ = 125 trials per video × 11 = **1,375 trials.**
 
 ### Phase 9 — Stabilization (input_1 only)
 
@@ -255,16 +260,16 @@ is the cross-product of motion-model × per-frame × cumulative = 2 × 5 × 5 = 
 | Phase | Trials | Notes |
 |---|---:|---|
 | 1 | 891 | All 11 videos |
-| 2 | 726 | All 11 videos (Option-C deep weight grid) |
+| 2 | 968 | All 11 videos (Option-C deep weight grid: 17/17/9/1 colorspace combos × 2 darken) |
 | 3 | 242 | All 11 videos |
-| 4 | 1,298 | All 11 videos (Option-C finer threshold grid) |
-| 5 | 308 | All 11 videos (Option-C finer pre-blur grid) |
-| 6 | 374 | All 11 videos (Option-C finer post-blur grid) |
+| 4 | 1,298 | All 11 videos (Option-C finer threshold grid; all 6 modes) |
+| 5 | 363 | All 11 videos (Option-C finer pre-blur grid; all 5 kinds + none) |
+| 6 | 429 | All 11 videos (Option-C finer post-blur grid; all 5 kinds + none) |
 | 7 | 1,023 | All 11 videos (Option-C finer morph grid) |
 | 8 | 209 | All 11 videos (Option-C finer lock grid) |
-| 10 | 297 | All 11 videos (Option-C joint perturbation) |
+| 10 | 1,375 | All 11 videos (Option-C joint perturbation, 5³ expansion) |
 | 9 | 51 | input_1 only (run last) |
-| **Total** | **~5,419** | (drop the original §5 row totals; superseded by this row) |
+| **Total** | **~6,849** | (drop the original §5 row totals; superseded by this row) |
 
 | 3 | 242 | All 11 videos |
 | 4 | 649 | All 11 videos |
@@ -287,9 +292,9 @@ under N=10 (input_11 trimmed batch of 10 finished in 40.6 s wall-clock,
 matching ideal scaling on the 112-core box). The full ablation budget
 under Option C and N=10 workers projects to:
 
-- 5,419 trials × ~4 s effective / 10 workers ≈ **~36 min pure compute**
+- 6,849 trials × ~4 s effective / 10 workers ≈ **~46 min pure compute**
 - With process spawn overhead, agreement.py serialization, and
-  occasional retry: **estimate 1.5-3 hours wall-clock end-to-end.**
+  occasional retry: **estimate 2-4 hours wall-clock end-to-end.**
 
 The wall budget is now generous enough that the run is no longer the
 constraint; we'd rather report fewer trials with high CIs than push
@@ -429,17 +434,17 @@ asked for.
 | Phase | Subject | Sweep dims | Per-video trials | Videos | Total trials | Output |
 |---:|---|---|---:|---:|---:|---|
 | 1 | Rough baseline | thr-offset × min-area × morph-kernel × lock | 81 | 11 | 891 | data/ablation/phase1_*.{json,csv} |
-| 2 | Colorspace + channel weights (deep, Option-C) | colorspace × weights × darken | 66 | 11 | 726 | data/ablation/phase2_*.{json,csv} |
+| 2 | Colorspace + channel weights (deep, Option-C) | colorspace × weights × darken | 88 | 11 | 968 | data/ablation/phase2_*.{json,csv} |
 | 3 | Reference selection | mode + mode-specific params | 22 | 11 | 242 | data/ablation/phase3_*.{json,csv} |
 | 4 | Threshold mode (finer grids, Option-C) | otsu/triangle offsets, manual, percentile, adaptive-mean B×C, adaptive-gaussian B×C | 118 | 11 | 1,298 | data/ablation/phase4_*.{json,csv} |
-| 5 | Pre-delta blur (finer grids, Option-C) | kind × size, plus none | 28 | 11 | 308 | data/ablation/phase5_*.{json,csv} |
-| 6 | Post-delta blur (finer grids, Option-C) | kind × size, plus none | 34 | 11 | 374 | data/ablation/phase6_*.{json,csv} |
+| 5 | Pre-delta blur (finer grids + all 5 kinds, Option-C) | kind × size, plus none; flat/gaussian/triangle/median/bilateral | 33 | 11 | 363 | data/ablation/phase5_*.{json,csv} |
+| 6 | Post-delta blur (finer grids + all 5 kinds, Option-C) | kind × size, plus none; same kinds as Phase 5 | 39 | 11 | 429 | data/ablation/phase6_*.{json,csv} |
 | 7a | Morphology kernel × shape (Option-C) | 16 kernels × 3 shapes | 48 | 11 | 528 | data/ablation/phase7a_*.{json,csv} |
 | 7b | Morphology iterations × top-5 kernel | 9 iters × 5 kernels | 45 | 11 | 495 | data/ablation/phase7b_*.{json,csv} |
 | 8 | Lock fine sweep (Option-C) | 19 lock-frame values | 19 | 11 | 209 | data/ablation/phase8_*.{json,csv} |
-| 10 | Joint perturbation (Option-C) | 3 axes × 3 values around chained best | 27 | 11 | 297 | data/ablation/phase10_*.{json,csv} |
+| 10 | Joint perturbation (Option-C, 5³) | 3 axes × 5 values around chained best | 125 | 11 | 1,375 | data/ablation/phase10_*.{json,csv} |
 | 9 | Stabilization | camera-stable + motion-model × per-frame × cumulative | 51 | 1 (input_1) | 51 | data/ablation/phase9_*.{json,csv} |
-| **all** | | | | | **5,419** | data/ablation/summary.md |
+| **all** | | | | | **6,849** | data/ablation/summary.md |
 
 ## 11. What lands in the paper
 
