@@ -65,25 +65,47 @@ The first stage decodes each Blue-Green-Red (BGR) frame from the input video. Th
 
 == Region of interest
 
-A rectangular region of interest excludes the part frame, manifold flange, and bag wrinkles outside the laminate. The user supplies four fractional margins, one per edge, each clamped to the closed interval from zero to forty-nine hundredths of the corresponding side, and the algorithm builds a binary mask $R$ that is one inside the resulting rectangle and zero elsewhere. A single configuration parameter sets all four margins symmetrically, with per-edge overrides available. All subsequent stages operate only on pixels where $R = 1$.
+The region of interest is a binary mask $R in {0, 1}^(H times W)$ that is one inside the laminate and zero elsewhere; all subsequent stages operate only on pixels where $R = 1$. The pipeline supports two equivalent forms for constructing $R$. The rectangular form takes four fractional margins, one per edge, each clamped to the closed interval from zero to forty-nine hundredths of the corresponding side, and builds the rectangle bounded by those margins. A single configuration parameter sets all four margins symmetrically, with per-edge overrides available. The rectangular form is appropriate for laminates that fit a rectangular bounding box with no internal fixtures, which describes every sample in the labeling subset of Section~4. The imported-mask form takes a path to a single-channel image at the source video's resolution and uses the image directly as $R$, with non-zero pixels treated as inside the laminate. The imported form is appropriate when the laminate is non-rectangular (for instance a curved part boundary) or when fixtures, sensors, or labels inside the bag must be excluded from the difference computation but lie inside any axis-aligned rectangle that contains the laminate. The integrated configuration uses the rectangular form with `roi-margin = 0.15`; the imported form is selectable via `--roi-mask-path` and is exercised in the per-mold tuning regimes described in Section~7.
 
 #figure(
   // image("/typst/figures/roi_crop.pdf", width: 95%),
-  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
-    _ROI crop placeholder._ Single canonical input frame with the
-    rectangular ROI mask $R$ drawn as a translucent garnet overlay
-    over the laminate; the manifold flange and bag wrinkles outside
-    the rectangle are visibly excluded. A small inset in the corner
-    shows the four fractional margins (`roi-margin-top`, `-bottom`,
-    `-left`, `-right`) used in the integrated configuration. The
-    hatched region outside the rectangle is the area all subsequent
-    stages skip.
+  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
+    _ROI placeholder._ Two-panel comparison of the two ROI forms on
+    the same frame. Left: rectangular form. Single canonical input
+    frame with the rectangular ROI mask $R$ drawn as a translucent
+    garnet overlay; the manifold flange and bag wrinkles outside
+    the rectangle are visibly excluded, and a small inset shows the
+    four fractional margins used in the integrated configuration.
+    Right: imported-mask form. Same frame with a non-rectangular
+    laminate boundary drawn as a translucent garnet overlay, with
+    an internal fixture (bagging-tape patch, embedded thermocouple,
+    or operator hand) drawn as a hatched exclusion region inside
+    what would have been the rectangular bounding box. The imported
+    form covers regimes the rectangular form cannot.
   ],
   caption: [
-    ROI mask $R$ applied to a canonical input frame. Pixels outside
-    the rectangle are excluded from every subsequent stage.
+    The two equivalent forms for constructing the ROI mask $R$: a
+    rectangle parameterised by four fractional margins (left), or
+    an externally-supplied binary image at the source resolution
+    (right).
   ],
 ) <fig:roi_crop>
+
+#figure(
+  table(
+    columns: (auto, 1fr),
+    align: (left, left),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header([*Option*], [*Description*]),
+    table.hline(stroke: 0.5pt),
+    [rectangular],   [Bounding rectangle parameterised by four fractional margins (`roi-margin`, optionally overridden per edge by `roi-margin-top`, `-bottom`, `-left`, `-right`), each clamped to $[0, 0.49]$.],
+    [imported mask], [Single-channel binary image read from `roi-mask-path` at the source video's resolution; non-zero pixels are treated as inside the laminate. Used when the laminate is non-rectangular or when interior fixtures must be excluded.],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [The two forms of the region-of-interest mask $R$. The integrated configuration uses the rectangular form.],
+) <tab:roi_modes>
 
 == Camera-shift detection and registration
 
