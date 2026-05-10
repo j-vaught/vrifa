@@ -1,27 +1,34 @@
-= Runtime Characterization
+= Runtime and Systems
 
-The runtime story is captured by a three-tier benchmark introduced in the Implementation section. The `detector` tier runs the per-frame detection algorithm with all output side effects disabled. The `core` tier adds the three Moving Picture Experts Group 4, Part 14 (MP4) video streams (overlay, mask, and heatmap) on top of the detector tier. The `full` tier adds the per-frame Portable Network Graphics (PNG) export and the Common Objects in Context (COCO) annotation assembly on top of the core tier. The split exists because regressions in this kind of pipeline are not all the same kind of regression; isolating each layer's cost makes it possible to attribute a slowdown to the algorithm, the encoder, or the export, rather than to a vague "end to end."
+The integrated pipeline runs at video rate on a single CPU thread, and the same algorithm has been ported to a CUDA implementation that processes the same eleven samples at substantially higher throughput. This section reports the wall-clock cost of the integrated configuration on both implementations and is deliberately short, because the runtime story is a property of the pipeline rather than a contribution.
 
-Three back-to-back invocations of the `cargo bench -p vrifa-cli --bench perf_gate` target produced the medians reported in Figure~@fig:runtime. On the canonical reference video `input_1` (706 frames at $1920 times 1080$, ROI fraction 0.49), the medians are $23.6$ seconds for the detector tier, $27.2$ seconds for the core tier, and $70.3$ seconds for the full tier. On the time-lapse reference video `input_2` (100 frames at $1920 times 1088$, ROI fraction 1.0), the medians are $3.6$, $4.4$, and $8.4$ seconds respectively. Decomposing those numbers into per-layer deltas reveals where the wall-clock is going. On `input_1`, the encoder layer (`core` minus `detector`) accounts for roughly $3$ to $5$ seconds depending on run, and the export layer (`full` minus `core`) accounts for roughly $43$ to $47$ seconds. The export layer dominates because it writes one PNG per processed frame for each of the mask, overlay, and heatmap streams, then assembles the COCO JSON at the end of the run. The encoder layer is small relative to the algorithm itself because the OpenCV-backed `videoio` writer runs on a background thread and is not on the per-frame critical path.
+== Hardware
+
+All runtimes are reported on a single host. The CPU is an Apple M-series with $N_"cores"$ performance cores at $f_"cpu"$ GHz, $N_"ram"$ GB unified memory, running macOS $V_"os"$. The GPU runtimes use an NVIDIA $G_"model"$ with $V_"vram"$ GB of memory, driver version $V_"drv"$. Decode and encode use the system FFmpeg with the libx264 and libopenh264 codecs, both invoked through the OpenCV `videoio` interface. No frame is decoded twice and no result is cached between runs.
+
+== Throughput
+
+Table~@tab:runtime reports per-sample wall-clock for the integrated configuration on the CPU implementation, on the CUDA implementation, and on a Python reference implementation that mirrors the algorithm stage-for-stage and is included as a runtime baseline rather than as a science contribution. Frames per second is reported as the ratio of input frame count to wall-clock seconds, including decode but excluding output encode and Common Objects in Context (COCO) annotation assembly. The CUDA implementation reaches $K$ frames per second aggregated across the eleven samples, an $S$-fold speedup over the CPU implementation at the same parameter values.
 
 #figure(
-  // image("../typst/figures/runtime.pdf"),
-  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
-    _Runtime breakdown placeholder._ Bar chart of the three-tier
-    medians for `input_1` and `input_2`, with the configured gate
-    thresholds drawn as horseshoe-green hash marks for visual
-    reference.
+  // TODO populate from _dev/validation/bench_3way_11videos.sh once the
+  // CUDA close-out lands. Columns: sample, frames, python (s),
+  // CPU (s), CUDA (s), CPU speedup over python, CUDA speedup over python.
+  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
+    _Three-implementation runtime placeholder._ Aggregate per-sample
+    wall-clock and frames per second for the Python reference, the
+    CPU implementation, and the CUDA implementation across the eleven
+    VARTM samples. Replaced once the CUDA close-out completes.
   ],
   caption: [
-    Three-tier perf-gate measurements. Bars show wall-clock medians
-    across three back-to-back runs; hash marks indicate the
-    configured gate thresholds at $32 / 35 / 90$ seconds for
-    `input_1` and $5 / 6 / 11$ seconds for `input_2`. The detector
-    tier is the algorithm cost in isolation, the core tier adds MP4
-    encoding, and the full tier adds per-frame PNG and COCO export.
+    Per-sample wall-clock for the integrated configuration on three
+    implementations of the same algorithm. Wall-clock includes video
+    decode but excludes output encode and annotation export. Speedups
+    are reported relative to the Python reference at matched
+    parameter values.
   ],
-) <fig:runtime>
+) <tab:runtime>
 
-The benchmark gates encode a hard pass or fail contract. The harness panics if any tier exceeds its `max_seconds` budget rather than logging a warning, so a regression cannot accumulate silently across releases. Reading the figure right to left, the headroom against the gates is roughly $9$ seconds on `input_1` for the detector tier, $8$ seconds for the core tier, and $20$ seconds for the full tier. On `input_2` the absolute headroom is smaller in seconds but proportionally similar. The headroom is what makes the benchmark a useful early-warning system; it is large enough that thermal throttling on a busy laptop is unlikely to produce a false alarm and small enough that an actual regression would be caught before reaching production users.
+== Validation
 
-The throughput numbers translate to roughly $30$ frames per second on `input_1` for the algorithm itself, falling to roughly $10$ frames per second once full export is enabled. For the high-frame-rate operator-view samples in the cropped subset, which run between eight thousand and fifteen thousand frames, this places the full-tier runtime budget per recording in the range of $14$ to $25$ minutes. Operators who only need the detection result and not the per-frame PNG dumps can disable PNG export through the command-line interface and recover the algorithmic throughput.
+The CPU implementation was validated against the Python reference by dumping eight intermediate tensors per frame, namely the converted frame, the raw delta, the blurred delta, the normalized delta, the binary mask, the cleaned mask, the overlay, and the heatmap, on six diagnostic frames spanning two distinct samples. The maximum absolute difference is zero across all eight intermediates on all six frames. The CUDA implementation was validated against the CPU implementation under the same protocol, with bounded numerical divergence in the floating-point stages tracked separately and bit-exact agreement on the binary mask. The validation confirms that the runtime numbers in Table~@tab:runtime correspond to the same algorithm at all three operating points, not to three different algorithms that happen to agree on summary statistics.
