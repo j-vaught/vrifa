@@ -63,3 +63,4 @@ vrifa-stable-rs/target/
 
 # Jupyter
 .ipynb_checkpoints/
+!data/runtime_benchmark.json

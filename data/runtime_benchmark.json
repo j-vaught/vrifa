@@ -1,0 +1,71 @@
+{
+  "cpu": {},
+  "cuda": {
+    "input_1": {
+      "runtime_s": 6.581059455871582,
+      "ok": true,
+      "n_masks": 706
+    },
+    "input_2": {
+      "runtime_s": 1.5276048183441162,
+      "ok": true,
+      "n_masks": 100
+    },
+    "input_3": {
+      "runtime_s": 2.121657371520996,
+      "ok": true,
+      "n_masks": 200
+    },
+    "input_4": {
+      "runtime_s": 1.8194506168365479,
+      "ok": true,
+      "n_masks": 542
+    },
+    "input_5": {
+      "runtime_s": 1.8206491470336914,
+      "ok": true,
+      "n_masks": 542
+    },
+    "input_6": {
+      "runtime_s": 1.8209967613220215,
+      "ok": true,
+      "n_masks": 542
+    },
+    "input_7": {
+      "runtime_s": 1.8696632385253906,
+      "ok": true,
+      "n_masks": 542
+    },
+    "input_8": {
+      "runtime_s": 2.521794319152832,
+      "ok": true,
+      "n_masks": 842
+    },
+    "input_9": {
+      "runtime_s": 3.021817207336426,
+      "ok": true,
+      "n_masks": 1037
+    },
+    "input_10": {
+      "runtime_s": 3.0731945037841797,
+      "ok": true,
+      "n_masks": 767
+    },
+    "input_11": {
+      "runtime_s": 5.37806248664856,
+      "ok": true,
+      "n_masks": 997
+    }
+  },
+  "hardware": {
+    "cpu_model": "Intel(R) Xeon(R) w9-3495X",
+    "cpu_cores": "112",
+    "cpu_max_mhz": "4800.0000",
+    "ram_total": "502Gi",
+    "gpu_model": "NVIDIA RTX 6000 Ada Generation",
+    "gpu_vram": "49140 MiB",
+    "gpu_driver": "550.144.03",
+    "os_version": "22.04.5 LTS (Jammy Jellyfish)"
+  },
+  "overall_elapsed_s": 3071.42015004158
+}

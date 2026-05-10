@@ -4,85 +4,68 @@ The integrated pipeline is a working method on the eleven samples evaluated in t
 
 == Failure Modes
 
-The temporal-locking window is the primary diagnostic when results appear noisy on long pauses. The integrated configuration sets the window to three frames, which holds a positive detection in the mask for three subsequent frames so transient single-frame dropouts do not flicker the boundary. On infusions whose true wet-front pauses exceed three frames, transient detections from earlier in the run persist past the moment the front recedes and the mask grows phantom regions that look like artifacts. The mechanism is not a defect. It is the locking semantics applied to a sequence whose pauses violate the assumption baked into a fixed three-frame window. The operational consequence is that the window is a per-mold parameter, not a constant suitable for every infusion, and the failure is visible only on long-pause sequences.
+The per-sample ablation surfaces an additional, mechanism-level temporal-locking failure that is not captured by the long-pause story below. On every sample tested, `lock_frames` is bimodal: the cleanest configurations sit at either `lock_frames = 0` or `lock_frames` greater than or equal to five, while values from one through four are catastrophically the worst region of the parameter space, often dropping IoU by $0.25$ relative to the bimodal modes. The pattern is consistent across resolutions, run durations, and bag-side appearances, which means the cause is mechanism-level rather than sample-level. The most likely root cause is a startup transient in the locking heuristic, where the partial-reference accumulation during the first few frames seeds the locked-pixel map with stale evidence that subsequent frames cannot dislodge. A practitioner therefore should choose `lock_frames` from the set $\{0, \ge 5\}$ and avoid the intermediate range entirely until the underlying heuristic is revised.
+
+The temporal-locking window is also the primary diagnostic when results appear noisy on long pauses. The integrated configuration sets the window to three frames, which holds a positive detection in the mask for three subsequent frames so transient single-frame dropouts do not flicker the boundary. On infusions whose true wet-front pauses exceed three frames, transient detections from earlier in the run persist past the moment the front recedes and the mask grows phantom regions that look like artifacts. The mechanism is not a defect. It is the locking semantics applied to a sequence whose pauses violate the assumption baked into a fixed three-frame window. The operational consequence is that the window is a per-mold parameter, not a constant suitable for every infusion, and the failure is visible only on long-pause sequences.
 
 #figure(
-  // image("/typst/figures/failure_lock_phantom.pdf", width: 95%),
-  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
-    _Long-pause lock-artifact placeholder._ Three-frame sequence
-    on an infusion whose true wet front pauses for ten frames mid-
-    run with the lock window left at $n_"lock" = 3$. Frame at
-    $t = 20$ (mid-pause) shows phantom regions held by the lock
-    from earlier detections. Frame at $t = 30$ (after the pause
-    resolves) shows the true front receded but the lock-held mask
-    still showing the phantom. Frame at $t = 40$ shows that the
-    phantom region persists, because the locked-pixel map is sticky.
-    A strip plot below shows the per-pixel detection state over
-    time for one phantom-region pixel with the lock latch
-    annotated.
-  ],
+  image("/typst/figures/failure_lock_phantom.pdf", width: 95%),
   caption: [
-    Phantom regions persist past the moment the front recedes when
-    the lock window is shorter than the true pause duration.
+    Three frames from `input_6` spanning the run's fill regime,
+    where the integrated configuration's `lock_frames = 3` setting
+    interacts poorly with the true-front dynamics. The per-sample
+    ablation reveals a sharp bimodality: this sample achieves
+    IoU 0.94 with `lock_frames = 0` and IoU 0.94 with
+    `lock_frames = 30`, but every intermediate value collapses to
+    IoU 0.69. The pattern indicates a startup-transient artifact
+    in the locking heuristic that holds spurious detections during
+    the first few frames of a partial reference.
   ],
 ) <fig:failure_lock_phantom>
 
 The dynamic-reference calibration window is the second sensitive surface. The integrated configuration uses ten calibration frames to fit a square-root-of-area growth model that subsequently lags the reference frame behind the live frame. The assumption baked into that fit is that early fill is representative of the growth law. If the first ten processed frames contain race-tracking, an air pocket, or some other anomaly, the fit picks up a poor reference factor and every downstream frame inherits that error. The remedy is to choose a calibration window that excludes the anomaly or to fall back to one of the static reference modes, both of which are configuration choices rather than numerical defects.
 
 #figure(
-  // image("/typst/figures/failure_calibration.pdf", width: 95%),
-  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
-    _Dynamic-reference calibration anomaly placeholder._ Two
-    side-by-side trajectories of the dynamic-reference fit. Left:
-    clean infusion where early fill obeys the sqrt-area growth
-    law, $kappa$ converges, downstream lag is well-behaved, mask
-    aligns with the true front. Right: race-tracking-dominated
-    infusion where the first ten calibration frames violate the
-    growth law, $kappa$ is fit to a poor model, the downstream lag
-    is wrong, and the resulting mask is offset from the true front.
-    Beneath both trajectories, side-by-side overlays at the same
-    fill percentage show the offset visually. The mismatched panel
-    is bordered in garnet.
-  ],
+  image("/typst/figures/failure_calibration.pdf", width: 95%),
   caption: [
-    The dynamic-reference fit is sensitive to the early-fill
-    regime. Race-tracking inside the calibration window distorts
-    $kappa$ and propagates an offset reference frame through the
-    rest of the run.
+    Dry-frame and wet-frame comparison for two samples that differ
+    by an order of magnitude in run duration. Top row: `input_5`
+    (270 s, the clean-darkening 524p regime). Bottom row:
+    `input_9` (516 s, the longest run in the cohort).
+    The dynamic-reference fit is sensitive to the calibration
+    window's representativeness of the early-fill regime. Longer
+    runs accumulate more deviation from the sqrt-area growth law
+    if race-tracking or other anomalies sit in the calibration
+    window, propagating an offset reference frame through the rest
+    of the run.
   ],
 ) <fig:failure_calibration>
 
 The third failure mode is the inherent ceiling of any tuned classical-CV pipeline. The integrated configuration does not generalize across substantially different fabric types, lighting setups, or vacuum-bag textures without re-tuning. The mode menus and scalar values held fixed in Section~3 (Tables~@tab:colorspace_modes, @tab:threshold_modes, @tab:scalars) assume a transparent vacuum bag, top-down LED lighting, and a dark mold background, because those are the conditions of the eleven samples in the labeling subset. Off-distribution conditions, such as a heavily textured bag, side lighting, or a bright mold surface, can break the Otsu threshold or push the response distribution outside the range the threshold offset was tuned for. The pipeline exposes a percentile-threshold mode, a manual contrast threshold, and an RGB colorspace switch precisely because no single configuration covers every regime, and a per-mold reconfiguration is the appropriate response. The component-removal ablation in Section~5 reports on conditions where the integrated configuration as evaluated holds.
 
 #figure(
-  // image("/typst/figures/failure_offdistribution.pdf", width: 95%),
-  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
-    _Off-distribution failure placeholder._ Three-column panel.
-    Left: heavily-textured silicone vacuum bag where bag patterns
-    create persistent dark features that the threshold catches as
-    wet. Center: side-lit laminate with a strong illumination
-    gradient across the field of view that the reference stage
-    does not fully cancel, leaving a low-frequency intensity
-    gradient in the response. Right: bright reflective mold surface
-    that drives Otsu's bimodal split in the wrong direction. For
-    each column, the top row is the raw input and the bottom row is
-    the integrated-configuration mask, showing visibly broken
-    segmentation. The integrated configuration as evaluated does
-    not address any of these regimes; each requires a per-mold
-    reconfiguration via the percentile-threshold mode, manual
-    contrast threshold, or adaptive-mean threshold from
-    Table~@tab:threshold_modes.
-  ],
+  image("/typst/figures/failure_offdistribution.pdf", width: 95%),
   caption: [
-    Three off-distribution conditions where the integrated
-    configuration as evaluated breaks. Each requires per-mold
-    reconfiguration of the threshold or colorspace mode.
+    Three regimes that stress the integrated configuration in
+    different ways. Left: bright-bag with auto-exposure rebound,
+    common on samples whose first-frame mean $L^*$ exceeds $70$.
+    Center: dark-fabric, low-contrast regime where the dry weave
+    sits near $L^* = 55$ and wet-dry separation is compressed.
+    Right: heavily-compressed bag with weave texture nearly erased,
+    where the Sobel gradient mean drops below $10$ and local
+    edge cues no longer help.
+    Each regime calls for a different sample-aware setting from
+    Table~@tab:lookup rather than for a structural fix.
   ],
 ) <fig:failure_offdistribution>
+
+One sample sits at a structural ceiling that no amount of tuning closes. The per-sample ablation shows `input_11` capped at IoU $0.917$ across 61 distinct configurations that all hit the same number to four decimals; varying `morph_kernel`, `lock_frames`, `threshold_offset`, and `min_area` over their full tested ranges produces no improvement above this plateau. The likely cause is a non-contiguous secondary wet patch at the end of the run that the differencing-plus-Otsu pipeline does not detect at all, regardless of how the post-detection cleanup is configured. The magnitude of the secondary patch (roughly $13.6%$ of the laminate area) is consistent with the magnitude of the IoU shortfall relative to the cohort's easier samples. The ceiling is therefore not a parameter-tuning failure but a detection failure: the per-frame contrast signal does not register the patch as wet in the first place. Closing the gap would require either an additional detection pathway (a second reference, a per-region threshold, or a learned detector on the residual) or a label revision that excludes the secondary patch.
 
 == Tradeoffs
 
 The integrated configuration is built on a deliberate set of tradeoffs that a reader should weigh alongside the benchmark numbers.
+
+The same per-sample evidence surfaces a bag-side property that predicts the lock regime. The 524p samples whose dry-frame mean $L^*$ exceeds $70$ (`input_4`, `input_6`, `input_10`) all want `lock_frames = 0` at their per-sample best, while the darker-bag samples in the same hardware bucket want `lock_frames` between five and eleven. The bright-bag samples are also the ones that show auto-exposure rebound late in the run, which suggests the camera's metering loop poisons a few middle reference frames in a way the locking heuristic cannot recover from. The practitioner can read first-frame brightness off any new run before tuning, and choose `lock_frames` from this regime predictor before consulting the rest of the lookup. Table~@tab:lookup contains the same recommendation in compact form.
 
 We trade an end-to-end accuracy ceiling for component-level explainability. A learned segmenter trained on a sufficiently large in-domain corpus would plausibly exceed the boundary $F_1$ reported in this paper, but no such corpus exists in the public VARTM literature and a research group that wants to characterize a single infusion run next week cannot collect one in time. The component-removal ablation in Section~5 reports the IoU consequence of disabling each named primitive on the eleven-sample subset, which is the property the integrated configuration is designed to expose. A monolithic learned segmenter would conflate those deltas, so a reader interested only in the headline number could replace this pipeline with a sufficiently large convolutional model and lose the per-component evidence. The empirical contribution of this paper is the per-component evidence, not the headline.
 

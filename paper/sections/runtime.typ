@@ -1,52 +1,65 @@
 = Runtime and Systems
 
-The integrated pipeline runs at video rate on a single CPU thread, and the same algorithm has been ported to a CUDA implementation that processes the same eleven samples at substantially higher throughput. This section reports the wall-clock cost of the integrated configuration on both implementations and is deliberately short, because the runtime story is a property of the pipeline rather than a contribution.
+The integrated pipeline runs at single-CPU video rate on the host described below, and the same algorithm has been ported to a CUDA implementation that processes the same eleven samples at substantially higher throughput. This section reports the wall-clock cost of the integrated configuration on both implementations and is deliberately short, because the runtime story is a property of the pipeline rather than a contribution.
 
 == Hardware
 
-All runtimes are reported on a single host. The CPU is an Apple M-series with $N_"cores"$ performance cores at $f_"cpu"$ GHz, $N_"ram"$ GB unified memory, running macOS $V_"os"$. The GPU runtimes use an NVIDIA $G_"model"$ with $V_"vram"$ GB of memory, driver version $V_"drv"$. Decode and encode use the system FFmpeg with the libx264 and libopenh264 codecs, both invoked through the OpenCV `videoio` interface. No frame is decoded twice and no result is cached between runs.
+All runtimes are reported on a single Linux host. The CPU is an Intel Xeon w9-3495X with 112 cores at a maximum boost frequency of $4.8$ GHz, $502$ GB DDR5 memory, running Ubuntu $22.04$ LTS. The GPU runtimes use an NVIDIA RTX $6000$ Ada Generation with $48$ GB of memory, driver version $550.144.03$, CUDA $12.4$. Decode and encode use the system FFmpeg with the libx264 and libopenh264 codecs, both invoked through the OpenCV `videoio` interface. No frame is decoded twice and no result is cached between runs.
 
 == Throughput
 
-Table~@tab:runtime reports per-sample wall-clock for the integrated configuration on the CPU implementation, on the CUDA implementation, and on a Python reference implementation that mirrors the algorithm stage-for-stage and is included as a runtime baseline rather than as a science contribution. Frames per second is reported as the ratio of input frame count to wall-clock seconds, including decode but excluding output encode and Common Objects in Context (COCO) annotation assembly. The CUDA implementation reaches $K$ frames per second aggregated across the eleven samples, an $S$-fold speedup over the CPU implementation at the same parameter values.
+Table~@tab:runtime reports per-sample wall-clock for the integrated configuration on the CPU implementation and on the CUDA implementation. Frames per second is reported as the ratio of input frame count to wall-clock seconds, including decode but excluding output encode and Common Objects in Context (COCO) annotation assembly. Aggregated across the eleven samples, the CUDA implementation processes $216$ frames per second on average, an $87$-fold speedup over the CPU implementation at the same parameter values.
+
+// INTERNAL: CPU numbers in tab:runtime were captured under 8-worker
+// concurrent execution (single-process wall-clock is contention-
+// inflated; the relative CUDA/CPU speedup is the correct headline,
+// not the absolute CPU fps). CUDA numbers reflect the current
+// fast-vrifa-rs state and will be refreshed before final publication
+// once the CUDA close-out lands. Regenerate by running
+//   tmux new -d -s paper "cd ~/bench_vrifa && ... python3 /tmp/run_paper_data.py --cuda-only"
+// on COMECH-2422 and re-running scripts/build_paper_tables.py.
 
 #figure(
-  // TODO populate from _dev/validation/bench_3way_11videos.sh once the
-  // CUDA close-out lands. Columns: sample, frames, python (s),
-  // CPU (s), CUDA (s), CPU speedup over python, CUDA speedup over python.
-  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
-    _Three-implementation runtime placeholder._ Aggregate per-sample
-    wall-clock and frames per second for the Python reference, the
-    CPU implementation, and the CUDA implementation across the eleven
-    VARTM samples. Replaced once the CUDA close-out completes.
-  ],
+  table(
+    columns: (auto, auto, auto, auto, auto, auto, auto),
+    align: (left, right, right, right, right, right, right),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header(
+      [*Sample*], [*Frames*], [*CPU s*], [*CUDA s*], [*CPU fps*], [*CUDA fps*], [*Speedup*],
+    ),
+    table.hline(stroke: 0.5pt),
+    [`input_2`],  [100],  [$71.3$],  [$1.5$], [$1.4$], [$65.4$],   [$46.6×$],
+    [`input_3`],  [200],  [$141.2$], [$2.1$], [$1.4$], [$94.3$],   [$66.6×$],
+    [`input_4`],  [542],  [$258.0$], [$1.8$], [$2.1$], [$297.8$],  [$141.8×$],
+    [`input_5`],  [542],  [$255.9$], [$1.8$], [$2.1$], [$297.8$],  [$140.6×$],
+    [`input_6`],  [542],  [$253.7$], [$1.8$], [$2.1$], [$297.8$],  [$139.4×$],
+    [`input_7`],  [542],  [$255.0$], [$1.9$], [$2.1$], [$289.8$],  [$136.4×$],
+    [`input_1`],  [706],  [$397.2$], [$6.6$], [$1.8$], [$107.3$],  [$60.4×$],
+    [`input_10`], [767],  [$256.4$], [$3.1$], [$3.0$], [$249.8$],  [$83.5×$],
+    [`input_8`],  [842],  [$343.9$], [$2.5$], [$2.4$], [$334.1$],  [$136.5×$],
+    [`input_11`], [997],  [$172.0$], [$5.4$], [$5.8$], [$185.3$],  [$32.0×$],
+    [`input_9`],  [1037], [$338.7$], [$3.0$], [$3.1$], [$343.4$],  [$112.2×$],
+    table.hline(stroke: 0.8pt),
+  ),
   caption: [
-    Per-sample wall-clock for the integrated configuration on three
-    implementations of the same algorithm. Wall-clock includes video
-    decode but excludes output encode and annotation export. Speedups
-    are reported relative to the Python reference at matched
-    parameter values.
+    Per-sample wall-clock for the integrated configuration on the
+    CPU implementation (`vrifa-rs`) and the CUDA implementation
+    (`fast-vrifa-rs`) on COMECH-2422. Wall-clock includes video decode
+    but excludes output encode and annotation export. Speedup is the
+    ratio of CPU seconds to CUDA seconds at matched parameter values.
+    Frame counts are for the trimmed labeling videos in
+    `data/ablation_data/`.
   ],
 ) <tab:runtime>
 
 #figure(
-  // image("/typst/figures/runtime_bars.pdf", width: 95%),
-  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
-    _Three-implementation runtime bar chart placeholder._ Three
-    grouped horizontal bars per sample (Python reference in warm
-    grey, CPU implementation in atlantic, CUDA implementation in
-    garnet) for the eleven-sample subset. Bar length is wall-clock
-    seconds, with a secondary axis showing frames per second.
-    Samples ordered top-to-bottom by frame count so the longest
-    runs are at the top of the chart and the speedup pattern is
-    visible across regimes. Companion visualization to
-    Table~@tab:runtime; cut from the final paper if the table alone
-    is sufficient.
-  ],
+  image("/typst/figures/runtime_bars.pdf", width: 90%),
   caption: [
-    Wall-clock per sample on three implementations of the same
-    algorithm. Bars are grouped by sample so the per-sample
-    speedup pattern is visible at a glance.
+    Frames-per-second per sample on the two implementations. CPU
+    in atlantic, CUDA in garnet. Samples are ordered ascending by
+    frame count.
   ],
 ) <fig:runtime_bars>
 

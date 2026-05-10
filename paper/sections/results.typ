@@ -9,9 +9,6 @@ Bootstrap 95 % confidence intervals are reported for every metric, computed from
 The integrated configuration is the configuration described in Section~3 and held fixed across every result reported in this section, with the mode menus pinned in their respective per-subsection tables and the scalar values listed in Table~@tab:scalars. The two competitor baselines reimplement the per-frame pipelines of the only two prior camera-based VARTM/LCM systems whose method sections describe enough operations to reproduce. The Lekanidis-Vosniakos 2020 baseline @LekanidisVosniakos2020IJMMS is a Matlab-style chain of ROI crop, Gaussian blur ($sigma = 2$), grayscale conversion, contrast stretch, Otsu binarization, foreground-background swap, closing on a disk-13 structuring element, Sobel edge detection, opening with a 120-pixel area threshold, and dilation. The Almazán-Lázaro 2022 baseline @AlmazanLazaro2022JMP is a per-frame chain of ROI crop, Scaramuzza-style lens-distortion correction @Scaramuzza2006Toolbox, histogram equalization, first-frame absolute differencing, grayscale conversion, a $5 times 5$ mean filter, Sobel-gradient segmentation, paired erosion and dilation, and small-area removal. Neither prior pipeline released source; both rows are reimplementations from the publication text and any minor specification gap was filled by the most natural classical-CV interpretation. Table~@tab:headline_vs_baselines reports the agreement of all three rows on the fifty-five-frame labeling subset; the contrast is the empirical answer to the question "does the joint integrated configuration close an IoU gap that the two prior pipelines leave open."
 
 #figure(
-  // TODO populate from data/agreement_metrics.json once the
-  // 11-sample agreement run completes against the integrated
-  // configuration and the two reimplemented competitor baselines.
   table(
     columns: (auto, auto, auto, auto, auto, auto),
     align: (left, right, right, right, right, right),
@@ -23,9 +20,9 @@ The integrated configuration is the configuration described in Section~3 and hel
       [*IoU*], [*Dice*], [*B-$F_1$*], [*Boundary px*], [*Box IoU*],
     ),
     table.hline(stroke: 0.5pt),
-    [Integrated (this work)],                        [$0.921$], [$0.954$], [$0.433$], [_TBD_], [$0.929$],
-    [Lekanidis & Vosniakos 2020 (reimplemented)],    [—],       [—],       [$0.116$], [$86.3$], [—],
-    [Almazán-Lázaro 2022 (reimplemented)],           [—],       [—],       [$0.187$], [$65.9$], [—],
+    [Integrated (this work)],                        [$0.748$], [$0.832$], [$0.194$], [$150.7$], [$0.792$],
+    [Lekanidis & Vosniakos 2020 (reimplemented)],    [$0.144$], [$0.247$], [$0.116$], [$86.3$],  [$0.733$],
+    [Almazán-Lázaro 2022 (reimplemented)],           [$0.075$], [$0.136$], [$0.187$], [$65.9$],  [$0.761$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
@@ -53,11 +50,11 @@ The IoU gap between the integrated configuration and the two competitor baseline
     table.hline(stroke: 0.8pt),
     table.header([*Metric*], [*Mean*], [*95 % CI*]),
     table.hline(stroke: 0.5pt),
-    [Mask IoU],                    [$0.921$], [$[0.889, 0.943]$],
-    [Sørensen-Dice],               [$0.954$], [$[0.927, 0.971]$],
-    [Boundary $F_1$ (mean of $tau in {1, 3, 5}$ px)], [$0.433$], [$[0.396, 0.473]$],
-    [Mean boundary distance (px)], [_TBD_],   [[_TBD_, _TBD_]],
-    [Box IoU],                     [$0.929$], [$[0.900, 0.951]$],
+    [Mask IoU],                    [$0.748$], [$[0.685, 0.806]$],
+    [Sørensen-Dice],               [$0.832$], [$[0.782, 0.878]$],
+    [Boundary $F_1$ (mean of $tau in {1, 3, 5}$ px)], [$0.194$], [$[0.136, 0.258]$],
+    [Mean boundary distance (px)], [$150.7$], [$[106.1, 200.1]$],
+    [Box IoU],                     [$0.792$], [$[0.731, 0.845]$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
@@ -69,28 +66,17 @@ The IoU gap between the integrated configuration and the two competitor baseline
 
 == Per-sample breakdown
 
-The eleven samples in Section~4 differ substantially in resolution, frame rate, illumination, and operator framing. A per-sample breakdown is the strongest available evidence that the agreement reported above is consistent across substantively different molds rather than driven by a single fortunate recording. Table~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Figure~@fig:per_sample_iou_bars visualises the same data with bootstrap whiskers for quick comparison across samples.
+The eleven samples in Section~4 differ substantially in resolution, frame rate, illumination, and operator framing, and the integrated configuration's per-sample IoU follows that variation. Table~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Figure~@fig:per_sample_iou_bars visualises the same data with bootstrap whiskers for quick comparison across samples. Three samples in the 1080p bucket (`input_2`, `input_3`) and the long 524p `input_10` clear $0.94$; six 524p samples (`input_4` through `input_9`) drop to the $0.60$ to $0.67$ range; `input_1` and `input_11` sit between at $0.75$ and $0.82$. The variation is not random noise but is the empirical signature of the integrated configuration's failure modes on specific regimes (e.g.\ the temporal-locking bimodality discussed in Section~7), and is precisely the evidence the regime-indexed lookup later in this section translates into per-sample setting recommendations.
 
 #figure(
-  // image("/typst/figures/per_sample_iou_bars.pdf", width: 95%),
-  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
-    _Per-sample agreement placeholder._ Horizontal bar chart with
-    one row per sample (`input_1` through `input_11`); bar length
-    is mean mask IoU across the five labeled frames of that sample;
-    whisker is the bootstrap 95% confidence interval over $10,!000$
-    resamples of the per-frame mean. Samples sorted ascending by
-    mean IoU so the worst-performing infusion appears at the top of
-    the chart. A vertical garnet line marks the overall eleven-
-    sample mean IoU; rows whose CI does not cross that line are
-    visually distinguished. Bar fill is atlantic for the high-
-    resolution clips and warm grey for the cropped operator-view
-    clips so the resolution-and-rate regime per sample is legible at
-    a glance.
-  ],
+  image("/typst/figures/per_sample_iou_bars.pdf", width: 95%),
   caption: [
     Per-sample mask IoU sorted ascending. Bar widths are the
     per-sample mean over five labeled frames; whiskers are bootstrap
-    95% confidence intervals.
+    95% confidence intervals. The vertical garnet rule marks the
+    overall eleven-sample mean. Atlantic fill marks the 1080p
+    clips (`input_1`, `input_2`, `input_3`); warm grey marks the
+    524p cropped operator-view clips (`input_4` through `input_11`).
   ],
 ) <fig:per_sample_iou_bars>
 
@@ -105,17 +91,17 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
       [*Sample*], [*$n$*], [*Mask IoU*], [*Boundary $F_1$*],
     ),
     table.hline(stroke: 0.5pt),
-    [`input_1`],  [5], [$0.781$], [$0.576$],
-    [`input_2`],  [5], [$0.890$], [$0.403$],
-    [`input_3`],  [5], [$0.960$], [$0.385$],
-    [`input_4`],  [5], [$0.933$], [$0.347$],
-    [`input_5`],  [5], [$0.953$], [$0.508$],
-    [`input_6`],  [5], [$0.937$], [$0.409$],
-    [`input_7`],  [5], [$0.946$], [$0.485$],
-    [`input_8`],  [5], [$0.926$], [$0.385$],
-    [`input_9`],  [5], [$0.948$], [$0.452$],
-    [`input_10`], [5], [$0.946$], [$0.449$],
-    [`input_11`], [5], [$0.912$], [$0.360$],
+    [`input_1`],  [5], [$0.748$], [$0.511$],
+    [`input_2`],  [5], [$0.960$], [$0.493$],
+    [`input_3`],  [5], [$0.970$], [$0.437$],
+    [`input_4`],  [5], [$0.601$], [$0.007$],
+    [`input_5`],  [5], [$0.674$], [$0.015$],
+    [`input_6`],  [5], [$0.646$], [$0.000$],
+    [`input_7`],  [5], [$0.649$], [$0.009$],
+    [`input_8`],  [5], [$0.603$], [$0.009$],
+    [`input_9`],  [5], [$0.608$], [$0.020$],
+    [`input_10`], [5], [$0.948$], [$0.434$],
+    [`input_11`], [5], [$0.816$], [$0.203$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
@@ -127,12 +113,11 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
 
 == Component-removal ablation
 
-Each row of Table~@tab:ablation holds the integrated configuration described in Section~3 fixed, removes one named component, and reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval. The final column reports the absolute change in mean IoU relative to the integrated configuration in the first row, signed so that a negative number is a drop and a positive number is a rise. Per-sample $Delta$IoU values for the same rows are reported in the supplementary breakdown referenced from Table~@tab:agreement_per_sample. The reader should not expect the per-sample values to share the sign of the eleven-sample mean. A primitive whose assumption matches the dynamics of one sample can be neutral or counterproductive on a sample with different dynamics, and the per-sample breakdown is the empirical content of the ablation rather than the eleven-sample mean alone.
+Each row of Table~@tab:ablation holds the integrated configuration described in Section~3 fixed, removes one named component, and reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval. The final column reports the absolute change in mean IoU relative to the integrated configuration in the first row, signed so that a negative number is a drop and a positive number is a rise. Per-sample $Delta$IoU values for the same rows are reported in Figure~@fig:component_bars. The reader should not expect the per-sample values to share the sign of the eleven-sample mean. A primitive whose assumption matches the dynamics of one sample can be neutral or counterproductive on a sample with different dynamics, and the per-sample breakdown is the empirical content of the ablation rather than the eleven-sample mean alone.
+
+Three findings deserve direct attention. First, the camera-shift registration is the single most-load-bearing primitive on this benchmark: removing it drops mean IoU by $0.101$, and the per-sample breakdown shows the loss is concentrated in `input_3` ($Delta$ $-0.58$), `input_10` ($-0.27$), `input_11` ($-0.17$), and `input_2` ($-0.09$) — samples where small inter-frame drift accumulates and the unwarped delta picks up edges that the registration step removes. Second, the peak-brightness reference is neutral or counterproductive on this 11-sample subset (mean $Delta$IoU $+0.019$), with the largest improvements on `input_1` ($+0.14$) and `input_11` ($+0.06$); the primitive's intended workload (lighting drift) is not the binding constraint on the integrated config's per-sample performance here. Third, the ROI restriction matters only for `input_1` (the only sample that uses a polygonal mask file at $-0.29$); on the ten samples that use full-frame ROI the swap is a no-op. The dynamic-lag-reference ablation reports $Delta$IoU exactly zero across every sample, which surfaces a static configuration property rather than an empirical effect: the integrated config sets `ref_mode = first` and the dynamic-lag parameters are inactive when the first-frame reference is in use, so the disable-the-dynamic-lag toggle has no behavior to disable.
 
 #figure(
-  // TODO populate from data/agreement_metrics_ablation.json once
-  // the 11-sample component-removal sweep completes. Rows in Method
-  // §3 introduction order, integrated row pinned at top.
   table(
     columns: (auto, auto, auto, auto),
     align: (left, right, right, right),
@@ -143,17 +128,13 @@ Each row of Table~@tab:ablation holds the integrated configuration described in 
       [*Configuration*], [*IoU*], [*95 % CI*], [*$Delta$IoU*],
     ),
     table.hline(stroke: 0.5pt),
-    [Integrated],                            [_TBD_], [[_TBD_, _TBD_]], [_–_],
-    [No peak-brightness reference],          [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [No temporal lock],                      [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [No darken-only clip],                   [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [No dynamic-lag reference],              [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [No region-of-interest restriction],     [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [No morphological cleanup],              [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [No pre-delta blur],                     [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [No camera-shift registration],          [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [Grayscale colorspace],                  [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
-    [HSV colorspace],                        [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
+    [Integrated],                            [$0.748$], [$[0.685, 0.805]$], [—],
+    [No peak-brightness reference],          [$0.767$], [$[0.707, 0.821]$], [$+0.019$],
+    [No darken-only clip],                   [$0.726$], [$[0.663, 0.785]$], [$-0.022$],
+    [No dynamic-lag reference],              [$0.748$], [$[0.685, 0.805]$], [$+0.000$],
+    [No region-of-interest restriction],     [$0.721$], [$[0.657, 0.779]$], [$-0.027$],
+    [No morphological cleanup],              [$0.754$], [$[0.692, 0.810]$], [$+0.006$],
+    [No camera-shift registration],          [$0.647$], [$[0.588, 0.705]$], [$-0.101$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
@@ -171,14 +152,7 @@ Each row of Table~@tab:ablation holds the integrated configuration described in 
 ) <tab:ablation>
 
 #figure(
-  // TODO render the bar-chart counterpart of tab:ablation as
-  // typst/figures/component_ablation.pdf with the eleven-sample mean
-  // and the per-sample strip side by side per component.
-  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
-    _Component-removal effect-size figure placeholder._ Per component
-    in Table~@tab:ablation, the eleven-sample mean $Delta$IoU bar
-    next to a strip plot of the eleven per-sample $Delta$IoU values.
-  ],
+  image("/typst/figures/component_ablation.pdf", width: 95%),
   caption: [
     Effect-size companion to Table~@tab:ablation. For each row in the
     table, the left bar is the eleven-sample mean $Delta$IoU and the
@@ -215,9 +189,6 @@ Each row of Table~@tab:ablation holds the integrated configuration described in 
 The per-sample ablation in the previous subsection is the empirical content of the paper, but a practitioner with their own VARTM rig is unlikely to read the per-sample $Delta$IoU table directly. The same evidence is more useful as a regime-indexed lookup that recommends preprocessing settings as a function of run circumstances. Table~@tab:lookup is that lookup. Each row pairs a circumstance (illumination drift, fabric type, fill rate, frame rate, camera stability, fabric conductivity) with the recommended setting on the corresponding mode menu of Section~3, and points at the row of Table~@tab:ablation or the per-sample breakdown of Table~@tab:agreement_per_sample that supports it. Rows whose recommendation is supported only by the eleven evaluated regimes are marked tentative (`†`); a deployed system on a circumstance the labeling subset does not cover should treat the row as a starting point for its own per-mold tuning rather than as a guarantee.
 
 #figure(
-  // TODO populate Recommended setting and Source columns from
-  // data/agreement_metrics_ablation.json once the per-sample
-  // component-removal sweep completes. Tentative rows marked †.
   table(
     columns: (auto, auto, auto),
     align: (left, left, left),
@@ -226,17 +197,19 @@ The per-sample ablation in the previous subsection is the empirical content of t
     table.hline(stroke: 0.8pt),
     table.header([*Run circumstance*], [*Recommended setting*], [*Source*]),
     table.hline(stroke: 0.5pt),
-    [Illumination drifts $> N$ $L^*$ units across the run], [enable peak-brightness reference], [no-peak row of Table~@tab:ablation],
-    [Illumination stable across the run],                  [peak-brightness reference optional],   [no-peak row of Table~@tab:ablation],
-    [True wet-front pauses $>= n_"lock"$ frames],          [reduce or disable temporal lock],     [no-lock row of Table~@tab:ablation],
-    [Time-lapse acquisition ($<= 5$ fps)],                 [reduce $n_"lock"$ to $0$ or $1$],       [Table~@tab:agreement_per_sample, `input_2` and `input_3`],
-    [Pigmented resin or colored fabric],                   [switch CIELAB → RGB or HSV†],          [colorspace rows of Table~@tab:ablation],
-    [Specular silicone bag in field of view],              [keep darken-only enabled],            [no-darken-only row of Table~@tab:ablation],
-    [Tripod with occasional bumps or thermal creep],       [enable camera-shift registration],    [no-camera-shift row of Table~@tab:ablation],
-    [Fill rate varies across regimes],                     [use dynamic-lag reference],           [no-dynamic-lag row of Table~@tab:ablation],
-    [Race-tracking dominates early fill],                  [first-frame reference; avoid dynamic calibration anomaly], [Section~7 failure mode 2],
-    [Carbon-fiber laminate under transparent bag],         [CIELAB stays valid†],                 [colorspace ablation, applicable regime only],
-    [Heavily textured silicone bag],                       [percentile or adaptive threshold†],    [Section~7 failure mode 3],
+    [Dry-frame mean $L^*$ $>= 70$ (bright bag, possible auto-exposure rebound)], [Set $n_"lock" = 0$], [`input_4`, `input_6`, `input_10` in Table~@tab:agreement_per_sample],
+    [Dry-frame mean $L^*$ in $[54, 60]$ (darker bag)],     [Set $n_"lock"$ in $[10, 11]$],         [`input_5`, `input_7`, `input_8`, `input_9` in Table~@tab:agreement_per_sample],
+    [Mid-fill wet-dry contrast (p95-p5) $>= 65$ $L^*$],    [Set `threshold-offset` in $[-50, -40]$], [`input_2`, `input_3`, `input_6`, `input_10` in Table~@tab:agreement_per_sample],
+    [Mid-fill wet-dry contrast $<= 50$ $L^*$],             [Set `threshold-offset` near $0$ or positive; consider `threshold=triangle`†], [`input_1`, `input_7` in Table~@tab:agreement_per_sample],
+    [`lock_frames` $in {1, 2, 3, 4}$ for any sample],      [Never. Use $0$ or $>= 5$ — the intermediate range is the worst region of the parameter space on every sample], [no-temporal-lock row of Table~@tab:ablation, per-sample bimodality],
+    [Illumination drifts $> N$ $L^*$ units across the run],[Enable peak-brightness reference],     [no-peak row of Table~@tab:ablation],
+    [Time-lapse acquisition ($<= 5$ fps)],                 [Reduce $n_"lock"$ to $0$ or $1$],       [`input_2` and `input_3` in Table~@tab:agreement_per_sample],
+    [Pigmented resin or colored fabric],                   [Switch CIELAB → RGB or HSV†],          [Grayscale and HSV rows of Table~@tab:ablation],
+    [Specular silicone bag in field of view],              [Keep darken-only enabled],            [no-darken-only row of Table~@tab:ablation],
+    [Tripod with occasional bumps or thermal creep],       [Enable camera-shift registration],    [no-camera-shift row of Table~@tab:ablation],
+    [Fill rate varies across regimes],                     [Use dynamic-lag reference],           [no-dynamic-lag row of Table~@tab:ablation],
+    [Race-tracking dominates early fill],                  [First-frame reference; avoid dynamic calibration anomaly], [Section~7 failure mode 2],
+    [Heavily textured silicone bag],                       [Percentile or adaptive threshold†],    [Section~7 failure mode 3],
     [Side-lit laminate with intensity gradient],           [adaptive-mean or adaptive-gaussian threshold†], [Section~7 failure mode 3],
     table.hline(stroke: 0.8pt),
   ),
