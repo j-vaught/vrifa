@@ -13,6 +13,8 @@ from .config import (
     ROI_MARGIN_BY_SAMPLE,
     SAMPLE_STABILIZATION,
     SAMPLES_FULL,
+    SAMPLES_WITH_ROI_MASK,
+    roi_mask_path_for,
 )
 from .trial import TrialConfig
 
@@ -41,12 +43,27 @@ def base_config_for(sample: str, prior_winner: dict[str, Any] | None) -> dict[st
 
     For Phase 1 the prior_winner is None and we use INTEGRATED_DEFAULTS.
     For later phases the per-sample prior winner is the chained best.
-    The ROI margin is video-specific (input_1 keeps default margin,
-    pre-cropped videos use 0).
+    ROI handling is video-specific: input_1 imports a polygon mask,
+    the pre-cropped videos use rectangular --roi-margin 0. The two
+    forms are mutually exclusive in the vrifa CLI.
     """
     base = dict(INTEGRATED_DEFAULTS) if prior_winner is None else dict(prior_winner)
     base.update(OUTPUT_FLAGS)
-    base["roi_margin"] = ROI_MARGIN_BY_SAMPLE.get(sample, 0.15)
+
+    # Strip any prior ROI choice so we set exactly one form below.
+    base.pop("roi_margin", None)
+    base.pop("roi_mask", None)
+
+    if sample in SAMPLES_WITH_ROI_MASK:
+        mask_path = roi_mask_path_for(sample)
+        if mask_path is None or not mask_path.exists():
+            raise FileNotFoundError(
+                f"ROI mask PNG missing for {sample!r} at {mask_path}. "
+                f"Run `python3 _dev/validation/build_roi_masks.py` to materialize it."
+            )
+        base["roi_mask"] = str(mask_path)
+    else:
+        base["roi_margin"] = ROI_MARGIN_BY_SAMPLE.get(sample, 0.0)
     return base
 
 

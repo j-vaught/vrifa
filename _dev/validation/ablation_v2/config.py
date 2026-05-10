@@ -17,16 +17,31 @@ DEFAULT_LABELS = DEFAULT_VIDEOS_DIR / "labels.json"
 DEFAULT_BINARY = REPO_ROOT / "vrifa-rs" / "target" / "release" / "vrifa"
 DEFAULT_STATE_DIR = Path("/tmp/vrifa_ablation")
 DEFAULT_RESULTS_DIR = REPO_ROOT / "data" / "ablation"
+DEFAULT_ROI_MASKS_DIR = REPO_ROOT / "data" / "roi_masks"
 
 PHASE_ORDER = ["1", "2", "3", "4", "5", "6", "7a", "7b", "8", "10", "9"]
 SAMPLES_FULL = [f"input_{i}" for i in range(1, 12)]
 SAMPLE_STABILIZATION = "input_1"
 
-# Per-sample ROI margins. Pre-cropped videos use 0; the canonical input_1
-# clip keeps its default margin so the integrated configuration's
-# per-edge-margin logic still gets exercised somewhere in the ablation.
+# Per-sample ROI handling.
+#
+# input_1 uses a polygon-shaped ROI imported from the labeled boundary
+# frame (data/roi_masks/input_1.png), passed via --roi-mask. The
+# imported mask is mutually exclusive with --roi-margin*.
+#
+# input_2..input_11 are pre-cropped to roughly the laminate region in
+# their source videos, so the ablation runs them with --roi-margin 0
+# (full frame).
+SAMPLES_WITH_ROI_MASK = {"input_1"}
 ROI_MARGIN_BY_SAMPLE = {sample: 0.0 for sample in SAMPLES_FULL}
-ROI_MARGIN_BY_SAMPLE["input_1"] = 0.15
+
+
+def roi_mask_path_for(sample: str, masks_dir: Path = DEFAULT_ROI_MASKS_DIR) -> Path | None:
+    """Return the per-sample ROI mask PNG path, or None if the sample
+    uses the rectangular --roi-margin form."""
+    if sample not in SAMPLES_WITH_ROI_MASK:
+        return None
+    return masks_dir / f"{sample}.png"
 
 # Integrated configuration defaults. These are what `vrifa --help`
 # reports as the binary's defaults; the ablation reports what changing
