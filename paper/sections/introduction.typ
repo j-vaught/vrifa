@@ -17,7 +17,30 @@
   height: 2,
   hanging-indent: 0em,
   justify: true,
-)[V #smallcaps([acuum])-Assisted Resin Transfer Molding (VARTM) is the dominant process for one-off composite laminates from research panels through small-series aerospace structural parts, and the principal observable signal available to the operator during a run is the visible advance of the resin flow front under the transparent vacuum bag @Konstantopoulos2014InlineSensing.] The position, shape, and rate of that front carry process-quality information that other, more instrumented modalities recover only indirectly. Distributed dielectric arrays @Tifkitsis2014Dielectric and area-sensor grids @Matsuzaki2011AreaSensor produce excellent local wetness measurements but require sensors embedded in the lay-up, and fiber-optic frequency-domain reflectometry @Matsuzaki2022FiberOptic demands instrumentation no operator on a research bench will install for a one-off panel. Direct video of the bag is the one modality that costs nothing extra, sees the entire laminate at once, and is already recorded in most labs as a procedural artifact.
+)[V #smallcaps([artm]), or Vacuum Assisted Resin Transfer Molding, is a widely 
+used process for one-off composite laminates in research, marine, wind, and 
+large-format defense applications, and is the principal route for parts whose 
+size or geometry rules out autoclave processing @Konstantopoulos2014InlineSensing. 
+However, the process is susceptible to defects that can render parts unusable.
+Dry spots from incomplete impregnation, race-tracking along edges and the distribution medium, voids and porosity from trapped air, and resin starvation in interior 
+regions of the laminate can all reduce stiffness and strength of the cured part, which is often undesirable in production.
+Identifying, predicting, and preventing these defects spans post-cure non-destructive 
+evaluation, in-situ embedded sensing during infusion, forward Darcy-flow simulation of 
+the run, and digital-twin systems that combine these signals. Each modality 
+contributes a different slice of evidence, but most are ultimately reasoning about 
+which fabric wetted, where, and when. The resin flow front therefore consolidates much 
+of this information into a single quantity that can be measured directly during the run. Real-time, precise information about the front position gives the operator the most direct lever on part quality during an active infusion. Given that signal, the operator can re-sequence inlets to redirect flow toward a starved region, open additional vents to break a race-track, or stop the infusion before resin gels.]
+
+The position, shape, and rate of that front carry process-quality information 
+that other, more instrumented modalities recover only indirectly. Distributed 
+dielectric arrays @Tifkitsis2014Dielectric and area-sensor grids 
+@Matsuzaki2011AreaSensor produce excellent local wetness measurements but 
+require sensors embedded in the lay-up, and fiber-optic frequency-domain 
+reflectometry @Matsuzaki2022FiberOptic demands instrumentation no operator on 
+a research bench will install for a one-off panel. Direct video of the bag is 
+the one modality that costs nothing extra, sees the entire laminate at once, 
+and is already recorded in most labs as a procedural artifact. 
+
 
 Prior camera-based VARTM and Liquid Composite Molding (LCM) systems agree on the basic recipe. Difference the live frame against a reference image of the dry preform, threshold the response into a binary candidate mask, and clean the mask with morphology @LekanidisVosniakos2020IJMMS @AlmazanLazaro2018Materials @AlmazanLazaro2022JMP. They disagree on every detail that controls how well the recipe works. Some systems clip the difference so that only darkening counts as wetting and others do not @AlmazanLazaro2022JMP. Some track a per-pixel running maximum as the reference and others pin a single early frame @LekanidisVosniakos2020IJMMS. Some impose a temporal-locking rule that holds a positive detection through transient dropouts and others operate frame-by-frame @Esposito2025AIFusion. None of these systems reports the joint contribution of the components it uses, the marginal cost of each component it discards, or the agreement of the resulting mask against a labeled video benchmark, because no shared labeled benchmark exists. The practitioner is left to take the recipe at face value.
 
