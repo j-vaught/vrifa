@@ -23,7 +23,9 @@ use vrifa_core::overlay::create_overlay;
 use vrifa_core::peak::update_peak_brightness_plane;
 use vrifa_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
 use vrifa_core::registration::{fit_affine_warp, strong_gradient_mask, MotionModel};
-use vrifa_core::roi::{build_roi_mask, resolve_roi_margins};
+use vrifa_core::roi::{build_roi_mask_with_override, resolve_roi_margins, RoiMargins};
+
+pub mod roi_mask;
 use vrifa_core::warp::{apply_warp, apply_warp_plane, AffineWarp};
 use vrifa_core::{detect_front, detect_front_debug, DetectFrontDebug, DetectFrontParams};
 use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
@@ -50,6 +52,12 @@ pub struct CliArgs {
     roi_margin_left: Option<f32>,
     #[arg(long)]
     roi_margin_right: Option<f32>,
+    /// Optional path to a prebuilt ROI mask. Accepts a single-channel
+    /// PNG (binary at >127) or a COCO JSON whose polygon annotations
+    /// match the input video by file name. Mutually exclusive with
+    /// the `--roi-margin*` flags.
+    #[arg(long)]
+    roi_mask: Option<PathBuf>,
     /// Post-delta blur, applied to the delta field before threshold.
     /// Format: KIND[:SIZE]. KIND is one of none, flat, gaussian, triangle,
     /// median (size <= 5 only), bilateral. SIZE required when KIND != none.
@@ -217,6 +225,7 @@ pub struct Config {
     pub roi_margin_bottom: Option<f32>,
     pub roi_margin_left: Option<f32>,
     pub roi_margin_right: Option<f32>,
+    pub roi_mask: Option<PathBuf>,
     pub pre_delta_blur: BlurSpec,
     pub post_blur: BlurSpec,
     pub morph_kernel: usize,
@@ -273,6 +282,7 @@ impl Default for Config {
             roi_margin_bottom: None,
             roi_margin_left: None,
             roi_margin_right: None,
+            roi_mask: None,
             pre_delta_blur: BlurSpec::none(),
             post_blur: BlurSpec::gaussian(9),
             morph_kernel: 13,
@@ -358,6 +368,14 @@ impl TryFrom<CliArgs> for Config {
         if args.frame_step == 0 {
             bail!("--frame-step must be >= 1");
         }
+        if args.roi_mask.is_some()
+            && (args.roi_margin_top.is_some()
+                || args.roi_margin_bottom.is_some()
+                || args.roi_margin_left.is_some()
+                || args.roi_margin_right.is_some())
+        {
+            bail!("--roi-mask cannot be combined with --roi-margin* flags");
+        }
 
         let channel_weights =
             parse_channel_weights(args.channel_weights.as_deref(), colorspace.channel_count())?;
@@ -379,6 +397,7 @@ impl TryFrom<CliArgs> for Config {
             roi_margin_bottom: args.roi_margin_bottom,
             roi_margin_left: args.roi_margin_left,
             roi_margin_right: args.roi_margin_right,
+            roi_mask: args.roi_mask,
             pre_delta_blur,
             post_blur,
             morph_kernel: args.morph_kernel,
@@ -858,17 +877,10 @@ pub fn run_config(config: Config) -> Result<()> {
     let mut dynamic_first_lag: Option<usize> = None;
     let mut dynamic_last_lag: Option<usize> = None;
 
-    let roi_margins = resolve_roi_margins(
-        config.roi_margin,
-        config.roi_margin_top,
-        config.roi_margin_bottom,
-        config.roi_margin_left,
-        config.roi_margin_right,
-    );
-    let roi_mask = build_roi_mask(
+    let roi_mask = resolve_configured_roi_mask(
+        &config,
         (first_frame_converted.dim().0, first_frame_converted.dim().1),
-        roi_margins,
-    );
+    )?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let mut peak_brightness_map = if config.peak_reference {
@@ -1295,17 +1307,10 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
     let mut dynamic_measurements: Vec<(f32, f32)> = Vec::new();
     let mut dynamic_factor: Option<f32> = None;
 
-    let roi_margins = resolve_roi_margins(
-        config.roi_margin,
-        config.roi_margin_top,
-        config.roi_margin_bottom,
-        config.roi_margin_left,
-        config.roi_margin_right,
-    );
-    let roi_mask = build_roi_mask(
+    let roi_mask = resolve_configured_roi_mask(
+        &config,
         (first_frame_converted.dim().0, first_frame_converted.dim().1),
-        roi_margins,
-    );
+    )?;
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let mut peak_brightness_map = if config.peak_reference {
@@ -1897,4 +1902,23 @@ pub fn config_from_paths(video_path: PathBuf, output_dir: PathBuf) -> Config {
 
 pub fn output_dir(path: impl AsRef<Path>) -> PathBuf {
     path.as_ref().to_path_buf()
+}
+
+pub fn resolve_configured_roi_mask(
+    config: &Config,
+    shape: (usize, usize),
+) -> Result<ndarray::Array2<u8>> {
+    let roi_margins: RoiMargins = resolve_roi_margins(
+        config.roi_margin,
+        config.roi_margin_top,
+        config.roi_margin_bottom,
+        config.roi_margin_left,
+        config.roi_margin_right,
+    );
+    let supplied = if let Some(path) = config.roi_mask.as_deref() {
+        Some(roi_mask::load_roi_mask(path, &config.video_path, shape)?)
+    } else {
+        None
+    };
+    Ok(build_roi_mask_with_override(shape, roi_margins, supplied.as_ref()))
 }
