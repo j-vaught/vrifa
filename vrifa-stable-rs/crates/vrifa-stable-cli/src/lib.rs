@@ -20,7 +20,7 @@ use vrifa_stable_core::motion::estimate_translation;
 use vrifa_stable_core::overlay::create_overlay;
 use vrifa_stable_core::peak::update_peak_brightness;
 use vrifa_stable_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
-use vrifa_stable_core::registration::{fit_affine_warp, MotionModel};
+use vrifa_stable_core::registration::{fit_affine_warp, strong_gradient_mask, MotionModel};
 use vrifa_stable_core::roi::{build_roi_mask, resolve_roi_margins};
 use vrifa_stable_core::warp::{apply_warp, apply_warp_plane, AffineWarp};
 use vrifa_stable_core::{detect_front, detect_front_debug, DetectFrontDebug, DetectFrontParams};
@@ -507,6 +507,64 @@ fn build_registration_mask(prev_mask: Option<&Array2<u8>>) -> Option<Array2<u8>>
     (dry_fraction >= MIN_DRY_FRACTION).then_some(dry_mask)
 }
 
+fn build_static_registration_mask(
+    prev_mask: Option<&Array2<u8>>,
+    reference_for_frame: &Array3<f32>,
+    roi_mask: &Array2<u8>,
+) -> Result<Option<Array2<u8>>> {
+    const STRONG_EDGE_PERCENTILE: f32 = 0.90;
+    const BORDER_FRACTION: f32 = 0.08;
+    const MIN_MASK_FRACTION: f32 = 0.02;
+
+    let (height, width, _) = reference_for_frame.dim();
+    let total_pixels = height.saturating_mul(width);
+    if total_pixels == 0 {
+        return Ok(None);
+    }
+
+    let dry_mask = build_registration_mask(prev_mask);
+    let edge_mask = strong_gradient_mask(reference_for_frame, STRONG_EDGE_PERCENTILE)?;
+    let border_mask = build_frame_border_mask((height, width), BORDER_FRACTION);
+
+    let mut combined = Array2::<u8>::zeros((height, width));
+    let mut combined_pixels = 0usize;
+    for y in 0..height {
+        for x in 0..width {
+            let is_dry = dry_mask.as_ref().map(|mask| mask[(y, x)] > 0).unwrap_or(true);
+            let outside_roi = roi_mask[(y, x)] == 0;
+            let is_static = border_mask[(y, x)] > 0 || outside_roi || edge_mask[(y, x)] > 0;
+            if is_dry && is_static {
+                combined[(y, x)] = 255;
+                combined_pixels += 1;
+            }
+        }
+    }
+
+    if combined_pixels as f32 / total_pixels as f32 >= MIN_MASK_FRACTION {
+        return Ok(Some(combined));
+    }
+    Ok(dry_mask)
+}
+
+fn build_frame_border_mask(shape: (usize, usize), border_fraction: f32) -> Array2<u8> {
+    let (height, width) = shape;
+    let border_y = ((height as f32 * border_fraction).round() as usize).clamp(1, height.max(1));
+    let border_x = ((width as f32 * border_fraction).round() as usize).clamp(1, width.max(1));
+    let mut mask = Array2::<u8>::zeros((height, width));
+    for y in 0..height {
+        for x in 0..width {
+            if y < border_y
+                || y >= height.saturating_sub(border_y)
+                || x < border_x
+                || x >= width.saturating_sub(border_x)
+            {
+                mask[(y, x)] = 255;
+            }
+        }
+    }
+    mask
+}
+
 pub fn run() -> Result<()> {
     let args = CliArgs::parse();
     let debug_dump_frames = parse_frame_list(args.debug_dump_frames.as_deref())?;
@@ -534,6 +592,7 @@ fn prepare_camera_stable(
     frame_index: usize,
     frame_converted: &Array3<f32>,
     reference_for_frame: &Array3<f32>,
+    roi_mask: &Array2<u8>,
     reference_token: usize,
     peak_state: Option<&Array2<f32>>,
     config: &Config,
@@ -590,8 +649,11 @@ fn prepare_camera_stable(
             let needs_fit = state.shift_event_active || drift_trigger;
 
             if needs_fit {
-                let registration_mask =
-                    build_registration_mask(state.prev_registration_mask.as_ref());
+                let registration_mask = build_static_registration_mask(
+                    state.prev_registration_mask.as_ref(),
+                    reference_for_frame,
+                    roi_mask,
+                )?;
                 let init_warp = if state.warp_active {
                     let residual_dx = state.cumulative_dx - cached_warp_dx;
                     let residual_dy = state.cumulative_dy - cached_warp_dy;
@@ -920,6 +982,7 @@ pub fn run_config(config: Config) -> Result<()> {
                 frame_index,
                 &frame_converted,
                 &reference_for_frame,
+                &roi_mask,
                 reference_token_for_frame(&config.ref_mode, frame_index, reference_frame_index),
                 peak_brightness_map.as_ref(),
                 &config,
@@ -1291,6 +1354,7 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
                 frame_index,
                 &frame_converted,
                 &reference_for_frame,
+                &roi_mask,
                 reference_token_for_frame(&config.ref_mode, frame_index, reference_frame_index),
                 peak_brightness_map.as_ref(),
                 &config,
