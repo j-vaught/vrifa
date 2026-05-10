@@ -21,41 +21,7 @@ What the three systems do not report is the question this paper answers. They re
 
 Adjacent to the front-segmentation literature is a broader composite-defect-detection literature that increasingly leans on deep convolutional and transformer detectors trained on hand-curated defect crops. The material-defect-detection survey by Ren and co-workers identifies pixel-accurate labels as the primary bottleneck across that survey, ahead of model capacity @Ren2024MaterialDefectSurvey. Modern detectors such as YOLO @Redmon2016YOLO @Jocher2023YOLOv8 and segmentation architectures such as U-Net @Ronneberger2015UNet illustrate why this matters, because they are starved for in-domain pixel labels rather than for parameters. A per-pixel front-mask producer that runs deterministically on production video, as opposed to a learned detector that requires its own labeled-video training set per bench, is therefore upstream of that bottleneck. The integrated pipeline of this paper is positioned to fill that upstream role, and the 55-frame hand-labeled benchmark introduced alongside it is positioned to support evaluation of any future learned segmenter that wants to claim improvement over the classical baseline.
 
-#figure(
-  // image("/typst/figures/competitor_pipelines.pdf", width: 100%),
-  rect(width: 100%, height: 2.4in, stroke: 0.5pt, inset: 8pt)[
-    _Competitor-pipeline comparison placeholder._ Three-row diagram
-    showing the per-frame stage sequence of the two prior camera-CV
-    pipelines that report enough method detail to reproduce, and
-    the integrated pipeline of this work. Top row: Lekanidis and
-    Vosniakos 2020 (IJMMS) -- decode, ROI crop, Gaussian blur,
-    grayscale, contrast stretch, Otsu binarize, foreground swap,
-    closing on disk-13 SE, Sobel edge, opening with area threshold
-    120, dilation. Middle row: Almazán-Lázaro 2022 (J Manuf
-    Processes) -- decode, ROI crop, Scaramuzza distortion correction,
-    histogram equalization, first-frame absolute difference,
-    grayscale, 5-by-5 mean filter, Sobel gradient, erosion, dilation,
-    small-area removal. Bottom row: this work (16 stages from
-    fig:pipeline). Each row is a horizontal chain of named
-    operations drawn in the same brand palette as fig:pipeline; boxes
-    that appear only in the integrated pipeline (peak-brightness
-    reference, darken-only clip, dynamic-lag reference, post-delta
-    blur as a discrete stage, paired close+open with min-area
-    filter, temporal lock, run-time camera-shift registration) are
-    bordered in garnet so the reader sees what the integrated
-    pipeline adds at a glance. Boxes in the prior pipelines that
-    have no analogue in this work (Almazán's Scaramuzza
-    lens-distortion calibration) are bordered in atlantic.
-  ],
-  caption: [
-    Per-frame stage comparison of the three classical-CV pipelines
-    for VARTM/LCM that report enough method detail to reproduce.
-    Boxes bordered in garnet are present only in the integrated
-    pipeline.
-  ],
-) <fig:competitor_pipelines>
-
-The two axes on which the camera-CV pipelines differ from the integrated pipeline are reducible to two specific operators. The lens-distortion calibration step that Almazán-Lázaro and co-workers apply once at setup time @Scaramuzza2006Toolbox is the only operation in either prior camera-CV pipeline that has no analogue in this work, and the run-time camera-shift registration described in Section~3 is the only operation in this work that has no analogue in either prior camera-CV pipeline. The two are complementary axes rather than substitutes, and a deployed system would benefit from both.
+Two specific operators define the difference between the prior camera-CV pipelines and the integrated pipeline. The lens-distortion calibration step that Almazán-Lázaro and co-workers apply once at setup time @Scaramuzza2006Toolbox is the only operation in either prior camera-CV pipeline that has no analogue in this work, and the run-time camera-shift registration described in Section~3 is the only operation in this work that has no analogue in either prior camera-CV pipeline. The two are complementary axes rather than substitutes, and a deployed system would benefit from both.
 
 == Classical primitives and the per-component evidence this paper supplies
 
