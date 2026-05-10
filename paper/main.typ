@@ -107,3 +107,4 @@
 #include "sections/runtime.typ"
 #include "sections/discussion.typ"
 #include "sections/conclusion.typ"
+#include "sections/acknowledgments.typ"
