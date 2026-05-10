@@ -213,7 +213,7 @@
 
   // Configure paragraph properties.
   show: columns.with(1, gutter: 0pt)
-  set par(justify: true, first-line-indent: 1.5em, spacing: 0.65em)
+  set par(justify: true, first-line-indent: (amount: 1.5em, all: true), spacing: 0.65em)
 
   // Configure footnote numbering
   set footnote(numbering: "*")
