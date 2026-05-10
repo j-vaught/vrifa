@@ -15,14 +15,17 @@ The integrated configuration is the configuration described in Section~3 and hel
   table(
     columns: (auto, auto, auto, auto, auto, auto),
     align: (left, right, right, right, right, right),
-    stroke: 0.4pt,
+    stroke: none,
     inset: 5pt,
+    table.hline(stroke: 0.8pt),
     table.header(
       [*Configuration*],
       [*IoU*], [*Dice*], [*B-$F_1$*], [*Boundary px*], [*Box IoU*],
     ),
+    table.hline(stroke: 0.5pt),
     [Integrated], [_TBD_], [_TBD_], [_TBD_], [_TBD_], [_TBD_],
     [Naive baseline], [_TBD_], [_TBD_], [_TBD_], [_TBD_], [_TBD_],
+    table.hline(stroke: 0.8pt),
   ),
   caption: [
     Integrated configuration vs. naive baseline on the
@@ -43,14 +46,17 @@ The integrated configuration is the configuration described in Section~3 and hel
   table(
     columns: (auto, auto, auto),
     align: (left, right, right),
-    stroke: 0.4pt,
+    stroke: none,
     inset: 6pt,
+    table.hline(stroke: 0.8pt),
     table.header([*Metric*], [*Mean*], [*95 % CI*]),
+    table.hline(stroke: 0.5pt),
     [Mask IoU], [_TBD_], [[_TBD_, _TBD_]],
     [Sørensen-Dice], [_TBD_], [[_TBD_, _TBD_]],
     [Boundary $F_1$], [_TBD_], [[_TBD_, _TBD_]],
     [Mean boundary distance (px)], [_TBD_], [[_TBD_, _TBD_]],
     [Box IoU], [_TBD_], [[_TBD_, _TBD_]],
+    table.hline(stroke: 0.8pt),
   ),
   caption: [
     Integrated-configuration agreement on the fifty-five-frame
@@ -67,11 +73,13 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
   table(
     columns: (auto, auto, auto, auto),
     align: (left, right, right, right),
-    stroke: 0.4pt,
+    stroke: none,
     inset: 5pt,
+    table.hline(stroke: 0.8pt),
     table.header(
       [*Sample*], [*$n$*], [*Mask IoU*], [*Boundary $F_1$*],
     ),
+    table.hline(stroke: 0.5pt),
     [`input_1`],  [5], [_TBD_], [_TBD_],
     [`input_2`],  [5], [_TBD_], [_TBD_],
     [`input_3`],  [5], [_TBD_], [_TBD_],
@@ -83,6 +91,7 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
     [`input_9`],  [5], [_TBD_], [_TBD_],
     [`input_10`], [5], [_TBD_], [_TBD_],
     [`input_11`], [5], [_TBD_], [_TBD_],
+    table.hline(stroke: 0.8pt),
   ),
   caption: [
     Per-sample agreement for mask IoU and boundary $F_1$. Each row
@@ -97,17 +106,19 @@ Each row of Table~@tab:ablation holds the integrated configuration of Table~@tab
 
 #figure(
   // TODO populate from paper/data/agreement_metrics_ablation.json once
-  // the 11-sample component-removal sweep completes. Rows in order of
-  // descending IoU drop; integrated row pinned at top.
+  // the 11-sample component-removal sweep completes. Rows in Method
+  // §3 introduction order, integrated row pinned at top.
   table(
     columns: (auto, auto, auto, auto),
     align: (left, right, right, right),
-    stroke: 0.4pt,
+    stroke: none,
     inset: 5pt,
+    table.hline(stroke: 0.8pt),
     table.header(
       [*Configuration*], [*IoU*], [*95 % CI*], [*$Delta$IoU*],
     ),
-    [Integrated],                            [_TBD_], [[_TBD_, _TBD_]], [—],
+    table.hline(stroke: 0.5pt),
+    [Integrated],                            [_TBD_], [[_TBD_, _TBD_]], [_–_],
     [No peak-brightness reference],          [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
     [No temporal lock],                      [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
     [No darken-only clip],                   [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
@@ -118,6 +129,7 @@ Each row of Table~@tab:ablation holds the integrated configuration of Table~@tab
     [No camera-shift registration],          [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
     [Grayscale colorspace],                  [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
     [HSV colorspace],                        [_TBD_], [[_TBD_, _TBD_]], [_TBD_],
+    table.hline(stroke: 0.8pt),
   ),
   caption: [
     Component-removal ablation on the fifty-five-frame labeling

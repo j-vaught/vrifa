@@ -163,8 +163,10 @@ Table~@tab:defaults lists the configuration values held fixed across every exper
   table(
     columns: (auto, auto, auto),
     align: (left, left, left),
-    stroke: (x: none, y: 0.5pt),
+    stroke: none,
+    table.hline(stroke: 0.8pt),
     table.header[*Symbol / parameter*][*Default*][*Description*],
+    table.hline(stroke: 0.5pt),
     [colorspace], [CIELAB], [Working colorspace for the difference computation.],
     [roi-margin], [0.15], [Symmetric fractional ROI margin per edge.],
     [ref-mode], [first], [Reference selection mode.],
@@ -191,6 +193,7 @@ Table~@tab:defaults lists the configuration values held fixed across every exper
     [dynamic-target-fraction, $rho$], [0.2], [Target wet-area fraction for dynamic-reference lag.],
     [dynamic-lag-scale, $lambda$], [1.0], [Multiplicative scale on the dynamic-mode lag.],
     [dynamic-ref-cache-size], [32], [Frames cached for the dynamic-reference reader.],
+    table.hline(stroke: 0.8pt),
   ),
   caption: [
     Configuration values held fixed across every experiment reported

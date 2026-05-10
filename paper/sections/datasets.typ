@@ -6,11 +6,13 @@ The evaluation rests on eleven Vacuum-Assisted Resin Transfer Molding (VARTM) in
   table(
     columns: (auto, auto, auto, auto, auto, auto),
     align: (left, right, right, right, right, left),
-    stroke: 0.4pt,
+    stroke: none,
     inset: 6pt,
+    table.hline(stroke: 0.8pt),
     table.header(
       [*Sample*], [*Frames*], [*FPS*], [*Width*], [*Height*], [*Class*],
     ),
+    table.hline(stroke: 0.5pt),
     [`input_1`],  [706],  [29.97], [1920], [1080], [high-res standard],
     [`input_2`],  [100],  [3.33],  [1920], [1088], [high-res time-lapse],
     [`input_3`],  [200],  [3.33],  [1920], [1088], [high-res time-lapse],
@@ -22,6 +24,7 @@ The evaluation rests on eleven Vacuum-Assisted Resin Transfer Molding (VARTM) in
     [`input_9`],  [15 469], [30.00], [1048], [524], [cropped operator],
     [`input_10`], [11 426], [30.00], [1048], [524], [cropped operator],
     [`input_11`], [14 876], [30.00], [1048], [524], [cropped operator],
+    table.hline(stroke: 0.8pt),
   ),
   caption: [
     Sample inventory. Eleven VARTM infusion clips committed under
