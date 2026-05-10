@@ -51,28 +51,28 @@
   abstract: [
     Vacuum-Assisted Resin Transfer Molding (VARTM) operators read the
     visible advance of the resin flow front under the transparent
-    vacuum bag as their primary process indicator, yet the open
-    toolchain for turning that video into a reproducible,
-    time-resolved flow-front segmentation is thin. Published vision
-    systems for VARTM and Liquid Composite Molding are released
-    either as proprietary controllers tied to a specific cell or as
-    deep convolutional networks trained on simulated frames whose
-    distribution does not match a typical research-bench camera,
-    leaving practitioners without a starting point. This work
-    presents a twelve-stage classical computer-vision pipeline
-    implemented in Rust, configured via roughly fifty parameters,
-    and released under the MIT license, that segments resin flow
-    fronts in VARTM video at thirty frames per second end-to-end on
-    a single CPU. On a fifty-five-frame hand-labeled subset spanning
-    eleven distinct VARTM runs, the default configuration achieves
-    a mask Intersection-over-Union of $X.X X X$ (95 % bootstrap
-    confidence interval $[a, b]$) and a boundary $F_1$ of $Y.Y Y Y$
-    (CI $[c, d]$). The implementation is auditable end-to-end via
-    bit-exact per-stage parity tests and exports annotations in
-    COCO, YOLOv5, and Darknet formats, supplying the supervision
-    needed to bootstrap a downstream learned detector and serving
-    as a reproducible reference for permeability-inversion and
-    process-monitoring studies that today have no shared baseline.
+    vacuum bag as their primary process indicator. Prior vision
+    systems for VARTM and Liquid Composite Molding use the same
+    classical visual primitives, namely reference-frame differencing,
+    Otsu thresholding, and morphological cleanup, but each system
+    uses a different subset, no system reports the joint and
+    individual contribution of those primitives, and no labeled
+    video benchmark exists against which to attribute that
+    contribution. This work presents an integrated classical
+    computer-vision pipeline that combines a peak-brightness
+    reference, a darken-only difference, region-of-interest
+    restriction, dynamic-lag reference selection, morphological
+    cleanup, and persistence-based temporal locking, evaluated on a
+    fifty-five-frame hand-labeled subset spanning eleven distinct
+    VARTM infusion runs. The integrated configuration reaches mask
+    Intersection-over-Union of $X.X X X$ (95 % bootstrap confidence
+    interval $[a, b]$) and boundary $F_1$ of $Y.Y Y Y$
+    (CI $[c, d]$). A component-removal ablation shows that disabling
+    any single primitive drops mean IoU by at least $Delta$IoU
+    absolute, with the peak-reference and temporal-lock components
+    accounting for the largest individual deltas. The pipeline runs
+    at thirty frames per second on a single CPU and at $K$ frames
+    per second on a CUDA implementation across the eleven samples.
   ],
 )
 
