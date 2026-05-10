@@ -14,11 +14,12 @@ use std::time::Instant;
 use vrifa_stable_annotations::AnnotationFrame;
 use vrifa_stable_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_stable_core::contours::extract_bounding_boxes;
+use vrifa_stable_core::delta::blur_plane;
 use vrifa_stable_core::lock::{apply_locking, LockState};
 use vrifa_stable_core::morphology::MorphShape;
 use vrifa_stable_core::motion::estimate_translation;
 use vrifa_stable_core::overlay::create_overlay;
-use vrifa_stable_core::peak::update_peak_brightness;
+use vrifa_stable_core::peak::update_peak_brightness_plane;
 use vrifa_stable_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
 use vrifa_stable_core::registration::{fit_affine_warp, strong_gradient_mask, MotionModel};
 use vrifa_stable_core::roi::{build_roi_mask, resolve_roi_margins};
@@ -575,6 +576,18 @@ fn build_frame_border_mask(shape: (usize, usize), border_fraction: f32) -> Array
     mask
 }
 
+fn peak_frame_plane(
+    frame_converted: &Array3<f32>,
+    pre_delta_blur_kernel: usize,
+) -> Result<Array2<f32>> {
+    let frame_l = frame_converted.slice(ndarray::s![.., .., 0]).to_owned();
+    if pre_delta_blur_kernel > 1 {
+        blur_plane(&frame_l, pre_delta_blur_kernel).map_err(Into::into)
+    } else {
+        Ok(frame_l)
+    }
+}
+
 pub fn run() -> Result<()> {
     let args = CliArgs::parse();
     let debug_dump_frames = parse_frame_list(args.debug_dump_frames.as_deref())?;
@@ -775,7 +788,11 @@ fn prepare_camera_stable(
         reference_for_frame.clone()
     };
     let peak_map = if config.peak_reference {
-        Some(update_peak_brightness(frame_converted, peak_base.as_ref())?)
+        let peak_frame = peak_frame_plane(frame_converted, config.pre_delta_blur_kernel)?;
+        Some(update_peak_brightness_plane(
+            &peak_frame,
+            peak_base.as_ref(),
+        )?)
     } else {
         None
     };
@@ -846,11 +863,10 @@ pub fn run_config(config: Config) -> Result<()> {
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let mut peak_brightness_map = if config.peak_reference {
-        Some(
-            first_frame_converted
-                .slice(ndarray::s![.., .., 0])
-                .to_owned(),
-        )
+        Some(peak_frame_plane(
+            &first_frame_converted,
+            config.pre_delta_blur_kernel,
+        )?)
     } else {
         None
     };
@@ -1286,11 +1302,10 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let mut peak_brightness_map = if config.peak_reference {
-        Some(
-            first_frame_converted
-                .slice(ndarray::s![.., .., 0])
-                .to_owned(),
-        )
+        Some(peak_frame_plane(
+            &first_frame_converted,
+            config.pre_delta_blur_kernel,
+        )?)
     } else {
         None
     };

@@ -75,13 +75,29 @@ pub fn blur_frame(frame_converted: &Array3<f32>, kernel: usize) -> Result<Array3
     let (height, width, channels) = frame_converted.dim();
     let mut blurred = Array3::<f32>::zeros((height, width, channels));
     for channel in 0..channels {
-        let src = cvutil::array3_f32_channel_to_mat(frame_converted, channel)?;
-        let mut dst = opencv::core::Mat::default();
-        imgproc::gaussian_blur_def(&src, &mut dst, Size::new(kernel as i32, kernel as i32), 0.0)?;
-        let plane = cvutil::mat_to_array2_f32(&dst)?;
+        let plane = blur_plane(
+            &frame_converted
+                .slice(ndarray::s![.., .., channel])
+                .to_owned(),
+            kernel,
+        )?;
         blurred
             .slice_mut(ndarray::s![.., .., channel])
             .assign(&plane);
     }
     Ok(blurred)
+}
+
+pub fn blur_plane(plane: &Array2<f32>, kernel: usize) -> Result<Array2<f32>> {
+    let mut kernel = kernel;
+    if kernel <= 1 {
+        return Ok(plane.clone());
+    }
+    if kernel % 2 == 0 {
+        kernel += 1;
+    }
+    let src = cvutil::array2_f32_to_mat(plane)?;
+    let mut dst = opencv::core::Mat::default();
+    imgproc::gaussian_blur_def(&src, &mut dst, Size::new(kernel as i32, kernel as i32), 0.0)?;
+    cvutil::mat_to_array2_f32(&dst)
 }
