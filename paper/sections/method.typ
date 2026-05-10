@@ -9,7 +9,7 @@ The detection algorithm treats each video frame as a comparison against a refere
 #figure(
   image("/typst/figures/pipeline.pdf", width: 95%),
   caption: [
-    Fourteen-stage VRIFA pipeline. Each frame flows from decode
+    Fourteen-stage integrated pipeline. Each frame flows from decode
     through an optional camera-shift registration and pre-delta
     blur, then through an appearance-difference comparison against
     a chosen reference, into a thresholded and morphologically
@@ -70,9 +70,9 @@ The peak map can be disabled through a single configuration parameter, which is 
 
 == Reference selection
 
-The reference image $G_t$ used for the difference computation has five modes. The first-frame mode pins $G_t = F_0$ for every $t$. The running mode updates an exponential moving average $G_t = (1 - alpha) G_(t-1) + alpha F_t$ with default $alpha = 0.05$. The previous-frame mode uses a fixed-offset history $G_t = F_(t - k)$, with the buffer bootstrapped from $F_0$ until $t > k$. The absolute mode pins $G_t$ to a user-specified absolute frame index. The dynamic mode adapts the lag online from a square-root-area growth model fit to the early frames. The default selection is the first-frame mode, which, combined with the peak map above, gives a piecewise-static reference whose only adaptation is the peak update.
+The reference image $G_t$ used for the difference computation has five modes. The first-frame mode pins $G_t = F_0$ for every $t$. The running mode updates an exponential moving average $G_t = (1 - alpha) G_(t-1) + alpha F_t$ with $alpha = 0.05$. The previous-frame mode uses a fixed-offset history $G_t = F_(t - k)$, with the buffer bootstrapped from $F_0$ until $t > k$. The absolute mode pins $G_t$ to a user-specified absolute frame index. The dynamic mode adapts the lag online from a square-root-area growth model fit to the early frames. The integrated configuration uses the first-frame mode, which, combined with the peak map above, gives a piecewise-static reference whose only adaptation is the peak update.
 
-The dynamic mode warrants a closer look because it is what enables comparable behavior across runs of different fill speeds. For the first $N_"calib"$ frames after detection bootstrapping, VRIFA records the wet area $a_t$ inside the region of interest and the elapsed time $tau_t = (t-1)/f$ in seconds, where $f$ is the video frame rate. It then estimates a growth-rate factor $kappa$ as the median of $a_t / tau_t^(3/2)$ across the calibration frames; the three-halves exponent comes from the area-growth law observed for radial Darcy infusion, where wetted area is approximately proportional to time at the three-halves power once flow is well established. Given $kappa$ and a target wet fraction $rho$ of the region-of-interest area $|R|$ (default $0.2$), the dynamic lag $Delta tau_t$ in seconds that places the reference at the moment when the wet area was a fraction $rho$ of the current area is
+The dynamic mode warrants a closer look because it is what enables comparable behavior across runs of different fill speeds. For the first $N_"calib"$ frames after detection bootstrapping, the pipeline records the wet area $a_t$ inside the region of interest and the elapsed time $tau_t = (t-1)/f$ in seconds, where $f$ is the video frame rate. It then estimates a growth-rate factor $kappa$ as the median of $a_t / tau_t^(3/2)$ across the calibration frames. The three-halves exponent comes from the area-growth law observed for radial Darcy infusion, where wetted area is approximately proportional to time at the three-halves power once flow is well established. Given $kappa$ and a target wet fraction $rho$ of the region-of-interest area $|R|$ (held at $0.2$ in the integrated configuration), the dynamic lag $Delta tau_t$ in seconds that places the reference at the moment when the wet area was a fraction $rho$ of the current area is
 
 $ Delta tau_t = lambda dot.c [ ( (rho |R|) / kappa + sqrt(tau_t) )^2 - tau_t ], $ <eq:dynlag>
 
