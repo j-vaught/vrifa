@@ -93,11 +93,18 @@ def run_trial(
         shutil.rmtree(trial_dir, ignore_errors=True)
     sample_dir.mkdir(parents=True, exist_ok=True)
 
+    # --backend is a fast-vrifa-only flag. When running the CPU vrifa-rs
+    # binary (e.g. for phases that exercise blur or threshold modes the
+    # CUDA fast path doesn't support), strip it so vrifa-rs doesn't error.
+    flags = dict(trial.flags)
+    if Path(binary).name != "fast-vrifa" and "backend" in flags:
+        flags.pop("backend")
+
     argv = [
         str(binary),
         "--video-path", str(trial.video_path),
         "--output-dir", str(sample_dir),
-    ] + flags_to_argv(trial.flags)
+    ] + flags_to_argv(flags)
 
     start = time.monotonic()
     proc_result: dict[str, Any] = {"timeout": False, "rc": None,
