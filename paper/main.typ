@@ -67,10 +67,11 @@
     VARTM infusion runs. The integrated configuration reaches mask
     Intersection-over-Union of $X.X X X$ (95 % bootstrap confidence
     interval $[a, b]$) and boundary $F_1$ of $Y.Y Y Y$
-    (CI $[c, d]$). A component-removal ablation shows that disabling
-    any single primitive drops mean IoU by at least $Delta$IoU
-    absolute, with the peak-reference and temporal-lock components
-    accounting for the largest individual deltas. The pipeline runs
+    (CI $[c, d]$). A per-sample component-removal ablation on the
+    same subset characterizes the marginal IoU effect of each named
+    primitive, both as an eleven-sample mean and broken down per
+    sample so that primitives whose contribution depends on infusion
+    regime are visible rather than averaged away. The pipeline runs
     at thirty frames per second on a single CPU and at $K$ frames
     per second on a CUDA implementation across the eleven samples.
   ],

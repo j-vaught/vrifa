@@ -66,7 +66,7 @@ The pipeline accumulates a running maximum of the working channel across all fra
   ],
 ) <fig:peak>
 
-The peak map can be disabled through a single configuration parameter, which is the row of Table~@tab:ablation labeled "no peak-brightness reference" and is the largest single $Delta$IoU in the ablation.
+The peak map can be disabled through a single configuration parameter. The "no peak-brightness reference" row of Table~@tab:ablation reports the IoU effect of doing so on each of the eleven samples, with the per-sample breakdown showing that the effect is not constant across infusion regimes.
 
 == Reference selection
 
@@ -141,7 +141,7 @@ Stage thirteen imposes hysteresis along the time axis. Each pixel keeps a small 
   ],
 ) <fig:lock>
 
-The integrated configuration uses $n_"lock" = 3$, which trades a small number of frames of recovery latency for boundary stability. Setting the lock window to zero disables the stage altogether and corresponds to the "no temporal lock" row of Table~@tab:ablation, the second-largest single $Delta$IoU in the ablation.
+The integrated configuration uses $n_"lock" = 3$, which trades a small number of frames of recovery latency for boundary stability. Setting the lock window to zero disables the stage altogether. The "no temporal lock" row of Table~@tab:ablation reports the per-sample effect, which depends on whether the live infusion contains pauses on the order of three frames or longer.
 
 == Heatmap, overlay, and contour export
 

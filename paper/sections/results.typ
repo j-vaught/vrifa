@@ -93,7 +93,7 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
 
 == Component-removal ablation
 
-The empirical claim of this paper is that the joint configuration matters and every named component contributes a measurable IoU delta to the joint. Table~@tab:ablation reports that claim directly. Each row holds the integrated configuration of Table~@tab:defaults fixed and removes one named component, the column reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval, and the final column reports the absolute IoU drop relative to the integrated configuration in the first row.
+Each row of Table~@tab:ablation holds the integrated configuration of Table~@tab:defaults fixed, removes one named component, and reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval. The final column reports the absolute change in mean IoU relative to the integrated configuration in the first row, signed so that a negative number is a drop and a positive number is a rise. Per-sample $Delta$IoU values for the same rows are reported in the supplementary breakdown referenced from Table~@tab:agreement_per_sample. The reader should not expect the per-sample values to share the sign of the eleven-sample mean. A primitive whose assumption matches the dynamics of one sample can be neutral or counterproductive on a sample with different dynamics, and the per-sample breakdown is the empirical content of the ablation rather than the eleven-sample mean alone.
 
 #figure(
   // TODO populate from paper/data/agreement_metrics_ablation.json once
@@ -122,28 +122,32 @@ The empirical claim of this paper is that the joint configuration matters and ev
   caption: [
     Component-removal ablation on the fifty-five-frame labeling
     subset. Each row holds Table~@tab:defaults fixed and disables one
-    named component. $Delta$IoU is absolute drop relative to the
-    integrated configuration. Rows ordered by descending $Delta$IoU
-    so that the components with the largest individual contribution
-    appear first. Confidence intervals are bootstrap quantiles over
-    $10,!000$ resamples of the per-frame mean.
+    named component. $Delta$IoU is the signed change in mean IoU
+    relative to the integrated configuration; negative values are
+    drops, positive values are rises. Rows are listed in the order
+    in which each corresponding primitive is introduced in
+    Section~3, not sorted by $Delta$IoU, so that the order is
+    independent of the data. Confidence intervals are bootstrap
+    quantiles over $10,!000$ resamples of the per-frame mean.
   ],
 ) <tab:ablation>
 
 #figure(
   // TODO render the bar-chart counterpart of tab:ablation as
-  // typst/figures/component_ablation.pdf, sorted by descending IoU
-  // drop with bootstrap CI whiskers, brand palette.
+  // typst/figures/component_ablation.pdf with the eleven-sample mean
+  // and the per-sample strip side by side per component.
   rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
-    _Component-removal bar chart placeholder._ One bar per component
-    in Table~@tab:ablation, IoU mean with bootstrap 95 % CI whiskers,
-    sorted by descending $Delta$IoU.
+    _Component-removal effect-size figure placeholder._ Per component
+    in Table~@tab:ablation, the eleven-sample mean $Delta$IoU bar
+    next to a strip plot of the eleven per-sample $Delta$IoU values.
   ],
   caption: [
-    Bar-chart counterpart of Table~@tab:ablation. Bars are sorted by
-    descending IoU drop relative to the integrated configuration, so
-    the leftmost bars are the components whose removal hurts the
-    most. The integrated bar is highlighted in garnet for reference.
+    Effect-size companion to Table~@tab:ablation. For each row in the
+    table, the left bar is the eleven-sample mean $Delta$IoU and the
+    right strip is the eleven per-sample $Delta$IoU values. Strips
+    that cross zero identify primitives that are neutral or
+    counterproductive on at least one sample, which is information
+    the eleven-sample mean alone hides.
   ],
 ) <fig:component_bars>
 
