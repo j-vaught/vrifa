@@ -27,12 +27,12 @@
   stage("Colorspace",   "colorspace.rs",   atlantic),
   stage("ROI",          "roi.rs",          atlantic),
   stage("Stabilize",    "registration.rs", atlantic),
-  stage("Pre-blur",     "blur::frame",     atlantic),
+  stage("Pre-blur",     "blur.rs",     atlantic),
   stage("Reference",    "reference.rs",    atlantic),
   stage("Peak track",   "peak.rs",         atlantic),
   // Row 2: detect + clean (6).
-  stage("Delta",        "delta::compute",  garnet),
-  stage("Post-blur",    "blur::plane",     garnet),
+  stage("Delta",        "delta.rs",  garnet),
+  stage("Post-blur",    "blur.rs",     garnet),
   stage("Threshold",    "threshold.rs",    garnet),
   stage("Morph close",  "morphology.rs",   horseshoe),
   stage("Morph open",   "morphology.rs",   horseshoe),
@@ -47,7 +47,7 @@
 #cetz.canvas({
   import cetz.draw: *
 
-  let cell-w = 2.2
+  let cell-w = 2.8
   let cell-h = 0.95
   let gap = 0.4
   let row-pad = 0.6
