@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ndarray::{Array2, Array3};
 use serde::{Deserialize, Serialize};
-use vrifa_core::delta::blur_plane;
+use vrifa_core::blur::{self, BlurSpec};
 use vrifa_core::morphology::MorphShape;
 use vrifa_core::peak::update_peak_brightness_plane;
 use vrifa_core::roi::RoiMargins;
@@ -81,7 +81,7 @@ pub trait PeakImageBackend: ImageBackend {
         kernel: usize,
     ) -> Result<Self::DevicePlaneF32> {
         let plane = self.download_plane_f32(plane)?;
-        let blurred = blur_plane(&plane, kernel)?;
+        let blurred = blur::blur_plane(&plane, BlurSpec::gaussian(kernel))?;
         self.upload_plane_f32(&blurred)
     }
 

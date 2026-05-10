@@ -23,9 +23,10 @@ use std::thread;
 use std::time::Instant;
 use vrifa_annotations::AnnotationFrame;
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
+use vrifa_core::blur::{self, BlurKind, BlurSpec};
 use vrifa_core::contours::extract_bounding_boxes;
 use vrifa_core::cvutil;
-use vrifa_core::delta::{blur_frame, blur_plane, compute_delta};
+use vrifa_core::delta::compute_delta;
 use vrifa_core::heatmap::apply_turbo_colormap;
 use vrifa_core::lock::{apply_locking, LockState};
 use vrifa_core::morphology::{MorphShape, MorphologyParams};
@@ -37,7 +38,7 @@ use vrifa_core::reference::{
 };
 use vrifa_core::registration::{fit_affine_warp, strong_gradient_mask, MotionModel};
 use vrifa_core::roi::{build_roi_mask, resolve_roi_margins};
-use vrifa_core::threshold;
+use vrifa_core::threshold::{self, ThresholdMode};
 use vrifa_core::warp::{apply_warp, AffineWarp};
 #[cfg(feature = "cuda")]
 use vrifa_io::VideoMetadata;
@@ -290,13 +291,13 @@ fn build_frame_border_mask(shape: (usize, usize), border_fraction: f32) -> Array
 
 fn peak_frame_plane(
     frame_converted: &Array3<f32>,
-    pre_delta_blur_kernel: usize,
+    pre_delta_blur: BlurSpec,
 ) -> Result<Array2<f32>> {
     let frame_l = frame_converted.slice(s![.., .., 0]).to_owned();
-    if pre_delta_blur_kernel > 1 {
-        Ok(blur_plane(&frame_l, pre_delta_blur_kernel)?)
-    } else {
+    if pre_delta_blur.is_no_op() {
         Ok(frame_l)
+    } else {
+        Ok(blur::blur_plane(&frame_l, pre_delta_blur)?)
     }
 }
 
@@ -943,6 +944,11 @@ fn parse_fast_bool_flag(raw: &str, flag: &str) -> Result<bool> {
 }
 
 fn resolve_configured_roi_mask(config: &Config, shape: (usize, usize)) -> Array2<u8> {
+    if let Some(path) = config.roi_mask.as_deref() {
+        if let Ok(mask) = load_roi_mask_png(path, shape) {
+            return mask;
+        }
+    }
     build_roi_mask(
         shape,
         resolve_roi_margins(
@@ -953,6 +959,33 @@ fn resolve_configured_roi_mask(config: &Config, shape: (usize, usize)) -> Array2
             config.roi_margin_right,
         ),
     )
+}
+
+fn load_roi_mask_png(path: &Path, shape: (usize, usize)) -> Result<Array2<u8>> {
+    let img = opencv::imgcodecs::imread(
+        &path.to_string_lossy(),
+        opencv::imgcodecs::IMREAD_GRAYSCALE,
+    )?;
+    if img.empty() {
+        bail!("could not read ROI mask PNG at {}", path.display());
+    }
+    let (height, width) = shape;
+    let mat = if (img.rows() as usize, img.cols() as usize) == shape {
+        img
+    } else {
+        let mut resized = core::Mat::default();
+        opencv::imgproc::resize(
+            &img,
+            &mut resized,
+            core::Size::new(width as i32, height as i32),
+            0.0,
+            0.0,
+            opencv::imgproc::INTER_NEAREST,
+        )?;
+        resized
+    };
+    let arr = cvutil::mat_to_array2_u8(&mat)?;
+    Ok(arr.mapv(|v| if v > 127 { 1 } else { 0 }))
 }
 
 fn run_cpu_backend(config: Config, options: &FastCliOptions) -> Result<()> {
@@ -1003,10 +1036,26 @@ fn can_use_cuda_batched_peak_fast_path(config: &Config) -> bool {
         && config.darken_only
         && config.peak_reference
         && !config.camera_stable
-        && config.pre_delta_blur_kernel <= 1
+        && config.pre_delta_blur.is_no_op()
         && matches!(config.ref_mode, ReferenceMode::First)
-        && config.contrast_threshold.is_none()
-        && config.contrast_percentile.is_none()
+        && matches!(config.threshold_mode, ThresholdMode::Otsu)
+        && matches!(config.post_blur.kind, BlurKind::Gaussian | BlurKind::None)
+        && config.roi_mask.is_none()
+}
+
+/// Decompose a BlurSpec into the legacy (kernel_size, blur_enabled)
+/// pair the CUDA backend's BatchDetectorOptions still expects. CUDA only
+/// implements Gaussian; other kinds bail and the harness routes the
+/// trial to vrifa-rs.
+fn legacy_blur_kernel(spec: BlurSpec) -> Result<(usize, bool)> {
+    match spec.kind {
+        BlurKind::None => Ok((1, false)),
+        BlurKind::Gaussian => Ok((spec.size.max(1), true)),
+        other => bail!(
+            "fast-vrifa CUDA path implements only Gaussian/none blur; got {other:?}. \
+             Re-run this trial with the CPU vrifa-rs binary."
+        ),
+    }
 }
 
 #[cfg(feature = "cuda")]
@@ -1102,10 +1151,11 @@ fn run_cuda_batched_peak_pipeline(
 
     let need_host_mask = needs_output_workers || config.write_mask_video || write_overlay_video;
     let need_host_delta_norm = write_heatmap_pngs || write_heatmap_video;
+    let (blur_kernel, blur_enabled) = legacy_blur_kernel(config.post_blur)?;
     let batch_options = CudaBatchDetectorOptions {
         channel_weight: config.channel_weights[0],
-        blur_kernel: config.blur_kernel,
-        blur_enabled: !config.skip_blur,
+        blur_kernel,
+        blur_enabled,
         threshold_offset: config.threshold_offset,
         morph_shape: config.morph_shape,
         morph_kernel: config.morph_kernel,
@@ -1359,7 +1409,7 @@ where
     let device_delta_eligible =
         config.darken_only && matches!(config.colorspace, ColorSpace::Cielab);
     let use_device_plane_path =
-        device_delta_eligible && (config.camera_stable || config.pre_delta_blur_kernel > 1);
+        device_delta_eligible && (config.camera_stable || !config.pre_delta_blur.is_no_op());
     let absolute_reference = if reference_values_needed {
         if let Some(index) = absolute_index {
             if let Some(total) = metadata.total_frames {
@@ -1430,7 +1480,7 @@ where
     let mut peak_brightness_map = if config.peak_reference && !device_delta_eligible {
         Some(peak_frame_plane(
             &first_frame_converted,
-            config.pre_delta_blur_kernel,
+            config.pre_delta_blur,
         )?)
     } else {
         None
@@ -1443,8 +1493,8 @@ where
             .transpose()?
             .ok_or_else(|| anyhow!("device peak path requires a device CIELAB frame"))?;
         Some(
-            if use_device_plane_path && config.pre_delta_blur_kernel > 1 {
-                backend.blur_plane_f32_device(&first_l, config.pre_delta_blur_kernel)?
+            if use_device_plane_path && !config.pre_delta_blur.is_no_op() {
+                backend.blur_plane_f32_device(&first_l, config.pre_delta_blur.size.max(1))?
             } else {
                 first_l
             },
@@ -1519,7 +1569,7 @@ where
         || output_context.annotations_enabled;
     let output_pool = needs_output_workers.then(|| OutputWorkerPool::new(output_context.clone()));
     let supports_device_auto_threshold =
-        config.contrast_threshold.is_none() && config.contrast_percentile.is_none();
+        matches!(config.threshold_mode, ThresholdMode::Otsu);
     let mut device_lock_state = if config.lock_frames > 0 {
         backend.create_lock_state(roi_mask.dim())?
     } else {
@@ -1634,13 +1684,11 @@ where
         if frame_index % config.frame_step == 0 {
             let compute_start = Instant::now();
             let morph_params = MorphologyParams {
-                blur_kernel: config.blur_kernel,
+                post_blur: config.post_blur,
                 morph_kernel: config.morph_kernel,
                 min_area: config.min_area,
-                manual_threshold: config.contrast_threshold,
-                percentile_threshold: config.contrast_percentile,
+                threshold_mode: config.threshold_mode,
                 threshold_offset: config.threshold_offset,
-                blur_enabled: !config.skip_blur,
                 morph_shape: config.morph_shape,
                 morph_close_iterations: config.morph_close_iterations,
                 morph_open_iterations: config.morph_open_iterations,
@@ -1671,9 +1719,9 @@ where
             if let Some(device_lab) = current.device_lab.as_ref() {
                 if device_delta_eligible && use_device_plane_path {
                     let mut frame_l = backend.extract_l_plane(device_lab)?;
-                    if config.pre_delta_blur_kernel > 1 {
+                    if !config.pre_delta_blur.is_no_op() {
                         frame_l = backend
-                            .blur_plane_f32_device(&frame_l, config.pre_delta_blur_kernel)?;
+                            .blur_plane_f32_device(&frame_l, config.pre_delta_blur.size.max(1))?;
                     }
                     if config.peak_reference {
                         let peak_base = apply_peak_shift_device(
@@ -1708,10 +1756,10 @@ where
                             reference_plane =
                                 backend.warp_plane_f32_device(&reference_plane, warp)?;
                         }
-                        if config.pre_delta_blur_kernel > 1 {
+                        if !config.pre_delta_blur.is_no_op() {
                             reference_plane = backend.blur_plane_f32_device(
                                 &reference_plane,
-                                config.pre_delta_blur_kernel,
+                                config.pre_delta_blur.size.max(1),
                             )?;
                         }
                         backend.compute_delta_darken_only_planes_device(
@@ -1721,10 +1769,12 @@ where
                             config.channel_weights[0],
                         )?
                     };
+                    let (post_blur_kernel_legacy, post_blur_enabled_legacy) =
+                        legacy_blur_kernel(morph_params.post_blur)?;
                     if let Some(device_delta_norm) = backend.blur_and_normalize_delta(
                         &device_delta,
-                        morph_params.blur_kernel,
-                        morph_params.blur_enabled,
+                        post_blur_kernel_legacy,
+                        post_blur_enabled_legacy,
                     )? {
                         let mut device_mask = if supports_device_auto_threshold {
                             backend.threshold_and_morph_mask_auto(
@@ -1744,8 +1794,7 @@ where
                             let threshold_value = threshold::choose_threshold(
                                 &delta_norm,
                                 &roi_mask,
-                                morph_params.manual_threshold,
-                                morph_params.percentile_threshold,
+                                morph_params.threshold_mode,
                                 morph_params.threshold_offset,
                             )?;
                             host_delta_norm = Some(delta_norm.clone());
@@ -1884,10 +1933,12 @@ where
                             config.channel_weights[0],
                         )?
                     };
+                    let (post_blur_kernel_legacy, post_blur_enabled_legacy) =
+                        legacy_blur_kernel(morph_params.post_blur)?;
                     if let Some(device_delta_norm) = backend.blur_and_normalize_delta(
                         &device_delta,
-                        morph_params.blur_kernel,
-                        morph_params.blur_enabled,
+                        post_blur_kernel_legacy,
+                        post_blur_enabled_legacy,
                     )? {
                         let mut device_mask = if supports_device_auto_threshold {
                             backend.threshold_and_morph_mask_auto(
@@ -1907,8 +1958,7 @@ where
                             let threshold_value = threshold::choose_threshold(
                                 &delta_norm,
                                 &roi_mask,
-                                morph_params.manual_threshold,
-                                morph_params.percentile_threshold,
+                                morph_params.threshold_mode,
                                 morph_params.threshold_offset,
                             )?;
                             host_delta_norm = Some(delta_norm.clone());
@@ -2024,19 +2074,19 @@ where
                             &camera_actions.peak_shift,
                         )?;
                         let peak_frame =
-                            peak_frame_plane(frame_host, config.pre_delta_blur_kernel)?;
+                            peak_frame_plane(frame_host, config.pre_delta_blur)?;
                         peak_brightness_map = Some(update_peak_brightness_plane(
                             &peak_frame,
                             peak_base.as_ref(),
                         )?);
                     }
-                    let frame_for_delta = if config.pre_delta_blur_kernel > 1 {
-                        blur_frame(frame_host, config.pre_delta_blur_kernel)?
+                    let frame_for_delta = if !config.pre_delta_blur.is_no_op() {
+                        blur::blur_frame(frame_host, config.pre_delta_blur)?
                     } else {
                         frame_host.clone()
                     };
-                    let reference_for_delta = if config.pre_delta_blur_kernel > 1 {
-                        blur_frame(&aligned_reference, config.pre_delta_blur_kernel)?
+                    let reference_for_delta = if !config.pre_delta_blur.is_no_op() {
+                        blur::blur_frame(&aligned_reference, config.pre_delta_blur)?
                     } else {
                         aligned_reference
                     };
@@ -2075,19 +2125,19 @@ where
                         peak_brightness_map.as_ref(),
                         &camera_actions.peak_shift,
                     )?;
-                    let peak_frame = peak_frame_plane(frame_host, config.pre_delta_blur_kernel)?;
+                    let peak_frame = peak_frame_plane(frame_host, config.pre_delta_blur)?;
                     peak_brightness_map = Some(update_peak_brightness_plane(
                         &peak_frame,
                         peak_base.as_ref(),
                     )?);
                 }
-                let frame_for_delta = if config.pre_delta_blur_kernel > 1 {
-                    blur_frame(frame_host, config.pre_delta_blur_kernel)?
+                let frame_for_delta = if !config.pre_delta_blur.is_no_op() {
+                    blur::blur_frame(frame_host, config.pre_delta_blur)?
                 } else {
                     frame_host.clone()
                 };
-                let reference_for_delta = if config.pre_delta_blur_kernel > 1 {
-                    blur_frame(&aligned_reference, config.pre_delta_blur_kernel)?
+                let reference_for_delta = if !config.pre_delta_blur.is_no_op() {
+                    blur::blur_frame(&aligned_reference, config.pre_delta_blur)?
                 } else {
                     aligned_reference
                 };
@@ -2417,18 +2467,8 @@ fn detect_mask_and_delta_norm(
     roi_mask: &Array2<u8>,
     params: &MorphologyParams,
 ) -> Result<DetectionOutputs> {
-    let delta_blur = if params.blur_enabled {
-        let mut kernel = params.blur_kernel;
-        if kernel % 2 == 0 {
-            kernel += 1;
-        }
-        let src = cvutil::array2_f32_to_mat(delta)?;
-        let mut dst = opencv::core::Mat::default();
-        imgproc::gaussian_blur_def(&src, &mut dst, Size::new(kernel as i32, kernel as i32), 0.0)?;
-        dst
-    } else {
-        cvutil::array2_f32_to_mat(delta)?
-    };
+    let blurred = blur::blur_plane(delta, params.post_blur)?;
+    let delta_blur = cvutil::array2_f32_to_mat(&blurred)?;
 
     let delta_norm = normalize_minmax_to_u8(&delta_blur)?;
     Ok(DetectionOutputs {
@@ -2443,10 +2483,9 @@ fn detect_mask_from_delta_norm(
     params: &MorphologyParams,
 ) -> Result<Array2<u8>> {
     let threshold_value = threshold::choose_threshold(
-        &delta_norm,
+        delta_norm,
         roi_mask,
-        params.manual_threshold,
-        params.percentile_threshold,
+        params.threshold_mode,
         params.threshold_offset,
     )?;
     detect_mask_from_delta_norm_threshold(delta_norm, threshold_value, params)
@@ -2773,22 +2812,14 @@ fn write_run_summary(
     put!("roi_margin_bottom", config.roi_margin_bottom.map(yaml_f32));
     put!("roi_margin_left", config.roi_margin_left.map(yaml_f32));
     put!("roi_margin_right", config.roi_margin_right.map(yaml_f32));
-    put!("pre_delta_blur_kernel", config.pre_delta_blur_kernel);
-    put!("blur_kernel", config.blur_kernel);
-    put!("skip_blur", config.skip_blur);
+    put!("pre_delta_blur", config.pre_delta_blur.to_string());
+    put!("blur", config.post_blur.to_string());
     put!("morph_kernel", config.morph_kernel);
     put!("morph_shape", config.morph_shape.name());
     put!("morph_close_iterations", config.morph_close_iterations);
     put!("morph_open_iterations", config.morph_open_iterations);
     put!("min_area", config.min_area);
-    put!(
-        "contrast_threshold",
-        config.contrast_threshold.map(yaml_f32)
-    );
-    put!(
-        "contrast_percentile",
-        config.contrast_percentile.map(yaml_f32)
-    );
+    put!("threshold", config.threshold_mode.to_string());
     put!("threshold_offset", yaml_f32(config.threshold_offset));
     put!("darken_only", config.darken_only);
     put!("peak_reference", config.peak_reference);

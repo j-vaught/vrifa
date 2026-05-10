@@ -242,6 +242,59 @@ fn adaptive_threshold(
     Ok(dst)
 }
 
+/// Compatibility shim for callers that still operate on the
+/// (manual, percentile, offset) triple plus a separately-applied threshold
+/// step. Returns the SCALAR threshold value that callers can hand to
+/// cv::threshold. Adaptive modes cannot be expressed as a single value
+/// and will error out -- those callers must use `apply_threshold` for
+/// the per-pixel binary mask directly.
+pub fn choose_threshold(
+    delta_norm: &Array2<u8>,
+    roi_mask: &Array2<u8>,
+    mode: ThresholdMode,
+    offset: f32,
+) -> Result<f32> {
+    let src = cvutil::array2_u8_to_mat(delta_norm)?;
+    let raw = match mode {
+        ThresholdMode::Otsu => otsu_value(&src)?,
+        ThresholdMode::Triangle => triangle_value(&src)?,
+        ThresholdMode::Manual(v) => v as f64,
+        ThresholdMode::Percentile(p) => {
+            let mut values: Vec<u8> = delta_norm
+                .iter()
+                .zip(roi_mask.iter())
+                .filter_map(|(value, mask)| (*mask > 0).then_some(*value))
+                .collect();
+            if values.is_empty() {
+                otsu_value(&src)?
+            } else {
+                values.sort_unstable();
+                numpy_linear_percentile(&values, p.clamp(0.0, 100.0)) as f64
+            }
+        }
+        ThresholdMode::AdaptiveMean { .. } | ThresholdMode::AdaptiveGaussian { .. } => {
+            return Err(VrifaError::InvalidParameter(
+                "adaptive thresholding cannot be expressed as a single value; \
+                 callers must use threshold::apply_threshold for adaptive modes"
+                    .into(),
+            ));
+        }
+    };
+    let value = raw + offset as f64;
+    Ok(value.clamp(0.0, 255.0) as f32)
+}
+
+fn triangle_value(src: &core::Mat) -> Result<f64> {
+    let mut dst = core::Mat::default();
+    Ok(imgproc::threshold(
+        src,
+        &mut dst,
+        0.0,
+        255.0,
+        imgproc::THRESH_BINARY | imgproc::THRESH_TRIANGLE,
+    )?)
+}
+
 fn numpy_linear_percentile(sorted: &[u8], percentile: f32) -> f32 {
     if sorted.len() == 1 {
         return sorted[0] as f32;
