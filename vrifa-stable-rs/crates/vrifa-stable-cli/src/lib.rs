@@ -50,6 +50,8 @@ pub struct CliArgs {
     roi_margin_right: Option<f32>,
     #[arg(long, default_value_t = 9)]
     blur_kernel: usize,
+    #[arg(long, default_value_t = 0)]
+    pre_delta_blur_kernel: usize,
     #[arg(long, action = ArgAction::SetTrue)]
     skip_blur: bool,
     #[arg(long, default_value_t = 13)]
@@ -205,6 +207,7 @@ pub struct Config {
     pub roi_margin_bottom: Option<f32>,
     pub roi_margin_left: Option<f32>,
     pub roi_margin_right: Option<f32>,
+    pub pre_delta_blur_kernel: usize,
     pub blur_kernel: usize,
     pub skip_blur: bool,
     pub morph_kernel: usize,
@@ -262,6 +265,7 @@ impl Default for Config {
             roi_margin_bottom: None,
             roi_margin_left: None,
             roi_margin_right: None,
+            pre_delta_blur_kernel: 0,
             blur_kernel: 9,
             skip_blur: false,
             morph_kernel: 13,
@@ -363,6 +367,7 @@ impl TryFrom<CliArgs> for Config {
             roi_margin_bottom: args.roi_margin_bottom,
             roi_margin_left: args.roi_margin_left,
             roi_margin_right: args.roi_margin_right,
+            pre_delta_blur_kernel: args.pre_delta_blur_kernel,
             blur_kernel: args.blur_kernel,
             skip_blur: args.skip_blur,
             morph_kernel: args.morph_kernel,
@@ -427,6 +432,8 @@ struct MotionTraceRow {
     warp_dy: f32,
     warp_error: f32,
     fit_applied: bool,
+    fit_model: Option<MotionModel>,
+    fit_score: Option<f32>,
     warp_active: bool,
 }
 
@@ -530,7 +537,10 @@ fn build_static_registration_mask(
     let mut combined_pixels = 0usize;
     for y in 0..height {
         for x in 0..width {
-            let is_dry = dry_mask.as_ref().map(|mask| mask[(y, x)] > 0).unwrap_or(true);
+            let is_dry = dry_mask
+                .as_ref()
+                .map(|mask| mask[(y, x)] > 0)
+                .unwrap_or(true);
             let outside_roi = roi_mask[(y, x)] == 0;
             let is_static = border_mask[(y, x)] > 0 || outside_roi || edge_mask[(y, x)] > 0;
             if is_dry && is_static {
@@ -604,6 +614,8 @@ fn prepare_camera_stable(
 
     let mut peak_base = peak_state.cloned();
     let mut fit_applied = false;
+    let mut fit_model = None;
+    let mut fit_score = None;
 
     if config.camera_stable {
         let (height, width, _) = frame_converted.dim();
@@ -644,8 +656,8 @@ fn prepare_camera_stable(
                 state.shift_event_active = true;
                 state.shift_event_stable_frames = 0;
             }
-            let drift_trigger = state.warp_active
-                && cached_translation_error > config.cumulative_motion_threshold;
+            let drift_trigger =
+                state.warp_active && cached_translation_error > config.cumulative_motion_threshold;
             let needs_fit = state.shift_event_active || drift_trigger;
 
             if needs_fit {
@@ -669,21 +681,21 @@ fn prepare_camera_stable(
                     config.motion_model,
                     registration_mask.as_ref(),
                 ) {
-                    Ok(warp) => {
-                        state.cached_warp = warp;
+                    Ok(fit) => {
+                        state.cached_warp = fit.warp;
                         let (fitted_dx, fitted_dy) =
                             state.cached_warp.center_displacement(width, height);
                         state.cumulative_dx = fitted_dx;
                         state.cumulative_dy = fitted_dy;
                         state.warp_active = !state.cached_warp.is_identityish(0.25);
                         fit_applied = true;
+                        fit_model = Some(fit.model);
+                        fit_score = Some(fit.score);
                         if config.peak_reference {
                             peak_base = match config.peak_on_shift {
                                 PeakOnShift::Reset => None,
                                 PeakOnShift::Warp => peak_state
-                                    .map(|peak| {
-                                        apply_warp_plane(peak, &state.cached_warp)
-                                    })
+                                    .map(|peak| apply_warp_plane(peak, &state.cached_warp))
                                     .transpose()?,
                             };
                         }
@@ -731,6 +743,8 @@ fn prepare_camera_stable(
                 warp_dy,
                 warp_error,
                 fit_applied,
+                fit_model,
+                fit_score,
                 warp_active: state.warp_active,
             });
         } else {
@@ -748,6 +762,8 @@ fn prepare_camera_stable(
                 warp_dy: 0.0,
                 warp_error: 0.0,
                 fit_applied: false,
+                fit_model: None,
+                fit_score: None,
                 warp_active: false,
             });
         }
@@ -990,6 +1006,7 @@ pub fn run_config(config: Config) -> Result<()> {
             )?;
             peak_brightness_map = camera_stable.peak_map;
             let params = DetectFrontParams {
+                pre_delta_blur_kernel: config.pre_delta_blur_kernel,
                 blur_kernel: config.blur_kernel,
                 morph_kernel: config.morph_kernel,
                 min_area: config.min_area,
@@ -1280,6 +1297,7 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
     let mut camera_stable_state = CameraStableState::new();
 
     let params = DetectFrontParams {
+        pre_delta_blur_kernel: config.pre_delta_blur_kernel,
         blur_kernel: config.blur_kernel,
         morph_kernel: config.morph_kernel,
         min_area: config.min_area,
@@ -1482,12 +1500,12 @@ fn write_motion_trace(path: &Path, rows: &[MotionTraceRow]) -> Result<()> {
     let mut file = File::create(path).with_context(|| format!("creating {}", path.display()))?;
     writeln!(
         file,
-        "frame,dx,dy,confidence,cumulative_dx,cumulative_dy,per_frame_magnitude,cumulative_magnitude,recent_window_magnitude,warp_dx,warp_dy,warp_error,fit_applied,warp_active"
+        "frame,dx,dy,confidence,cumulative_dx,cumulative_dy,per_frame_magnitude,cumulative_magnitude,recent_window_magnitude,warp_dx,warp_dy,warp_error,fit_applied,fit_model,fit_score,warp_active"
     )?;
     for row in rows {
         writeln!(
             file,
-            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}",
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{}",
             row.frame_index,
             row.dx,
             row.dy,
@@ -1501,6 +1519,10 @@ fn write_motion_trace(path: &Path, rows: &[MotionTraceRow]) -> Result<()> {
             row.warp_dy,
             row.warp_error,
             row.fit_applied,
+            row.fit_model.map(MotionModel::name).unwrap_or(""),
+            row.fit_score
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_default(),
             row.warp_active,
         )?;
     }
@@ -1785,6 +1807,7 @@ fn write_run_summary(
     put!("roi_margin_bottom", config.roi_margin_bottom.map(yaml_f32));
     put!("roi_margin_left", config.roi_margin_left.map(yaml_f32));
     put!("roi_margin_right", config.roi_margin_right.map(yaml_f32));
+    put!("pre_delta_blur_kernel", config.pre_delta_blur_kernel);
     put!("blur_kernel", config.blur_kernel);
     put!("skip_blur", config.skip_blur);
     put!("morph_kernel", config.morph_kernel);
