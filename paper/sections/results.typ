@@ -6,7 +6,7 @@ Bootstrap 95 % confidence intervals are reported for every metric, computed from
 
 == Integrated configuration vs. naive baseline
 
-The integrated configuration is the configuration described in Section~3 and held fixed across every result reported in this section, with values listed in Table~@tab:defaults. The naive baseline runs the same pipeline with every named component disabled, namely no peak-brightness reference, no darken-only clip, no temporal lock, no morphological cleanup, and no dynamic-lag reference selection. The naive baseline retains only the colorspace projection, the ROI restriction, and the Otsu threshold against the first-frame reference, which is the minimum that any prior camera-based VARTM system reports doing. The contrast between the two rows is the empirical answer to the question "does the joint configuration matter for IoU on this benchmark."
+The integrated configuration is the configuration described in Section~3 and held fixed across every result reported in this section, with the mode menus pinned in their respective per-subsection tables and the scalar values listed in Table~@tab:scalars. The naive baseline runs the same pipeline with every named component disabled, namely no peak-brightness reference, no darken-only clip, no temporal lock, no morphological cleanup, and no dynamic-lag reference selection. The naive baseline retains only the colorspace projection, the ROI restriction, and the Otsu threshold against the first-frame reference, which is the minimum that any prior camera-based VARTM system reports doing. The contrast between the two rows is the empirical answer to the question "does the joint configuration matter for IoU on this benchmark."
 
 #figure(
   // TODO populate from data/agreement_metrics.json once the
@@ -102,7 +102,7 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
 
 == Component-removal ablation
 
-Each row of Table~@tab:ablation holds the integrated configuration of Table~@tab:defaults fixed, removes one named component, and reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval. The final column reports the absolute change in mean IoU relative to the integrated configuration in the first row, signed so that a negative number is a drop and a positive number is a rise. Per-sample $Delta$IoU values for the same rows are reported in the supplementary breakdown referenced from Table~@tab:agreement_per_sample. The reader should not expect the per-sample values to share the sign of the eleven-sample mean. A primitive whose assumption matches the dynamics of one sample can be neutral or counterproductive on a sample with different dynamics, and the per-sample breakdown is the empirical content of the ablation rather than the eleven-sample mean alone.
+Each row of Table~@tab:ablation holds the integrated configuration described in Section~3 fixed, removes one named component, and reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval. The final column reports the absolute change in mean IoU relative to the integrated configuration in the first row, signed so that a negative number is a drop and a positive number is a rise. Per-sample $Delta$IoU values for the same rows are reported in the supplementary breakdown referenced from Table~@tab:agreement_per_sample. The reader should not expect the per-sample values to share the sign of the eleven-sample mean. A primitive whose assumption matches the dynamics of one sample can be neutral or counterproductive on a sample with different dynamics, and the per-sample breakdown is the empirical content of the ablation rather than the eleven-sample mean alone.
 
 #figure(
   // TODO populate from data/agreement_metrics_ablation.json once
@@ -133,8 +133,9 @@ Each row of Table~@tab:ablation holds the integrated configuration of Table~@tab
   ),
   caption: [
     Component-removal ablation on the fifty-five-frame labeling
-    subset. Each row holds Table~@tab:defaults fixed and disables one
-    named component. $Delta$IoU is the signed change in mean IoU
+    subset. Each row holds the integrated configuration of Section~3
+    (Tables~@tab:colorspace_modes through @tab:scalars) fixed and
+    disables one named component. $Delta$IoU is the signed change in mean IoU
     relative to the integrated configuration; negative values are
     drops, positive values are rises. Rows are listed in the order
     in which each corresponding primitive is introduced in

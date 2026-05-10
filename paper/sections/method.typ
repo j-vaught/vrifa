@@ -25,13 +25,112 @@ The pipeline is deliberately classical because the empirical claim of this paper
 
 The first stage decodes each Blue-Green-Red (BGR) frame from the input video. The second projects that frame into a working colorspace. The pipeline supports four options, namely the International Commission on Illumination (CIE) 1976 $L^* a^* b^*$ colorspace (CIELAB), Red-Green-Blue (RGB), Hue-Saturation-Value (HSV), and 8-bit grayscale. The integrated configuration uses CIELAB because for the resin-and-fabric combinations in the eleven samples evaluated here, wetting primarily darkens the lightness channel $L^*$ rather than shifting chrominance, so the single-channel $L^*$ projection used in the difference computation captures most of the signal. The choice is regime-dependent rather than universal. A pigmented resin or a colored fabric could shift the balance of evidence into chrominance and make RGB or HSV preferable, which is why the alternatives remain selectable. The eleven-sample mean and per-sample breakdown of the colorspace effect are reported in Table~@tab:ablation. We denote the converted frame at index $t$ by $F_t in bb(R)^(H times W times C)$, where $C$ is the channel count of the chosen colorspace.
 
+#figure(
+  // image("/typst/figures/colorspace_projection.pdf", width: 95%),
+  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
+    _Colorspace projection placeholder._ Four-panel grid showing the
+    same canonical input frame projected into each of the four
+    supported colorspaces. Column 1: raw BGR. Column 2: CIELAB
+    lightness $L^*$ (used by the integrated configuration). Column
+    3: HSV value channel. Column 4: 8-bit grayscale. Each panel
+    rendered with a perceptually uniform colormap so wet-vs-dry
+    separability per projection is visible. A bottom strip shows the
+    per-projection histogram for the laminate region of interest
+    with the wet and dry modes annotated. Regenerated from the new
+    ablation runs.
+  ],
+  caption: [
+    The four working-colorspace projections supported by the
+    pipeline.
+  ],
+) <fig:colorspace_projection>
+
+#figure(
+  table(
+    columns: (auto, 1fr),
+    align: (left, left),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header([*Option*], [*Description*]),
+    table.hline(stroke: 0.5pt),
+    [CIELAB], [CIE 1976 $L^* a^* b^*$. Wetting primarily darkens $L^*$ for the resin-and-fabric combinations evaluated in this paper.],
+    [RGB], [Red-Green-Blue. Useful when chrominance shifts under wetting are visible per channel, e.g.\ pigmented resin.],
+    [HSV], [Hue-Saturation-Value. Saturation tracks wet-out separately from luminance, useful under variable lighting.],
+    [Grayscale], [8-bit luminance projection. Cheapest but loses chrominance evidence entirely.],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [Working-colorspace options selectable via `--colorspace`.],
+) <tab:colorspace_modes>
+
 == Region of interest
 
 A rectangular region of interest excludes the part frame, manifold flange, and bag wrinkles outside the laminate. The user supplies four fractional margins, one per edge, each clamped to the closed interval from zero to forty-nine hundredths of the corresponding side, and the algorithm builds a binary mask $R$ that is one inside the resulting rectangle and zero elsewhere. A single configuration parameter sets all four margins symmetrically, with per-edge overrides available. All subsequent stages operate only on pixels where $R = 1$.
 
+#figure(
+  // image("/typst/figures/roi_crop.pdf", width: 95%),
+  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
+    _ROI crop placeholder._ Single canonical input frame with the
+    rectangular ROI mask $R$ drawn as a translucent garnet overlay
+    over the laminate; the manifold flange and bag wrinkles outside
+    the rectangle are visibly excluded. A small inset in the corner
+    shows the four fractional margins (`roi-margin-top`, `-bottom`,
+    `-left`, `-right`) used in the integrated configuration. The
+    hatched region outside the rectangle is the area all subsequent
+    stages skip.
+  ],
+  caption: [
+    ROI mask $R$ applied to a canonical input frame. Pixels outside
+    the rectangle are excluded from every subsequent stage.
+  ],
+) <fig:roi_crop>
+
 == Camera-shift detection and registration
 
 A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera in mid-run shifts the projected position of every laminate pixel by some vector that has nothing to do with wetting. The reference frame stops aligning with the live frame, the difference field lights up along high-contrast laminate edges, and the threshold catches that as wet. The pipeline detects the shift and corrects it before the difference is computed. For each frame, a single phase-correlation step on a fixed-resolution downsample of the working channel of the previous and current frames returns a translation $(d_x, d_y)$ and a confidence score. When either the per-frame magnitude $sqrt(d_x^2 + d_y^2)$ or the cumulative drift across a five-frame rolling window exceeds the configured threshold, an iterative-coplanar-correlation refinement fits a translation or affine warp $W_t$ on a static-edge mask of the current ROI, and the live frame is warped through $W_t$ into the reference coordinate system before all downstream stages. The static-edge mask is recomputed at each shift event so the registration is driven by mold and frame edges that do not move with the wet front rather than by the wet region itself. The peak map is either discarded (`peak-on-shift = reset`, used by the integrated configuration), so the post-warp pixels do not accumulate against pre-warp brightness, or warped through $W_t$ into the new coordinate system (`peak-on-shift = warp`), so the running maximum is preserved at the cost of carrying any residual registration error into the peak.
+
+#figure(
+  // image("/typst/figures/camera_shift_pair.pdf", width: 95%),
+  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
+    _Camera-shift event placeholder._ Three panels of the
+    bumped-tripod event near frame 71 of the canonical reference
+    video. Left: pre-event frame (frame 70). Center: post-event
+    frame (frame 72) overlaid translucently on the pre-event frame
+    with the phase-correlation translation vector drawn as an arrow.
+    Right: the post-event frame after the iterative-coplanar-
+    correlation refinement warps it through $W_t$ back into
+    reference coordinates, with the static-edge mask overlaid
+    showing which mold-and-frame edges drive the warp. A sub-panel
+    below plots the rolling five-frame cumulative motion magnitude
+    across the run with a marker on frame 71. Regenerated from the
+    new ablation runs.
+  ],
+  caption: [
+    A bumped-tripod event in the canonical reference video. The
+    phase-correlation step detects the shift, the
+    iterative-coplanar-correlation refinement warps the live frame
+    back into reference coordinates, and the rest of the recording
+    shows only sub-pixel residual motion.
+  ],
+) <fig:camera_shift_pair>
+
+#figure(
+  table(
+    columns: (auto, auto, 1fr),
+    align: (left, left, left),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header([*Parameter*], [*Option*], [*Description*]),
+    table.hline(stroke: 0.5pt),
+    [`motion-model`], [translation], [Two-degree-of-freedom translation warp; cheaper to fit, recovers pure tripod nudges.],
+    [`motion-model`], [affine],      [Six-degree-of-freedom affine warp; tolerates small rotations and shears in addition to translation.],
+    [`peak-on-shift`], [reset],      [Discard the peak map at registration and restart accumulation from the warped frame.],
+    [`peak-on-shift`], [warp],       [Warp the peak map itself through $W_t$ into the new coordinate system; preserves the running maximum at the cost of carrying residual registration error.],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [Camera-shift handling options. The integrated configuration uses `motion-model = affine` and `peak-on-shift = reset`.],
+) <tab:motion_modes>
 
 == Peak-brightness reference
 
@@ -67,7 +166,49 @@ The dynamic mode warrants a closer look because the integrated configuration doe
 
 $ Delta tau_t = lambda dot.c [ ( (rho |R|) / kappa + sqrt(tau_t) )^2 - tau_t ], $ <eq:dynlag>
 
-clipped to be non-negative and scaled by a user lag factor $lambda$ (default $1.0$). The reference frame is then read from a small cache at the integer index closest to $t - Delta tau_t f$, falling back to the first frame whenever the calibration has not yet produced a finite $kappa$. A linear-mode override replaces the sqrt-area growth fit with a linear lag schedule parameterised by `dynamic-lag-linear-start` and `dynamic-lag-linear-max`, which steps the reference frame back at a constant rate independent of the calibration estimate. The override is intended for diagnostic comparisons where the sqrt-area assumption is suspect, and a per-frame log of the chosen lag is written to `dynamic-lag-log` for post-hoc inspection.
+clipped to be non-negative and scaled by a user lag factor $lambda$. The reference frame is then read from a small cache at the integer index closest to $t - Delta tau_t f$, falling back to the first frame whenever the calibration has not yet produced a finite $kappa$. A linear-mode override replaces the sqrt-area growth fit with a linear lag schedule parameterised by `dynamic-lag-linear-start` and `dynamic-lag-linear-max`, which steps the reference frame back at a constant rate independent of the calibration estimate. The override is intended for diagnostic comparisons where the sqrt-area assumption is suspect, and a per-frame log of the chosen lag is written to `dynamic-lag-log` for post-hoc inspection.
+
+#figure(
+  // image("/typst/figures/reference_modes.pdf", width: 95%),
+  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
+    _Reference-mode comparison placeholder._ Six-panel grid showing
+    the same canonical input frame at fill position 50% under the
+    five reference modes plus the dynamic linear-lag override. Top
+    row: first-frame reference, running EMA reference,
+    previous-frame fixed-offset reference. Bottom row: absolute-frame
+    reference, dynamic sqrt-area reference, dynamic linear-lag
+    override. Each panel shows the resulting $D_t$ scalar field in
+    the Turbo colormap so the reader can see how each reference mode
+    selects different evidence on the same frame. The integrated-
+    configuration mode (first-frame combined with the peak map) is
+    bordered in garnet. Regenerated from the new ablation runs.
+  ],
+  caption: [
+    The five reference-selection modes the pipeline supports plus
+    the linear-lag dynamic override. The integrated configuration
+    uses the first-frame mode combined with the peak map.
+  ],
+) <fig:reference_modes>
+
+#figure(
+  table(
+    columns: (auto, 1fr),
+    align: (left, left),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header([*Option*], [*Description*]),
+    table.hline(stroke: 0.5pt),
+    [first],                 [Pin $G_t = F_0$ for every $t$. Combined with the peak map, used by the integrated configuration.],
+    [running],               [Exponential moving average $G_t = (1 - alpha) G_(t-1) + alpha F_t$.],
+    [previous],              [Fixed-offset history $G_t = F_(t - k)$.],
+    [absolute],              [Pin $G_t$ to a user-specified absolute frame index.],
+    [dynamic (sqrt-area)],   [Adapt the lag online from a square-root-area Darcy growth fit on $N_"calib"$ calibration frames per Eq.~@eq:dynlag.],
+    [dynamic (linear)],      [Constant-rate lag schedule, independent of the growth fit; intended for diagnostic comparisons.],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [Reference-selection options selectable via `--ref-mode`.],
+) <tab:reference_modes>
 
 == Delta computation
 
@@ -99,9 +240,88 @@ where $G_t^star$ equals the peak map $P_t$ when the peak-reference mode is enabl
 
 The delta field is smoothed by the post-delta blur stage, which is a single function exposed by the `blur.rs` module and shared with the optional pre-delta blur of stage four. The user selects a kernel kind from {flat, gaussian, triangle, median, bilateral, none} together with a kernel size, written as a single specification of the form KIND[:SIZE]. The integrated configuration uses `gaussian:9`, a separable Gaussian of size $k_b = 9$ pixels (forced odd at runtime). Gaussian is appropriate when speckle is approximately white noise around the underlying response field; flat and triangle are exposed because some camera-and-bag combinations produce structured noise that the corresponding box or tent filter handles with less bias. Routing both the pre- and post-delta blurs through the same module keeps their behavior identical at matched specifications and ensures that the bandwidth-limited input the peak map sees in stage four is the same kind of bandwidth-limited input the threshold sees in stage nine.
 
+#figure(
+  // image("/typst/figures/pre_post_blur.pdf", width: 95%),
+  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
+    _Pre- versus post-delta blur placeholder._ Two-row panel. Top
+    row: working frame with no pre-delta blur (left), with $k_p = 5$
+    pre-delta blur (center), with $k_p = 9$ pre-delta blur (right).
+    Bottom row: resulting $D_t$ after each, all then post-delta-
+    blurred with $k_b = 9$. The figure shows that pre-delta blur
+    reduces speckle that would otherwise enter the peak map, while
+    post-delta blur smooths the response field before thresholding.
+    The integrated configuration disables pre-delta ($k_p = 0$) and
+    applies post-delta with $k_b = 9$; both panels for that
+    configuration are bordered in garnet.
+  ],
+  caption: [
+    Effect of pre-delta blur (top) and post-delta blur (bottom) on
+    the response field $D_t$.
+  ],
+) <fig:pre_post_blur>
+
+#figure(
+  table(
+    columns: (auto, 1fr),
+    align: (left, left),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header([*Option*], [*Description*]),
+    table.hline(stroke: 0.5pt),
+    [gaussian],   [Separable Gaussian kernel; appropriate when speckle is approximately white noise around the underlying response.],
+    [flat],       [Box (uniform-mean) filter; cheapest, biases edges more than gaussian.],
+    [triangle],   [Tent kernel; intermediate between flat and gaussian on edge handling.],
+    [median],     [Median filter; appropriate for salt-and-pepper noise.],
+    [bilateral],  [Edge-preserving cross-bilateral filter; preserves boundaries between wet and dry while smoothing inside each region.],
+    [none],       [No blur applied. Equivalent to specification `none` or kernel size zero.],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [Blur kernels exposed by `blur.rs` and selected via the `KIND[:SIZE]` specification of `--pre-delta-blur` and `--blur`.],
+) <tab:blur_modes>
+
 == Normalization and threshold
 
-The smoothed field is rescaled to the byte range using a min-max linear rescaling, producing a $tilde(D)_t$ that fits in eight bits and feeds both the threshold-selection stage and the heatmap renderer. Six thresholding modes are exposed through a single specification of the form KIND[:ARGS]. The four global modes share a single offset $delta_tau$ that is added before binarization. Otsu's between-class variance method recovers an automatic threshold $tau_"otsu"$ over the full $tilde(D)_t$ histogram and adds the offset, which is the integrated configuration's choice and works on infusions whose histograms are roughly bimodal. The Triangle method recovers $tau_"tri"$ by the geometric construction of Zack et al. on the histogram, which is appropriate when one class dominates the histogram (typically early fill, where most pixels are dry). Manual mode uses a user-supplied absolute byte value $tau_"man"$ plus $delta_tau$; percentile mode sorts the ROI pixels and recovers the $p$-th percentile by linear interpolation. The two adaptive modes, adaptive-mean and adaptive-gaussian, compute a per-pixel threshold from a $b times b$ neighborhood mean (or Gaussian-weighted mean) minus a constant $C$, and bypass $delta_tau$ because $C$ already serves the same role. Adaptive thresholding is appropriate when the delta retains a low-frequency intensity gradient that the reference stage did not fully cancel, for instance under uneven side-lighting or vignette artifacts. The integrated configuration uses Otsu with $delta_tau = -30$, which biases the global threshold toward the wet class on infusions where the partially-wetted halo around the front sits below the bimodal split that Otsu finds. The bias is appropriate for the early-fill regime of the eleven labeled samples and not appropriate for every infusion. The Triangle, manual, percentile, and adaptive variants remain selectable for infusions whose histograms or intensity gradients fit those modes better; the integrated configuration does not exercise them, and the headline numbers of Section~5 are reported under Otsu plus offset.
+The smoothed field is rescaled to the byte range using a min-max linear rescaling, producing a $tilde(D)_t$ that fits in eight bits and feeds both the threshold-selection stage and the heatmap renderer. Six thresholding modes are exposed through a single specification of the form KIND[:ARGS]. The four global modes share a single offset $delta_tau$ that is added before binarization. Otsu's between-class variance method @Otsu1979Threshold recovers an automatic threshold $tau_"otsu"$ over the full $tilde(D)_t$ histogram and adds the offset, which is the integrated configuration's choice and works on infusions whose histograms are roughly bimodal. The Triangle method recovers $tau_"tri"$ by the geometric construction of Zack and co-workers on the histogram @Zack1977Triangle, which is appropriate when one class dominates the histogram (typically early fill, where most pixels are dry). Manual mode uses a user-supplied absolute byte value $tau_"man"$ plus $delta_tau$; percentile mode sorts the ROI pixels and recovers the $p$-th percentile by linear interpolation. The two adaptive modes, adaptive-mean and adaptive-gaussian, compute a per-pixel threshold from a $b times b$ neighborhood mean (or Gaussian-weighted mean) minus a constant $C$, and bypass $delta_tau$ because $C$ already serves the same role. Adaptive thresholding is appropriate when the delta retains a low-frequency intensity gradient that the reference stage did not fully cancel, for instance under uneven side-lighting or vignette artifacts. The integrated configuration uses Otsu with $delta_tau = -30$, which biases the global threshold toward the wet class on infusions where the partially-wetted halo around the front sits below the bimodal split that Otsu finds. The bias is appropriate for the early-fill regime of the eleven labeled samples and not appropriate for every infusion. The Triangle, manual, percentile, and adaptive variants remain selectable for infusions whose histograms or intensity gradients fit those modes better; the integrated configuration does not exercise them, and the headline numbers of Section~5 are reported under Otsu plus offset.
+
+#figure(
+  // image("/typst/figures/threshold_modes.pdf", width: 95%),
+  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
+    _Threshold-mode comparison placeholder._ Six-panel grid of
+    binary masks produced by each threshold mode on the same
+    normalized response field $tilde(D)_t$. Panels: Otsu plus offset
+    (used by the integrated configuration), Triangle, manual at
+    $tau_"man" = 64$, percentile at $p = 70$, adaptive-mean with
+    $b = 21$ and $C = 10$, adaptive-gaussian with $b = 21$ and
+    $C = 10$. Above the grid, the histogram of the response is
+    plotted with the Otsu and Triangle thresholds annotated. The
+    integrated mode is bordered in garnet.
+  ],
+  caption: [
+    The six threshold modes the pipeline supports applied to the
+    same normalized response field.
+  ],
+) <fig:threshold_modes>
+
+#figure(
+  table(
+    columns: (auto, 1fr),
+    align: (left, left),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header([*Option*], [*Description*]),
+    table.hline(stroke: 0.5pt),
+    [otsu],              [Between-class variance threshold over the histogram of $tilde(D)_t$ @Otsu1979Threshold, plus offset $delta_tau$.],
+    [triangle],          [Geometric construction of Zack and co-workers on the histogram @Zack1977Triangle, plus offset; appropriate when one class dominates the histogram.],
+    [manual],            [User-supplied absolute byte value $tau_"man"$, plus offset.],
+    [percentile],        [$p$-th percentile of ROI pixels of $tilde(D)_t$ by linear interpolation, plus offset.],
+    [adaptive-mean],     [Per-pixel threshold from a $b times b$ neighborhood mean minus constant $C$. Bypasses $delta_tau$.],
+    [adaptive-gaussian], [Per-pixel threshold from a $b times b$ Gaussian-weighted neighborhood mean minus constant $C$. Bypasses $delta_tau$.],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [Threshold modes selectable via the `KIND[:ARGS]` specification of `--threshold`.],
+) <tab:threshold_modes>
 
 == Morphological close
 
@@ -133,6 +353,40 @@ Stage eleven passes the closed mask through morphological opening with the same 
 
 The kernel parities are forced odd at runtime so that anchor handling is symmetric. The structuring-element shape is elliptical by default with optional rectangular and cross-shaped alternatives, exposed because the front shape changes with infusion geometry.
 
+#figure(
+  // image("/typst/figures/morph_kernels.pdf", width: 95%),
+  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
+    _Morphological-kernel comparison placeholder._ Three panels of
+    the cleaned mask under each structuring-element shape with
+    $k_m = 13$. Left: ellipse (used by the integrated configuration),
+    isotropic, appropriate for round fronts. Center: rectangle,
+    asymmetric, appropriate for stripe-shaped wet regions. Right:
+    cross, minimal, preserves corners. The integrated panel is
+    bordered in garnet.
+  ],
+  caption: [
+    Morphological structuring-element shape applied to the same
+    threshold output. The integrated configuration uses ellipse.
+  ],
+) <fig:morph_kernels>
+
+#figure(
+  table(
+    columns: (auto, 1fr),
+    align: (left, left),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header([*Option*], [*Description*]),
+    table.hline(stroke: 0.5pt),
+    [ellipse], [Disk-shaped structuring element. Isotropic; appropriate for round fronts.],
+    [rect],    [Rectangular structuring element. Asymmetric; appropriate for stripe-shaped wet regions.],
+    [cross],   [Plus-shaped structuring element. Minimal; preserves corners.],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [Structuring-element shapes selectable via `--morph-shape`. Used by both the closing and opening passes.],
+) <tab:morph_modes>
+
 == Temporal locking
 
 Stage twelve imposes hysteresis along the time axis. Each pixel keeps a small per-pixel counter that increments while the cleaned mask reports the pixel as wet and resets to zero on any frame where the cleaned mask says dry. Once the counter reaches the threshold $n_"lock"$ frames, a sticky locked-pixel map is set true at that location and never resets. The output of the stage is the elementwise OR of the cleaned mask with the sticky locked map, so a pixel that has ever been wet for $n_"lock"$ consecutive frames stays wet for the remainder of the run. Figure~@fig:lock illustrates the bookkeeping with a twelve-frame example for $n_"lock" = 3$.
@@ -156,54 +410,65 @@ The integrated configuration uses $n_"lock" = 3$, which holds a positive detecti
 
 The last two display stages exist for inspection and label export. The heatmap renderer maps the normalized delta $tilde(D)_t$ through the Turbo colormap to produce a three-channel pseudocolor image. The overlay renderer extracts the boundary of the locked mask via a five-by-five rectangular morphological gradient and paints those boundary pixels red on a copy of the original BGR frame. Neither renderer is part of the detection logic; they expose, in human-readable form, the field on which the threshold acted and the boundary that the locked mask encloses.
 
-For machine-readable export, the contour-extraction stage emits Common Objects in Context (COCO) and YOLO-format polygons for every connected component of the locked mask. Polygon segmentation is computed with a standard contour-extraction routine, optionally simplified by the Douglas-Peucker algorithm with tolerance $epsilon$, and optionally densified to a maximum edge length so that downstream rasterization preserves curvature. The annotation-sampling utility selects which frames receive labels using one of three modes, namely all-frame, evenly-spaced count, or fixed-stride, with deduplication of consecutive ties so that the integer-truncated linear-spacing exactly reproduces the standard reference behaviour.
+For machine-readable export, the contour-extraction stage emits Common Objects in Context (COCO) and YOLO-format polygons for every connected component of the locked mask. Polygon segmentation is computed with the Suzuki-Abe topological border-following algorithm @Suzuki1985Border, optionally simplified by the Douglas-Peucker algorithm with tolerance $epsilon$, and optionally densified to a maximum edge length so that downstream rasterization preserves curvature. The annotation-sampling utility selects which frames receive labels using one of three modes, namely all-frame, evenly-spaced count, or fixed-stride, with deduplication of consecutive ties so that the integer-truncated linear-spacing exactly reproduces the standard reference behaviour.
 
-== Configuration values held fixed across all experiments
+#figure(
+  // image("/typst/figures/heatmap_overlay_contour.pdf", width: 100%),
+  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
+    _Render-output placeholder._ Four panels for one frame of the
+    canonical reference video. Panel 1: raw BGR input. Panel 2:
+    heatmap render of the normalized response field $tilde(D)_t$
+    through the Turbo colormap. Panel 3: overlay of the locked-mask
+    boundary in red on the original BGR frame. Panel 4: COCO-format
+    polygon export drawn over the input with the polygon vertices
+    marked. Together the four panels show what the pipeline emits
+    for human review and machine-readable export.
+  ],
+  caption: [
+    The three render outputs for one frame: heatmap (panel 2),
+    overlay (panel 3), COCO contour export (panel 4). The raw
+    input (panel 1) is shown for reference.
+  ],
+) <fig:heatmap_overlay_contour>
 
-Table~@tab:defaults lists the configuration values held fixed across every experiment reported in this paper, including the per-component ablation. The values were chosen during development on a held-out subset disjoint from the labeled evaluation set, were not retuned per video or per metric, and are reproduced here so that any reader can recover the exact operating point of every reported number. The ablation in Section~5 reports what happens when each row is changed in isolation.
+== Scalar parameters held fixed
+
+Table~@tab:scalars collects the scalar parameter values held fixed across every experiment reported in this paper. The mode menus that each subsection above exposes are documented in their respective tables and are pinned in prose at "the integrated configuration uses..."; the scalars are listed here in one compact table so a reader can recover the exact operating point without scraping ten subsections. The values were chosen during development on a held-out subset disjoint from the labeled evaluation set and were not retuned per video or per metric.
 
 #figure(
   table(
-    columns: (auto, auto, auto),
-    align: (left, left, left),
+    columns: (auto, auto, 1fr),
+    align: (left, right, left),
     stroke: none,
+    inset: 5pt,
     table.hline(stroke: 0.8pt),
-    table.header[*Symbol / parameter*][*Default*][*Description*],
+    table.header([*Symbol*], [*Value*], [*Where used*]),
     table.hline(stroke: 0.5pt),
-    [colorspace], [CIELAB], [Working colorspace for the difference computation.],
-    [roi-margin], [0.15], [Symmetric fractional ROI margin per edge.],
-    [ref-mode], [first], [Reference selection mode.],
-    [ref-running-alpha, $alpha$], [0.05], [EMA weight for the running reference.],
-    [peak-reference], [true], [Use the running peak map in the working channel.],
-    [darken-only], [true], [Clip the delta to non-negative wetting deltas.],
-    [camera-stable], [false], [Enable phase-correlation camera-shift detection.],
-    [motion-per-frame-threshold], [1.5], [Per-frame translation magnitude that triggers a registration.],
-    [cumulative-motion-threshold], [3], [Accumulated drift, in pixels, that triggers a registration.],
-    [motion-model], [affine], [Warp model fit on a static-edge mask when a shift is detected.],
-    [peak-on-shift], [reset], [How the peak map is treated when a shift is registered.],
-    [pre-delta-blur], [none], [Pre-delta blur spec, KIND[:SIZE]. Applied to the working frame before peak update and delta.],
-    [blur, $k_b$], [gaussian:9], [Post-delta blur spec, KIND[:SIZE]. Applied to the delta field before threshold.],
-    [threshold], [otsu], [Threshold spec, KIND[:ARGS]. KIND is one of otsu, triangle, manual, percentile, adaptive-mean, adaptive-gaussian.],
-    [threshold-offset, $delta_tau$], [-30], [Offset added to Otsu/Triangle/manual/percentile threshold; ignored by adaptive modes.],
-    [morph-kernel, $k_m$], [13], [Morphology structuring-element size.],
-    [morph-shape], [ellipse], [Structuring-element shape.],
-    [morph-close-iterations], [1], [Morphological closing iterations.],
-    [morph-open-iterations], [1], [Morphological opening iterations.],
-    [min-area, $a_"min"$], [400], [Minimum connected-component area, in pixels.],
-    [lock-frames, $n_"lock"$], [3], [Temporal lock window, in frames.],
-    [frame-step], [1], [Frame stride at decode time.],
-    [dynamic-calibration-frames, $N_"calib"$], [10], [Frames used to fit the dynamic-reference factor $kappa$.],
-    [dynamic-target-fraction, $rho$], [0.2], [Target wet-area fraction for dynamic-reference lag.],
-    [dynamic-lag-scale, $lambda$], [1.0], [Multiplicative scale on the dynamic-mode lag.],
-    [dynamic-ref-cache-size], [32], [Frames cached for the dynamic-reference reader.],
+    [`roi-margin`],                     [$0.15$],         [Symmetric fractional region-of-interest margin per edge.],
+    [`motion-per-frame-threshold`],     [$1.5$ px],       [Per-frame translation magnitude that triggers registration.],
+    [`cumulative-motion-threshold`],    [$3$ px],         [Five-frame rolling cumulative drift that triggers registration.],
+    [$alpha$],                          [$0.05$],         [Exponential-moving-average weight for the running reference.],
+    [$k_p$],                            [$0$],            [Pre-delta blur kernel size (zero disables the stage).],
+    [$k_b$],                            [$9$],            [Post-delta blur kernel size in pixels (Gaussian).],
+    [$delta_tau$],                      [$-30$],          [Threshold offset added to Otsu / Triangle / manual / percentile.],
+    [$k_m$],                            [$13$],           [Morphological structuring-element size in pixels.],
+    [`morph-close-iterations`],         [$1$],            [Closing iterations applied at stage ten.],
+    [`morph-open-iterations`],          [$1$],            [Opening iterations applied at stage eleven.],
+    [$a_"min"$],                        [$400$ px],       [Minimum connected-component area accepted by the area filter.],
+    [$n_"lock"$],                       [$3$],            [Consecutive-wet frames required to latch a pixel in the lock map.],
+    [$N_"calib"$],                      [$10$],           [Frames used to fit the dynamic-reference factor $kappa$.],
+    [$rho$],                            [$0.2$],          [Target wet-area fraction for the dynamic-reference lag.],
+    [$lambda$],                         [$1.0$],          [Multiplicative lag-scale factor in Eq.~@eq:dynlag.],
+    [`dynamic-ref-cache-size`],         [$32$ frames],    [Frames cached for the dynamic-reference reader.],
+    [`frame-step`],                     [$1$],            [Frame stride at decode time.],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
-    Configuration values held fixed across every experiment reported
-    in this paper. Symbols match the variables introduced in the
-    preceding subsections. The only equation that depends on them
-    explicitly is the dynamic-mode lag of Eq.~@eq:dynlag. The
-    component-removal ablation in Section~5 reports the IoU effect
-    of changing each row in isolation.
+    Scalar parameter values held fixed in the integrated configuration
+    across every experiment reported in this paper. The only equation
+    that depends on them explicitly is the dynamic-mode lag of
+    Eq.~@eq:dynlag. Mode-menu choices (colorspace, motion-model, peak-
+    on-shift, ref-mode, blur kind, threshold kind, morph-shape) are
+    documented in the per-subsection tables.
   ],
-) <tab:defaults>
+) <tab:scalars>
