@@ -18,13 +18,12 @@
 #let ours-color   = rgb("#00FFFF")     // bright cyan
 #let gt-color     = rgb("#FFFFFF")     // white
 #let bg           = rgb("#000000")     // black backdrop for boundary panels
-#let b70          = rgb("#5C5C5C")
-#let b90          = rgb("#363636")
+#let txt          = rgb("#000000")     // every label, header, legend caption
 
 // Pre-rotate the row labels here so the typst built-in rotate() is in
 // scope. Inside cetz.canvas, `rotate` would shadow to cetz.draw.rotate.
 #let row-label-content = name => rotate(-90deg, reflow: true,
-  text(weight: 700, size: 11pt, fill: b70)[#name])
+  text(weight: 700, size: 11pt, fill: txt)[#name])
 
 #let row-labels-rotated = (
   row-label-content("25 % fill"),
@@ -55,7 +54,7 @@
   for (c, name) in columns.enumerate() {
     let x = row-label-w + c * (tile-w + gap) + tile-w / 2
     content((x, col-label-h / 2),
-            text(weight: 700, size: 10pt, fill: b90)[#name])
+            text(weight: 700, size: 10pt, fill: txt)[#name])
   }
 
   // Rows of panels.
@@ -99,9 +98,9 @@
     let xa = leg-x0 + i * item-w
     rect((xa, legend-y - swatch-h / 2),
          (xa + swatch-w, legend-y + swatch-h / 2),
-         fill: color, stroke: 0.5pt + b70)
+         fill: color, stroke: 0.5pt + txt)
     content((xa + swatch-w + label-pad, legend-y),
-            text(size: 9.5pt, fill: b90, weight: 600)[#name],
+            text(size: 9.5pt, fill: txt, weight: 600)[#name],
             anchor: "west")
   }
 })

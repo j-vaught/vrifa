@@ -1,5 +1,7 @@
 #import "@preview/droplet:0.3.1": dropcap
 
+#colbreak(weak: true)
+
 = Introduction
 
 #figure(
