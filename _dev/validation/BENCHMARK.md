@@ -77,12 +77,14 @@ Every trial in every phase follows the same recipe:
    sweeps.
 2. Set `--roi-margin 0` for input_2 through input_11 (pre-cropped),
    keep the default 0.15 for input_1.
-3. Run the vrifa binary with **mask PNGs only** — no overlays, no
-   heatmaps, no videos, no annotation export. (`--write-mask-pngs true`
-   plus the others false.)
+3. Run the vrifa binary on `data/ablation_data/<sample>.mp4` (trimmed
+   stride-15 + label-preserving copy, ~600-1000 frames per video) with
+   **mask PNGs only** -- no overlays, no heatmaps, no videos, no
+   annotation export. (`--write-mask-pngs true` plus the others false.)
 4. Output to `$TMPDIR/vrifa_ablation/runs/<trial_id>/<sample>/masks/`.
-5. Run `agreement.py` against `data/labels.json`, restricted
-   to the matching sample's frames.
+5. Run `agreement.py` against `data/ablation_data/labels.json` (remapped
+   to the trimmed videos' frame indices), restricted to the matching
+   sample's frames.
 6. Persist the trial's metrics into a per-trial JSON in
    `$TMPDIR/vrifa_ablation/results/phase<N>/<trial_id>.json`.
 7. Delete the trial's mask directory.

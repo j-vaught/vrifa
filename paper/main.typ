@@ -1,7 +1,7 @@
 //============================================================
-// VRIFA — Vision-Based Flow-Front Assessment in VARTM
+// Vision-Based Flow-Front Assessment in VARTM
 //
-// AIAA SciTech 2027 submission, Hybrid (Application + Systems).
+// AIAA SciTech 2027 submission, System with empirical eval as support. 
 // Format follows paper/aiaa-example/main.typ.
 //
 // Build:
