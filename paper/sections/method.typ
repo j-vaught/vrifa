@@ -31,22 +31,7 @@ A rectangular region of interest excludes the part frame, manifold flange, and b
 
 == Camera-shift detection and registration
 
-A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera in mid-run shifts the projected position of every laminate pixel by some vector that has nothing to do with wetting. The reference frame stops aligning with the live frame, the difference field lights up along high-contrast laminate edges, and the threshold catches that as wet. The pipeline detects the shift and corrects it before the difference is computed. For each frame, a single phase-correlation step on a fixed-resolution downsample of the working channel of the previous and current frames returns a translation $(d_x, d_y)$ and a confidence score. When either the per-frame magnitude $sqrt(d_x^2 + d_y^2)$ or the cumulative drift across a five-frame rolling window exceeds the configured threshold, an iterative-coplanar-correlation refinement fits a translation or affine warp $W_t$ on a static-edge mask of the current ROI, and the live frame is warped through $W_t$ into the reference coordinate system before all downstream stages. The static-edge mask is recomputed at each shift event so the registration is driven by mold and frame edges that do not move with the wet front rather than by the wet region itself. The peak map is reset on registration so the post-warp pixels do not accumulate against pre-warp brightness. Figure~@fig:motion shows the shift trace and trigger events on the canonical reference video, with one bumped-tripod event near frame 71 that the pipeline catches and corrects.
-
-#figure(
-  image("/typst/figures/motion_trace.pdf", width: 95%),
-  caption: [
-    Per-frame shift magnitude (garnet) and rolling five-frame
-    cumulative magnitude (atlantic) for the canonical reference video
-    after windowed phase correlation. Red ticks along the time axis
-    mark frames at which the iterative-coplanar-correlation refit
-    triggers. The dominant event near frame 71 is a real
-    bumped-tripod incident; the pipeline's per-frame and rolling
-    triggers both fire, the live frame is warped back into the
-    reference coordinate system, and the rest of the recording shows
-    only sub-pixel residual motion.
-  ],
-) <fig:motion>
+A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera in mid-run shifts the projected position of every laminate pixel by some vector that has nothing to do with wetting. The reference frame stops aligning with the live frame, the difference field lights up along high-contrast laminate edges, and the threshold catches that as wet. The pipeline detects the shift and corrects it before the difference is computed. For each frame, a single phase-correlation step on a fixed-resolution downsample of the working channel of the previous and current frames returns a translation $(d_x, d_y)$ and a confidence score. When either the per-frame magnitude $sqrt(d_x^2 + d_y^2)$ or the cumulative drift across a five-frame rolling window exceeds the configured threshold, an iterative-coplanar-correlation refinement fits a translation or affine warp $W_t$ on a static-edge mask of the current ROI, and the live frame is warped through $W_t$ into the reference coordinate system before all downstream stages. The static-edge mask is recomputed at each shift event so the registration is driven by mold and frame edges that do not move with the wet front rather than by the wet region itself. The peak map is reset on registration so the post-warp pixels do not accumulate against pre-warp brightness.
 
 == Peak-brightness reference
 
