@@ -82,22 +82,15 @@
 
 #nomenclature(
   ($F_t$, "converted-colorspace frame at time index t"),
-  ($G_t$, "reference image at time index t"),
-  ($G_t^star$, "effective reference (peak map when peak-reference enabled, otherwise channel-zero of G_t)"),
-  ($P_t$, "per-pixel peak-brightness map at time t"),
+  ($G_t$, "effective reference image at time index t"),
   ($D_t$, "per-pixel response field at time t"),
   ($R$, "binary region-of-interest mask"),
-  ($H, W$, "frame height and width in pixels"),
-  ($C$, "channel count of the working colorspace"),
   ([$alpha$], [exponential-moving-average factor for running-reference mode]),
   ([$kappa$], [sqrt-area growth factor estimated from calibration frames]),
   ([$rho$], [target wet-fraction for dynamic reference mode]),
   ([$lambda$], [user lag scale factor for dynamic reference]),
   ([$tau_t$], [elapsed time at frame index t in seconds]),
   ([$Delta tau_t$], [dynamic lag in seconds for the reference frame]),
-  ($w_c$, "channel weight in the delta computation"),
-  ($N_"calib"$, "number of calibration frames before dynamic reference activates"),
-  ($f$, "video frame rate in frames per second"),
   ($"IoU"$, "Intersection-over-Union mask agreement score"),
   ($F_1$, [boundary $F_1$ score, mean across pixel tolerances $tau in {1, 3, 5}$]),
 )
