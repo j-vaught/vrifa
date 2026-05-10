@@ -11,23 +11,6 @@ All runtimes are reported on a single host. The CPU is an Apple M-series with $N
 Table~@tab:runtime reports per-sample wall-clock for the integrated configuration on the CPU implementation, on the CUDA implementation, and on a Python reference implementation that mirrors the algorithm stage-for-stage and is included as a runtime baseline rather than as a science contribution. Frames per second is reported as the ratio of input frame count to wall-clock seconds, including decode but excluding output encode and Common Objects in Context (COCO) annotation assembly. The CUDA implementation reaches $K$ frames per second aggregated across the eleven samples, an $S$-fold speedup over the CPU implementation at the same parameter values.
 
 #figure(
-  image("/typst/figures/runtime.pdf", width: 95%),
-  caption: [
-    Wall-clock medians for the integrated configuration on the
-    high-resolution `input_1` and time-lapse `input_2` clips, broken
-    down into the algorithm cost (detector tier), the algorithm plus
-    MP4 encode (core tier), and the algorithm plus MP4 encode plus
-    per-frame Portable Network Graphics (PNG) and Common Objects in
-    Context (COCO) export (full tier). Hash marks indicate the
-    pass/fail budgets enforced by the regression harness. The
-    detector tier corresponds to roughly $30$ frames per second on
-    `input_1`. Three-implementation aggregate wall-clock against the
-    Python reference and the CUDA implementation is reported in
-    Table~@tab:runtime once the CUDA close-out completes.
-  ],
-) <fig:runtime>
-
-#figure(
   // TODO populate from _dev/validation/bench_3way_11videos.sh once the
   // CUDA close-out lands. Columns: sample, frames, python (s),
   // CPU (s), CUDA (s), CPU speedup over python, CUDA speedup over python.
