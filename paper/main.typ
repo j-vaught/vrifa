@@ -70,7 +70,7 @@
     settings as a function of run circumstances so a practitioner
     can select an empirically-grounded starting point. The fourth
     is the benchmark itself, namely a 55-frame hand-labeled subset
-    spanning 11 VARTM infusion runs with per-sample
+    across 11 VARTM infusion runs with per-sample
     region-of-interest masks and a documented labeling protocol,
     against which the two prior pipelines above are evaluated as
     reference points and any future flow-front segmentation method
