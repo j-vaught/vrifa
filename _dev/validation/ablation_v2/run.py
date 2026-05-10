@@ -69,6 +69,10 @@ def parse_args() -> argparse.Namespace:
                         help="Number of GPUs to round-robin workers across "
                              "via CUDA_VISIBLE_DEVICES. 0 = let the binary "
                              "pick its own GPU (default).")
+    parser.add_argument("--phase-order", type=str, default=None,
+                        help="Comma-separated phase IDs to run in order, "
+                             "overriding the default PHASE_ORDER. "
+                             "Example: --phase-order 7a,7b,8,10,3,2,5,6,4,9")
     return parser.parse_args()
 
 
@@ -467,17 +471,33 @@ def main() -> int:
           f"{len(state['trials_failed'])} failed, "
           f"{len(state['phases_done'])} phases done", flush=True)
 
-    phase_iter = PHASE_ORDER
-    if args.start_phase:
-        if args.start_phase not in PHASE_ORDER:
-            print(f"FATAL: unknown --start-phase {args.start_phase!r}", file=sys.stderr)
-            return 1
-        phase_iter = PHASE_ORDER[PHASE_ORDER.index(args.start_phase):]
+    # Precedence: --only-phase > --phase-order > --start-phase > default
     if args.only_phase:
         if args.only_phase not in PHASE_ORDER:
             print(f"FATAL: unknown --only-phase {args.only_phase!r}", file=sys.stderr)
             return 1
         phase_iter = [args.only_phase]
+    elif args.phase_order:
+        custom = [p.strip() for p in args.phase_order.split(",") if p.strip()]
+        unknown = [p for p in custom if p not in PHASE_ORDER]
+        if unknown:
+            print(f"FATAL: unknown phases in --phase-order: {unknown}", file=sys.stderr)
+            return 1
+        phase_iter = custom
+        if args.start_phase:
+            if args.start_phase not in custom:
+                print(f"FATAL: --start-phase {args.start_phase!r} not in --phase-order",
+                      file=sys.stderr)
+                return 1
+            phase_iter = phase_iter[phase_iter.index(args.start_phase):]
+        print(f"phase order overridden to: {phase_iter}", flush=True)
+    elif args.start_phase:
+        if args.start_phase not in PHASE_ORDER:
+            print(f"FATAL: unknown --start-phase {args.start_phase!r}", file=sys.stderr)
+            return 1
+        phase_iter = PHASE_ORDER[PHASE_ORDER.index(args.start_phase):]
+    else:
+        phase_iter = PHASE_ORDER
 
     overall_t0 = time.monotonic()
     for phase in phase_iter:

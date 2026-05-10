@@ -1032,6 +1032,12 @@ fn run_cuda_backend(config: Config, options: &FastCliOptions) -> Result<()> {
 
 #[cfg(feature = "cuda")]
 fn can_use_cuda_batched_peak_fast_path(config: &Config) -> bool {
+    // The fast path uploads the resolved ROI mask (rectangular OR
+    // imported PNG, both produced by resolve_configured_roi_mask)
+    // to the device once at start and applies it inside the batched
+    // kernels. There is no kernel-level difference between a
+    // rectangular mask and a polygon mask, so no need to gate on
+    // roi_mask.is_none().
     matches!(config.colorspace, ColorSpace::Cielab)
         && config.darken_only
         && config.peak_reference
@@ -1040,7 +1046,6 @@ fn can_use_cuda_batched_peak_fast_path(config: &Config) -> bool {
         && matches!(config.ref_mode, ReferenceMode::First)
         && matches!(config.threshold_mode, ThresholdMode::Otsu)
         && matches!(config.post_blur.kind, BlurKind::Gaussian | BlurKind::None)
-        && config.roi_mask.is_none()
 }
 
 /// Decompose a BlurSpec into the legacy (kernel_size, blur_enabled)

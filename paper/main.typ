@@ -49,26 +49,22 @@
     ),
   ),
   abstract: [
-    Our work presents three contributions to the real-time tracking and control of VARTM processes. 
+    Our work presents _three_ contributions to the real-time tracking and control of VARTM processes. 
     The first is an integrated classical computer-vision pipeline that combines a
     peak-brightness reference, a darken-only difference,
     region-of-interest restriction, dynamic-lag reference selection,
     morphological cleanup, persistence-based temporal locking, and
-    run-time camera-shift registration, reaching mean mask
+    run-time camera-shift registration, reaching amean mask
     Intersection-over-Union of $0.921$ (95 % bootstrap confidence
     interval $[0.889, 0.943]$) and mean boundary $F_1$ of $0.433$
-    (CI $[0.396, 0.473]$). The second is a
-    per-sample component-removal ablation on the same subset that
+    (CI $[0.396, 0.473]$). The second is a component-removal ablation that
     characterizes the marginal IoU effect of each named primitive,
-    both as an eleven-sample mean and broken down per sample so that
-    primitives whose contribution depends on infusion regime are
-    visible rather than averaged away. The third is a regime-indexed
+    broken down per sample. The third is a regime-indexed
     configuration lookup, derived from the per-sample ablation, that
     recommends preprocessing settings for each pipeline component as
-    a function of run circumstances (illumination drift, fabric
-    type, fill rate, frame rate, camera stability) so a practitioner
-    on a different bench can select an empirically-grounded starting
-    point rather than a default. The pipeline runs at thirty frames
+    a function of run circumstances so a practitioner
+    can select an empirically-grounded starting
+    points. The pipeline runs at thirty frames
     per second on a single CPU and at $K$ frames per second on a
     CUDA implementation across the eleven samples.
   ],
