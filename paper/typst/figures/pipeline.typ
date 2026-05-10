@@ -23,22 +23,25 @@
 
 // Four families: ingest (atlantic), detect (garnet), clean (horseshoe), export (warmgrey).
 #let stages = (
-  stage("Colorspace",   "colorspace.rs",       atlantic),
-  stage("ROI",          "roi.rs",              atlantic),
-  stage("Stabilize",    "registration.rs",     atlantic),
-  stage("Pre-blur",     "blur::blur_frame",    atlantic),
-  stage("Reference",    "reference.rs",        atlantic),
-  stage("Peak track",   "peak.rs",             atlantic),
-  stage("Delta",        "delta::compute_delta", garnet),
-  stage("Post-blur",    "blur::blur_plane",    garnet),
-  stage("Threshold",    "threshold.rs",        garnet),
-  stage("Morph close",  "morphology.rs",       horseshoe),
-  stage("Morph open",   "morphology.rs",       horseshoe),
-  stage("Lock",         "lock.rs",             horseshoe),
-  stage("Overlay",      "overlay.rs",          warmgrey),
-  stage("Heatmap",      "heatmap.rs",          warmgrey),
-  stage("Contours",     "contours.rs",         warmgrey),
-  stage("Sampling",     "sampling.rs",         warmgrey),
+  // Row 1: ingest (6).
+  stage("Colorspace",   "colorspace.rs",   atlantic),
+  stage("ROI",          "roi.rs",          atlantic),
+  stage("Stabilize",    "registration.rs", atlantic),
+  stage("Pre-blur",     "blur::frame",     atlantic),
+  stage("Reference",    "reference.rs",    atlantic),
+  stage("Peak track",   "peak.rs",         atlantic),
+  // Row 2: detect + clean (6).
+  stage("Delta",        "delta::compute",  garnet),
+  stage("Post-blur",    "blur::plane",     garnet),
+  stage("Threshold",    "threshold.rs",    garnet),
+  stage("Morph close",  "morphology.rs",   horseshoe),
+  stage("Morph open",   "morphology.rs",   horseshoe),
+  stage("Lock",         "lock.rs",         horseshoe),
+  // Row 3: export (4).
+  stage("Overlay",      "overlay.rs",      warmgrey),
+  stage("Heatmap",      "heatmap.rs",      warmgrey),
+  stage("Contours",     "contours.rs",     warmgrey),
+  stage("Sampling",     "sampling.rs",     warmgrey),
 )
 
 #cetz.canvas({
@@ -48,17 +51,37 @@
   let cell-h = 0.95
   let gap = 0.4
   let row-pad = 0.6
-  let cols = 8
-  let rows = 2
+  let row-layout = (6, 6, 4)
 
   // Black-filled stealth arrowhead, reused on every connector.
   let arrow = (end: "stealth", fill: black, scale: 0.8)
 
+  // Row width (units) given the cells in that row.
+  let row-widths = row-layout.map(n => n * cell-w + (n - 1) * gap)
+  let max-row-width = calc.max(..row-widths)
+
+  // x offset that centers a row of `r` cells inside the widest row.
+  let row-x(r) = (max-row-width - row-widths.at(r)) / 2
+
+  // Map stage index i to (row, col) within the (6, 6, 4) layout.
+  let stage-pos(i) = {
+    let acc = 0
+    let result = (row: 0, col: 0)
+    for r in range(row-layout.len()) {
+      let n = row-layout.at(r)
+      if i >= acc and i < acc + n {
+        result = (row: r, col: i - acc)
+      }
+      acc = acc + n
+    }
+    result
+  }
+
+  // Cell rendering.
   for (i, st) in stages.enumerate() {
-    let col = calc.rem(i, cols)
-    let row = int(i / cols)
-    let x0 = col * (cell-w + gap)
-    let y0 = -row * (cell-h + gap + row-pad)
+    let pos = stage-pos(i)
+    let x0 = row-x(pos.row) + pos.col * (cell-w + gap)
+    let y0 = -pos.row * (cell-h + gap + row-pad)
     let x1 = x0 + cell-w
     let y1 = y0 - cell-h
 
@@ -72,59 +95,58 @@
             text(size: 7.5pt, fill: black, font: "Menlo")[#st.code])
   }
 
-  // Connect stages left-to-right within rows, then row-to-row.
+  // Connector arrows: within-row hops, plus inter-row wraps.
   for i in range(stages.len() - 1) {
-    let col = calc.rem(i, cols)
-    let row = int(i / cols)
-    let next-row = int((i + 1) / cols)
+    let pos = stage-pos(i)
+    let next-pos = stage-pos(i + 1)
 
-    let x0 = col * (cell-w + gap) + cell-w
-    let y0 = -row * (cell-h + gap + row-pad) - cell-h / 2
-
-    if next-row == row {
+    if next-pos.row == pos.row {
       // Within-row arrow: short horizontal hop into the next cell.
+      let x0 = row-x(pos.row) + pos.col * (cell-w + gap) + cell-w
+      let y0 = -pos.row * (cell-h + gap + row-pad) - cell-h / 2
       line((x0, y0), (x0 + gap, y0),
            stroke: 0.8pt + black, mark: arrow)
     } else {
-      // Wrap arrow: routed around the cell layout so it does not cut
-      // through any row-1 cell. Six points, five segments:
-      //   right out of Threshold, down into the inter-row gap,
-      //   long left past the layout, down to row-1 mid, right into Morphology.
+      // Wrap arrow: out of last cell of source row, down to the
+      // mid-line between rows, across to just left of the target
+      // row's first cell, down again, then right into the target.
       let elbow-out = 0.55
       let elbow-back = 0.55
-      // Center the horizontal segment between row 0's bottom and row 1's top.
-      let row0-bottom = -cell-h
-      let row1-top = -(cell-h + gap + row-pad)
-      let intermediate-y = (row0-bottom + row1-top) / 2
-      let entry-y = -next-row * (cell-h + gap + row-pad) - cell-h / 2
+      let exit-x = row-x(pos.row) + pos.col * (cell-w + gap) + cell-w
+      let exit-y = -pos.row * (cell-h + gap + row-pad) - cell-h / 2
+      let entry-x = row-x(next-pos.row) + next-pos.col * (cell-w + gap)
+      let entry-y = -next-pos.row * (cell-h + gap + row-pad) - cell-h / 2
+      let source-bottom = -pos.row * (cell-h + gap + row-pad) - cell-h
+      let target-top = -next-pos.row * (cell-h + gap + row-pad)
+      let mid-y = (source-bottom + target-top) / 2
+
       line(
-        (x0, y0),
-        (x0 + elbow-out, y0),
-        (x0 + elbow-out, intermediate-y),
-        (-elbow-back, intermediate-y),
-        (-elbow-back, entry-y),
-        (0, entry-y),
+        (exit-x, exit-y),
+        (exit-x + elbow-out, exit-y),
+        (exit-x + elbow-out, mid-y),
+        (entry-x - elbow-back, mid-y),
+        (entry-x - elbow-back, entry-y),
+        (entry-x, entry-y),
         stroke: 0.8pt + black,
         mark: arrow,
       )
     }
   }
 
-  // Family legend, centered horizontally under the cell layout.
+  // Family legend, centered horizontally below the last row.
   let families = (
-    ("Ingest",   atlantic),
-    ("Detect",   garnet),
-    ("Clean",    horseshoe),
-    ("Export",   warmgrey),
+    ("Ingest", atlantic),
+    ("Detect", garnet),
+    ("Clean",  horseshoe),
+    ("Export", warmgrey),
   )
   let swatch-w = 0.4
-  let label-pad = 0.08    // gap between swatch right edge and label left edge
-  let item-w = 1.3        // approximate full item width (swatch + pad + label)
-  let leg-spacing = 1.55  // distance between consecutive item starts
-  let layout-w = cols * cell-w + (cols - 1) * gap
+  let label-pad = 0.08
+  let item-w = 1.3
+  let leg-spacing = 1.55
   let legend-w = (families.len() - 1) * leg-spacing + item-w
-  let leg-x0 = (layout-w - legend-w) / 2
-  let leg-y = -2 * (cell-h + gap + row-pad) + 0.85
+  let leg-x0 = (max-row-width - legend-w) / 2
+  let leg-y = -row-layout.len() * (cell-h + gap + row-pad) + 0.85
   for (i, (name, c)) in families.enumerate() {
     let x = leg-x0 + i * leg-spacing
     rect((x, leg-y), (x + swatch-w, leg-y - 0.32),
