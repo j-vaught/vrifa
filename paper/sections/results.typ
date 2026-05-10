@@ -207,3 +207,45 @@ Each row of Table~@tab:ablation holds the integrated configuration described in 
     against an actual frame rather than against summary statistics.
   ],
 ) <fig:montage>
+
+== Configuration lookup
+
+The per-sample ablation in the previous subsection is the empirical content of the paper, but a practitioner with their own VARTM rig is unlikely to read the per-sample $Delta$IoU table directly. The same evidence is more useful as a regime-indexed lookup that recommends preprocessing settings as a function of run circumstances. Table~@tab:lookup is that lookup. Each row pairs a circumstance (illumination drift, fabric type, fill rate, frame rate, camera stability, fabric conductivity) with the recommended setting on the corresponding mode menu of Section~3, and points at the row of Table~@tab:ablation or the per-sample breakdown of Table~@tab:agreement_per_sample that supports it. Rows whose recommendation is supported only by the eleven evaluated regimes are marked tentative (`†`); a deployed system on a circumstance the labeling subset does not cover should treat the row as a starting point for its own per-mold tuning rather than as a guarantee.
+
+#figure(
+  // TODO populate Recommended setting and Source columns from
+  // data/agreement_metrics_ablation.json once the per-sample
+  // component-removal sweep completes. Tentative rows marked †.
+  table(
+    columns: (auto, auto, auto),
+    align: (left, left, left),
+    stroke: none,
+    inset: 5pt,
+    table.hline(stroke: 0.8pt),
+    table.header([*Run circumstance*], [*Recommended setting*], [*Source*]),
+    table.hline(stroke: 0.5pt),
+    [Illumination drifts $> N$ $L^*$ units across the run], [enable peak-brightness reference], [no-peak row of Table~@tab:ablation],
+    [Illumination stable across the run],                  [peak-brightness reference optional],   [no-peak row of Table~@tab:ablation],
+    [True wet-front pauses $>= n_"lock"$ frames],          [reduce or disable temporal lock],     [no-lock row of Table~@tab:ablation],
+    [Time-lapse acquisition ($<= 5$ fps)],                 [reduce $n_"lock"$ to $0$ or $1$],       [Table~@tab:agreement_per_sample, `input_2` and `input_3`],
+    [Pigmented resin or colored fabric],                   [switch CIELAB → RGB or HSV†],          [colorspace rows of Table~@tab:ablation],
+    [Specular silicone bag in field of view],              [keep darken-only enabled],            [no-darken-only row of Table~@tab:ablation],
+    [Tripod with occasional bumps or thermal creep],       [enable camera-shift registration],    [no-camera-shift row of Table~@tab:ablation],
+    [Fill rate varies across regimes],                     [use dynamic-lag reference],           [no-dynamic-lag row of Table~@tab:ablation],
+    [Race-tracking dominates early fill],                  [first-frame reference; avoid dynamic calibration anomaly], [Section~7 failure mode 2],
+    [Carbon-fiber laminate under transparent bag],         [CIELAB stays valid†],                 [colorspace ablation, applicable regime only],
+    [Heavily textured silicone bag],                       [percentile or adaptive threshold†],    [Section~7 failure mode 3],
+    [Side-lit laminate with intensity gradient],           [adaptive-mean or adaptive-gaussian threshold†], [Section~7 failure mode 3],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [
+    Configuration lookup indexed by run circumstance. The
+    recommended setting names the option on the corresponding mode
+    menu of Section~3; the Source column points at the row of
+    Table~@tab:ablation or per-sample breakdown that supplies the
+    empirical evidence. Rows marked `†` extrapolate from the
+    eleven-sample subset to a regime the subset does not directly
+    cover and should be treated as a tuning starting point rather
+    than as an evaluated recommendation.
+  ],
+) <tab:lookup>
