@@ -19,10 +19,12 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict
+from multiprocessing import Value
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +65,24 @@ def parse_args() -> argparse.Namespace:
                         help="Smoke test: run only 3 trials per phase across 2 samples")
     parser.add_argument("--lean", action="store_true",
                         help="Use lean grids from phases_lean (~1.4k trials post-Phase-1).")
+    parser.add_argument("--gpus", type=int, default=0,
+                        help="Number of GPUs to round-robin workers across "
+                             "via CUDA_VISIBLE_DEVICES. 0 = let the binary "
+                             "pick its own GPU (default).")
     return parser.parse_args()
+
+
+def _gpu_init(counter, num_gpus: int):
+    """Process-pool initializer: each worker gets pinned to a GPU
+    via CUDA_VISIBLE_DEVICES. Counter is a multiprocessing.Value
+    that hands out sequential worker IDs."""
+    if num_gpus <= 0:
+        return
+    with counter.get_lock():
+        my_id = counter.value
+        counter.value += 1
+    gpu = my_id % num_gpus
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
 
 # Worker entry: ProcessPoolExecutor pickles the call. Keep arguments
@@ -333,7 +352,12 @@ def run_phase(
 
     completed = 0
     last_save = time.monotonic()
-    with ProcessPoolExecutor(max_workers=args.workers) as pool:
+    gpu_counter = Value("i", 0)
+    pool_kwargs: dict[str, Any] = {"max_workers": args.workers}
+    if args.gpus > 0:
+        pool_kwargs["initializer"] = _gpu_init
+        pool_kwargs["initargs"] = (gpu_counter, args.gpus)
+    with ProcessPoolExecutor(**pool_kwargs) as pool:
         futures = {
             pool.submit(
                 _worker_run_trial,
