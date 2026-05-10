@@ -128,8 +128,7 @@ fn convert_frame_to_colorspace_py<'py>(
     pre_delta_blur = "none",
     morph_kernel = 13,
     min_area = 400,
-    manual_threshold = None,
-    percentile_threshold = None,
+    threshold = "otsu",
     threshold_offset = -30.0,
     channel_weights = None,
     morph_shape = "ellipse",
@@ -147,8 +146,7 @@ fn detect_front_py<'py>(
     pre_delta_blur: &str,
     morph_kernel: usize,
     min_area: usize,
-    manual_threshold: Option<f32>,
-    percentile_threshold: Option<f32>,
+    threshold: &str,
     threshold_offset: f32,
     channel_weights: Option<Vec<f32>>,
     morph_shape: &str,
@@ -167,13 +165,14 @@ fn detect_front_py<'py>(
         .map_err(|err| PyValueError::new_err(format!("invalid blur: {err}")))?;
     let pre_delta_blur = vrifa_core::BlurSpec::parse(pre_delta_blur)
         .map_err(|err| PyValueError::new_err(format!("invalid pre_delta_blur: {err}")))?;
+    let threshold_mode = vrifa_core::ThresholdMode::parse(threshold)
+        .map_err(|err| PyValueError::new_err(format!("invalid threshold: {err}")))?;
     let params = DetectFrontParams {
         post_blur,
         pre_delta_blur,
         morph_kernel,
         min_area,
-        manual_threshold,
-        percentile_threshold,
+        threshold_mode,
         threshold_offset,
         channel_weights: channel_weights.unwrap_or_else(|| vec![1.0; frame.dim().2]),
         morph_shape: MorphShape::parse(morph_shape),

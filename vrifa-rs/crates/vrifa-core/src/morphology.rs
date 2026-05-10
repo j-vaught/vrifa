@@ -1,4 +1,4 @@
-use crate::{blur, cvutil, threshold, BlurSpec, Result};
+use crate::{blur, cvutil, threshold, BlurSpec, Result, ThresholdMode};
 use ndarray::Array2;
 use opencv::core::{self, Point, Scalar, Size};
 use opencv::imgproc;
@@ -42,8 +42,7 @@ pub struct MorphologyParams {
     pub post_blur: BlurSpec,
     pub morph_kernel: usize,
     pub min_area: usize,
-    pub manual_threshold: Option<f32>,
-    pub percentile_threshold: Option<f32>,
+    pub threshold_mode: ThresholdMode,
     pub threshold_offset: f32,
     pub morph_shape: MorphShape,
     pub morph_close_iterations: usize,
@@ -75,23 +74,13 @@ pub fn detect_mask_from_delta_debug(
     let delta_blur = blur::blur_plane(delta, params.post_blur)?;
 
     let delta_norm = normalize_minmax_to_u8(&delta_blur)?;
-    let threshold_value = threshold::choose_threshold(
+    let binary_array = threshold::apply_threshold(
         &delta_norm,
         roi_mask,
-        params.manual_threshold,
-        params.percentile_threshold,
+        params.threshold_mode,
         params.threshold_offset,
     )?;
-
-    let norm_mat = cvutil::array2_u8_to_mat(&delta_norm)?;
-    let mut binary = opencv::core::Mat::default();
-    imgproc::threshold(
-        &norm_mat,
-        &mut binary,
-        threshold_value as f64,
-        255.0,
-        imgproc::THRESH_BINARY,
-    )?;
+    let mut binary = cvutil::array2_u8_to_mat(&binary_array)?;
     let binary_pre_morph = binary.try_clone()?;
 
     let mut kernel_size = params.morph_kernel + (1 - params.morph_kernel % 2);

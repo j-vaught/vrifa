@@ -25,6 +25,7 @@ pub use contours::AnnotationBox;
 pub use morphology::{MorphShape, MorphologyParams};
 pub use motion::MotionEstimate;
 pub use registration::MotionModel;
+pub use threshold::ThresholdMode;
 pub use warp::AffineWarp;
 
 #[derive(Debug, Error)]
@@ -45,8 +46,7 @@ pub struct DetectFrontParams {
     pub post_blur: BlurSpec,
     pub morph_kernel: usize,
     pub min_area: usize,
-    pub manual_threshold: Option<f32>,
-    pub percentile_threshold: Option<f32>,
+    pub threshold_mode: ThresholdMode,
     pub threshold_offset: f32,
     pub channel_weights: Vec<f32>,
     pub morph_shape: MorphShape,
@@ -72,8 +72,7 @@ impl Default for DetectFrontParams {
             post_blur: BlurSpec::gaussian(9),
             morph_kernel: 13,
             min_area: 400,
-            manual_threshold: None,
-            percentile_threshold: None,
+            threshold_mode: ThresholdMode::Otsu,
             threshold_offset: -30.0,
             channel_weights: vec![1.0, 1.0, 1.0],
             morph_shape: MorphShape::Ellipse,
@@ -137,8 +136,7 @@ pub fn detect_front_debug(
             post_blur: params.post_blur,
             morph_kernel: params.morph_kernel,
             min_area: params.min_area,
-            manual_threshold: params.manual_threshold,
-            percentile_threshold: params.percentile_threshold,
+            threshold_mode: params.threshold_mode,
             threshold_offset: params.threshold_offset,
             morph_shape: params.morph_shape,
             morph_close_iterations: params.morph_close_iterations,

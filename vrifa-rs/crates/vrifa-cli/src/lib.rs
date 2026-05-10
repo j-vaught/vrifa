@@ -14,6 +14,7 @@ use std::time::Instant;
 use vrifa_annotations::AnnotationFrame;
 use vrifa_core::blur::{self, BlurSpec};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
+use vrifa_core::threshold::ThresholdMode;
 use vrifa_core::contours::extract_bounding_boxes;
 use vrifa_core::lock::{apply_locking, LockState};
 use vrifa_core::morphology::MorphShape;
@@ -69,10 +70,14 @@ pub struct CliArgs {
     morph_open_iterations: usize,
     #[arg(long, default_value_t = 400)]
     min_area: usize,
-    #[arg(long)]
-    contrast_threshold: Option<f32>,
-    #[arg(long)]
-    contrast_percentile: Option<f32>,
+    /// Threshold mode. Format: KIND[:ARGS].
+    /// Supported: otsu, triangle, manual:VALUE, percentile:P,
+    /// adaptive-mean:BLOCK:C, adaptive-gaussian:BLOCK:C.
+    /// Example: --threshold triangle, --threshold adaptive-gaussian:21:5.
+    #[arg(long, default_value = "otsu")]
+    threshold: String,
+    /// Offset added to global thresholds (otsu, triangle, manual, percentile)
+    /// before binarization. Ignored for adaptive modes (use the C parameter).
     #[arg(long, default_value_t = -30.0)]
     threshold_offset: f32,
     #[arg(long, default_value_t = true, action = ArgAction::SetTrue)]
@@ -219,8 +224,7 @@ pub struct Config {
     pub morph_close_iterations: usize,
     pub morph_open_iterations: usize,
     pub min_area: usize,
-    pub contrast_threshold: Option<f32>,
-    pub contrast_percentile: Option<f32>,
+    pub threshold_mode: ThresholdMode,
     pub threshold_offset: f32,
     pub darken_only: bool,
     pub peak_reference: bool,
@@ -276,8 +280,7 @@ impl Default for Config {
             morph_close_iterations: 1,
             morph_open_iterations: 1,
             min_area: 400,
-            contrast_threshold: None,
-            contrast_percentile: None,
+            threshold_mode: ThresholdMode::Otsu,
             threshold_offset: -30.0,
             darken_only: true,
             peak_reference: true,
@@ -365,6 +368,8 @@ impl TryFrom<CliArgs> for Config {
             .map_err(|e| anyhow!("invalid --blur: {e}"))?;
         let pre_delta_blur = BlurSpec::parse(&args.pre_delta_blur)
             .map_err(|e| anyhow!("invalid --pre-delta-blur: {e}"))?;
+        let threshold_mode = ThresholdMode::parse(&args.threshold)
+            .map_err(|e| anyhow!("invalid --threshold: {e}"))?;
         Ok(Self {
             video_path: args.video_path,
             output_dir: args.output_dir,
@@ -381,8 +386,7 @@ impl TryFrom<CliArgs> for Config {
             morph_close_iterations: args.morph_close_iterations,
             morph_open_iterations: args.morph_open_iterations,
             min_area: args.min_area,
-            contrast_threshold: args.contrast_threshold,
-            contrast_percentile: args.contrast_percentile,
+            threshold_mode,
             threshold_offset: args.threshold_offset,
             darken_only: args.darken_only && !args.no_darken_only,
             peak_reference: args.peak_reference && !args.no_peak_reference,
@@ -1031,8 +1035,7 @@ pub fn run_config(config: Config) -> Result<()> {
                 post_blur: config.post_blur,
                 morph_kernel: config.morph_kernel,
                 min_area: config.min_area,
-                manual_threshold: config.contrast_threshold,
-                percentile_threshold: config.contrast_percentile,
+                threshold_mode: config.threshold_mode,
                 threshold_offset: config.threshold_offset,
                 channel_weights: config.channel_weights.clone(),
                 morph_shape: config.morph_shape,
@@ -1320,8 +1323,7 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
         post_blur: config.post_blur,
         morph_kernel: config.morph_kernel,
         min_area: config.min_area,
-        manual_threshold: config.contrast_threshold,
-        percentile_threshold: config.contrast_percentile,
+        threshold_mode: config.threshold_mode,
         threshold_offset: config.threshold_offset,
         channel_weights: config.channel_weights.clone(),
         morph_shape: config.morph_shape,
@@ -1832,14 +1834,7 @@ fn write_run_summary(
     put!("morph_close_iterations", config.morph_close_iterations);
     put!("morph_open_iterations", config.morph_open_iterations);
     put!("min_area", config.min_area);
-    put!(
-        "contrast_threshold",
-        config.contrast_threshold.map(yaml_f32)
-    );
-    put!(
-        "contrast_percentile",
-        config.contrast_percentile.map(yaml_f32)
-    );
+    put!("threshold", config.threshold_mode.to_string());
     put!("threshold_offset", yaml_f32(config.threshold_offset));
     put!("darken_only", config.darken_only);
     put!("peak_reference", config.peak_reference);
