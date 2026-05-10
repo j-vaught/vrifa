@@ -38,7 +38,13 @@ A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera i
 The pipeline accumulates a running maximum of the working channel across all frames seen so far. When the pre-delta blur is enabled the maximum is updated from the blurred working channel rather than the raw channel so the peak map and the delta input share the same bandwidth, which prevents a one-pixel halo of speckle from shifting the peak above the eventual delta input and creating a phantom darkening signal. The motivation for the running maximum is that, on infusions where the dry preform is the brightest state the fabric reaches in the working channel, a per-pixel maximum tracks lighting drift caused by lamp warm-up and bag deformation rather than treating that drift as wetting evidence. Figure~@fig:peak illustrates the regime on one tracked pixel of the canonical input clip. The raw $L^*$ value drifts upward as the lamps stabilize, the running peak $P$ tracks that drift, and the front arrival separates as a sharp drop of more than thirty units below the peak. A fixed reference at frame zero would have included the post-warm-up lift in its difference. The assumption that wetting is the only event that lowers the peak does not hold universally. A specular flash that drives the peak above its long-term value, or a fabric whose wet state is brighter than its dry state for some channel, can produce a peak map that misrepresents subsequent wetting evidence. The IoU effect of disabling the primitive on the eleven-sample subset is reported in Table~@tab:ablation.
 
 #figure(
-  image("/typst/figures/peak_reference.pdf", width: 95%),
+  // image("/typst/figures/peak_reference.pdf", width: 95%),
+  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
+    _Peak-reference trace placeholder._ One pixel of the canonical
+    reference video tracked across all frames; raw $L^*$ in garnet,
+    running peak $P$ in atlantic, with the front-arrival drop
+    annotated. Regenerated from the new ablation runs.
+  ],
   caption: [
     One pixel of the first canonical input clip tracked across all
     706 frames. The raw CIELAB lightness $L^*$ drifts up by roughly
@@ -72,7 +78,13 @@ $ D_t (y, x) = R(y, x) dot.c max(0, w_0 dot.c (G_t^star (y, x) - F_t (y, x, 0)))
 where $G_t^star$ equals the peak map $P_t$ when the peak-reference mode is enabled and otherwise equals the channel-zero slice of $G_t$. The clip to non-negative values discards every pixel that becomes brighter than the reference, which removes specular flashes from the silicone vacuum bag and from condensation, neither of which are wetting events. A full-color mode replaces the difference with the channel-weighted Euclidean distance across all $C$ channels and is intended for HSV and RGB workflows where chrominance shifts are diagnostic. Figure~@fig:darken_only shows the effect of the clip on a single frame; Table~@tab:ablation reports the IoU cost of removing it across the eleven-sample subset.
 
 #figure(
-  image("/typst/figures/darken_only_compare.pdf", width: 100%),
+  // image("/typst/figures/darken_only_compare.pdf", width: 100%),
+  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
+    _Darken-only delta comparison placeholder._ Two delta panels for
+    the same frame: a naive Euclidean delta that lights up on the
+    vacuum-bag specular highlight, and a darken-only delta that
+    discards it. Regenerated from the new ablation runs.
+  ],
   caption: [
     Same input frame, two delta computations. The naive Euclidean
     delta (centre) lights up bright on the vacuum-bag specular
@@ -100,7 +112,13 @@ Stage ten passes the binary mask through morphological closing with an elliptica
 Stage eleven passes the closed mask through morphological opening with the same kernel and shape, removing specks below the kernel size that survived the closing pass. A connected-components labelling pass then discards any region whose pixel area is below $a_"min"$ pixels (default $400$), which removes the small islands that the morphology kernels are too small to suppress. Figure~@fig:cleanup shows the same frame at every step of stages nine through eleven.
 
 #figure(
-  image("/typst/figures/mask_cleanup.pdf", width: 100%),
+  // image("/typst/figures/mask_cleanup.pdf", width: 100%),
+  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
+    _Mask-cleanup montage placeholder._ Five panels for one frame:
+    the normalized response, the threshold output, after closing,
+    after opening, and after the connected-components area filter.
+    Regenerated from the new ablation runs.
+  ],
   caption: [
     Mask cleanup on the first canonical input clip at frame 200.
     The normalized response field (1) is thresholded into a noisy
