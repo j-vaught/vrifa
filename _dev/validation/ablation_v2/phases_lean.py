@@ -183,3 +183,25 @@ def phase9_overrides() -> list[dict[str, Any]]:
 def phase1_overrides() -> list[dict[str, Any]]:
     from . import phases as P
     return P.phase1_overrides()
+
+
+# Re-export the rest of the phases module's public surface so run.py can
+# swap `phases_lean as phase_defs` without further code changes.
+from . import phases as _P  # noqa: E402
+
+PHASE_SAMPLES = _P.PHASE_SAMPLES
+make_trials = _P.make_trials
+make_trial_id = _P.make_trial_id
+base_config_for = _P.base_config_for
+
+PHASE_OVERRIDE_FNS = {
+    "1": phase1_overrides,
+    "2": phase2_overrides,
+    "3": phase3_overrides,
+    "4": phase4_overrides,
+    "5": phase5_overrides,
+    "6": phase6_overrides,
+    "7a": phase7a_overrides,
+    "8": phase8_overrides,
+    "9": phase9_overrides,
+}

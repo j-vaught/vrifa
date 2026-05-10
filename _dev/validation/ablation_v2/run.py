@@ -35,7 +35,9 @@ from .config import (
     PHASE_ORDER,
     SAMPLES_FULL,
 )
-from . import phases as phase_defs
+from . import phases as phase_defs_full
+from . import phases_lean as phase_defs_lean
+phase_defs = phase_defs_full  # default; overridden by --lean
 from .state import load_state, save_state
 from .trial import TrialConfig, TrialResult, run_trial
 
@@ -59,6 +61,8 @@ def parse_args() -> argparse.Namespace:
                         help="Re-run trials that failed previously")
     parser.add_argument("--smoke", action="store_true",
                         help="Smoke test: run only 3 trials per phase across 2 samples")
+    parser.add_argument("--lean", action="store_true",
+                        help="Use lean grids from phases_lean (~1.4k trials post-Phase-1).")
     return parser.parse_args()
 
 
@@ -421,6 +425,11 @@ def main() -> int:
     runs_root.mkdir(parents=True, exist_ok=True)
     args.results_dir.mkdir(parents=True, exist_ok=True)
     all_trials_csv_init(csv_path)
+
+    if args.lean:
+        global phase_defs
+        phase_defs = phase_defs_lean
+        print("ablation v2: LEAN grids active (phases_lean)", flush=True)
 
     if not args.binary.exists():
         print(f"FATAL: vrifa binary missing at {args.binary}", file=sys.stderr)
