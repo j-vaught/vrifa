@@ -51,6 +51,10 @@ def flags_to_argv(flags: dict[str, Any]) -> list[str]:
     """
     argv: list[str] = []
     for name, value in flags.items():
+        # Private bookkeeping keys (e.g. __top5_kernels__ stashed on a
+        # phase-7a winner) are not vrifa CLI flags. Skip them.
+        if name.startswith("__"):
+            continue
         cli_name = "--" + name.replace("_", "-")
         if isinstance(value, bool):
             if name in {"darken_only", "peak_reference"}:
