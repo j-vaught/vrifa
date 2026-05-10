@@ -81,7 +81,7 @@ Every trial in every phase follows the same recipe:
    heatmaps, no videos, no annotation export. (`--write-mask-pngs true`
    plus the others false.)
 4. Output to `$TMPDIR/vrifa_ablation/runs/<trial_id>/<sample>/masks/`.
-5. Run `agreement.py` against `data/labels_55.json`, restricted
+5. Run `agreement.py` against `data/labels.json`, restricted
    to the matching sample's frames.
 6. Persist the trial's metrics into a per-trial JSON in
    `$TMPDIR/vrifa_ablation/results/phase<N>/<trial_id>.json`.

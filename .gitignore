@@ -30,7 +30,7 @@ test_venv/
 # the explicit exceptions below are the small files that travel with
 # the repo.
 data/*
-!data/labels_55.json
+!data/labels.json
 !data/ablation/
 # IDE
 .idea/
