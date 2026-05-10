@@ -79,4 +79,8 @@ OUTPUT_FLAGS = {
     "write_mask_pngs": "true",
     "write_overlay_pngs": "false",
     "write_heatmap_pngs": "false",
+    # fast-vrifa default backend is "delegate" which forwards to vrifa-rs
+    # CPU. Force CUDA when running through fast-vrifa. vrifa-rs ignores
+    # unknown flags? -- it doesn't. So this is fast-vrifa-only.
+    "backend": "cuda",
 }

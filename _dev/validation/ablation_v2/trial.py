@@ -65,8 +65,9 @@ def flags_to_argv(flags: dict[str, Any]) -> list[str]:
             else:
                 if value:
                     argv.append(cli_name)
-        elif isinstance(value, tuple):
+        elif isinstance(value, (tuple, list)):
             # ref_mode is a multi-arg flag: ("first",) or ("prev", "10").
+            # JSON-roundtripping a tuple gives a list, so accept both.
             # Multi-arg flags don't accept = syntax, so emit positionally
             # and rely on clap's num_args bound.
             argv.append(cli_name)
