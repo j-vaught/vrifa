@@ -1,1 +1,0 @@
-Internal validation harness used to verify the algorithm against a separate baseline implementation. This directory is not part of the published interface. If you are using VRIFA rather than validating it, you can ignore everything here.

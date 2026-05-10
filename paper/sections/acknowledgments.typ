@@ -18,7 +18,10 @@
 // remove the section entirely.
 // ----------------------------------------------------------------
 
-#text(fill: rgb("#A2A2A2"), style: "italic")[
-  _Pending sponsor confirmation. See author note in
-  `paper/sections/acknowledgments.typ`._
+#text(fill: rgb("#73000A"), weight: 800)[
+  #underline(stroke: 1.2pt + rgb("#73000A"), offset: 2pt)[
+    PENDING SPONSOR CONFIRMATION. See AUTHOR NOTE in
+    `paper/sections/acknowledgments.typ` and either populate or remove
+    this section before submission.
+  ]
 ]
