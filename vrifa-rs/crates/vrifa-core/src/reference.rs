@@ -82,7 +82,8 @@ pub fn select_dynamic_reference_index(
         return 1;
     }
     let time_current = (frame_index - 1) as f32 / fps;
-    let Some(delta_t) = compute_dynamic_delta_t_seconds(frame_index, fps, roi_pixels, params) else {
+    let Some(delta_t) = compute_dynamic_delta_t_seconds(frame_index, fps, roi_pixels, params)
+    else {
         return 1;
     };
     let ref_time = (time_current - delta_t.max(0.0)).max(0.0);

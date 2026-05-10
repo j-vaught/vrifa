@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::{SecondsFormat, Utc};
 use clap::{ArgAction, Parser};
 use indexmap::IndexMap;
-use ndarray::Array3;
+use ndarray::{Array2, Array3};
 use ndarray_npy::write_npy;
 use serde_yaml::Value;
 use std::collections::{BTreeSet, VecDeque};
@@ -11,21 +11,21 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
-use vrifa_annotations::{AnnotationExportOptions, AnnotationFrame};
+use vrifa_annotations::AnnotationFrame;
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
 use vrifa_core::contours::extract_bounding_boxes;
+use vrifa_core::delta::blur_plane;
 use vrifa_core::lock::{apply_locking, LockState};
 use vrifa_core::morphology::MorphShape;
+use vrifa_core::motion::estimate_translation;
 use vrifa_core::overlay::create_overlay;
-use vrifa_core::peak::update_peak_brightness;
+use vrifa_core::peak::update_peak_brightness_plane;
 use vrifa_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
-use vrifa_core::roi::{
-    build_roi_mask_with_override, clip_mask_to_roi, is_rectangular_roi_mask, resolve_roi_margins,
-};
+use vrifa_core::registration::{fit_affine_warp, strong_gradient_mask, MotionModel};
+use vrifa_core::roi::{build_roi_mask, resolve_roi_margins};
+use vrifa_core::warp::{apply_warp, apply_warp_plane, AffineWarp};
 use vrifa_core::{detect_front, detect_front_debug, DetectFrontDebug, DetectFrontParams};
 use vrifa_io::{AsyncPngWriter, AsyncVideoWriter, VideoReader};
-
-pub mod roi_mask;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -39,8 +39,8 @@ pub struct CliArgs {
     output_dir: PathBuf,
     #[arg(long, default_value_t = 1)]
     frame_step: usize,
-    #[arg(long)]
-    roi_margin: Option<f32>,
+    #[arg(long, default_value_t = 0.15)]
+    roi_margin: f32,
     #[arg(long)]
     roi_margin_top: Option<f32>,
     #[arg(long)]
@@ -49,10 +49,10 @@ pub struct CliArgs {
     roi_margin_left: Option<f32>,
     #[arg(long)]
     roi_margin_right: Option<f32>,
-    #[arg(long)]
-    roi_mask: Option<PathBuf>,
     #[arg(long, default_value_t = 9)]
     blur_kernel: usize,
+    #[arg(long, default_value_t = 0)]
+    pre_delta_blur_kernel: usize,
     #[arg(long, action = ArgAction::SetTrue)]
     skip_blur: bool,
     #[arg(long, default_value_t = 13)]
@@ -79,6 +79,16 @@ pub struct CliArgs {
     peak_reference: bool,
     #[arg(long = "no-peak-reference", action = ArgAction::SetTrue)]
     no_peak_reference: bool,
+    #[arg(long, action = ArgAction::SetTrue)]
+    camera_stable: bool,
+    #[arg(long, default_value_t = 1.5)]
+    motion_per_frame_threshold: f32,
+    #[arg(long, default_value_t = 3.0)]
+    cumulative_motion_threshold: f32,
+    #[arg(long, default_value = "affine")]
+    motion_model: String,
+    #[arg(long, default_value = "reset")]
+    peak_on_shift: String,
     #[arg(long, action = ArgAction::SetTrue)]
     write_videos: bool,
     #[arg(long, default_value = "false")]
@@ -165,6 +175,29 @@ impl ReferenceMode {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PeakOnShift {
+    Reset,
+    Warp,
+}
+
+impl PeakOnShift {
+    fn parse(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "reset" => Ok(Self::Reset),
+            "warp" => Ok(Self::Warp),
+            other => bail!("--peak-on-shift expects reset or warp, got '{other}'"),
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Reset => "reset",
+            Self::Warp => "warp",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub video_path: PathBuf,
@@ -175,7 +208,7 @@ pub struct Config {
     pub roi_margin_bottom: Option<f32>,
     pub roi_margin_left: Option<f32>,
     pub roi_margin_right: Option<f32>,
-    pub roi_mask: Option<PathBuf>,
+    pub pre_delta_blur_kernel: usize,
     pub blur_kernel: usize,
     pub skip_blur: bool,
     pub morph_kernel: usize,
@@ -188,6 +221,11 @@ pub struct Config {
     pub threshold_offset: f32,
     pub darken_only: bool,
     pub peak_reference: bool,
+    pub camera_stable: bool,
+    pub motion_per_frame_threshold: f32,
+    pub cumulative_motion_threshold: f32,
+    pub motion_model: MotionModel,
+    pub peak_on_shift: PeakOnShift,
     pub write_videos: bool,
     pub write_mask_pngs: bool,
     pub write_overlay_pngs: bool,
@@ -228,7 +266,7 @@ impl Default for Config {
             roi_margin_bottom: None,
             roi_margin_left: None,
             roi_margin_right: None,
-            roi_mask: None,
+            pre_delta_blur_kernel: 0,
             blur_kernel: 9,
             skip_blur: false,
             morph_kernel: 13,
@@ -241,6 +279,11 @@ impl Default for Config {
             threshold_offset: -30.0,
             darken_only: true,
             peak_reference: true,
+            camera_stable: false,
+            motion_per_frame_threshold: 1.5,
+            cumulative_motion_threshold: 3.0,
+            motion_model: MotionModel::Affine,
+            peak_on_shift: PeakOnShift::Reset,
             write_videos: false,
             write_mask_pngs: false,
             write_overlay_pngs: false,
@@ -310,29 +353,22 @@ impl TryFrom<CliArgs> for Config {
         if args.frame_step == 0 {
             bail!("--frame-step must be >= 1");
         }
-        if args.roi_mask.is_some()
-            && (args.roi_margin.is_some()
-                || args.roi_margin_top.is_some()
-                || args.roi_margin_bottom.is_some()
-                || args.roi_margin_left.is_some()
-                || args.roi_margin_right.is_some())
-        {
-            bail!("--roi-mask cannot be combined with --roi-margin* flags");
-        }
 
         let channel_weights =
             parse_channel_weights(args.channel_weights.as_deref(), colorspace.channel_count())?;
         let ref_mode = parse_ref_mode(&args.ref_mode)?;
+        let motion_model = MotionModel::parse(&args.motion_model)?;
+        let peak_on_shift = PeakOnShift::parse(&args.peak_on_shift)?;
         Ok(Self {
             video_path: args.video_path,
             output_dir: args.output_dir,
             frame_step: args.frame_step,
-            roi_margin: args.roi_margin.unwrap_or(0.15),
+            roi_margin: args.roi_margin,
             roi_margin_top: args.roi_margin_top,
             roi_margin_bottom: args.roi_margin_bottom,
             roi_margin_left: args.roi_margin_left,
             roi_margin_right: args.roi_margin_right,
-            roi_mask: args.roi_mask,
+            pre_delta_blur_kernel: args.pre_delta_blur_kernel,
             blur_kernel: args.blur_kernel,
             skip_blur: args.skip_blur,
             morph_kernel: args.morph_kernel,
@@ -345,6 +381,11 @@ impl TryFrom<CliArgs> for Config {
             threshold_offset: args.threshold_offset,
             darken_only: args.darken_only && !args.no_darken_only,
             peak_reference: args.peak_reference && !args.no_peak_reference,
+            camera_stable: args.camera_stable,
+            motion_per_frame_threshold: args.motion_per_frame_threshold.max(0.0),
+            cumulative_motion_threshold: args.cumulative_motion_threshold.max(0.0),
+            motion_model,
+            peak_on_shift,
             write_videos: args.write_videos,
             write_mask_pngs: parse_bool(&args.write_mask_pngs, "--write-mask-pngs")?,
             write_overlay_pngs: parse_bool(&args.write_overlay_pngs, "--write-overlay-pngs")?,
@@ -377,6 +418,176 @@ impl TryFrom<CliArgs> for Config {
     }
 }
 
+#[derive(Clone, Debug)]
+struct MotionTraceRow {
+    frame_index: usize,
+    dx: f32,
+    dy: f32,
+    confidence: f32,
+    cumulative_dx: f32,
+    cumulative_dy: f32,
+    per_frame_magnitude: f32,
+    cumulative_magnitude: f32,
+    recent_window_magnitude: f32,
+    warp_dx: f32,
+    warp_dy: f32,
+    warp_error: f32,
+    fit_applied: bool,
+    fit_model: Option<MotionModel>,
+    fit_score: Option<f32>,
+    warp_active: bool,
+}
+
+const CAMERA_STABLE_RECENT_WINDOW: usize = 5;
+
+#[derive(Clone, Debug)]
+struct CameraStableState {
+    prev_motion_frame: Option<Array3<f32>>,
+    prev_registration_mask: Option<Array2<u8>>,
+    reference_token: Option<usize>,
+    cumulative_dx: f32,
+    cumulative_dy: f32,
+    recent_motion: VecDeque<(f32, f32)>,
+    cached_warp: AffineWarp,
+    warp_active: bool,
+    shift_event_active: bool,
+    shift_event_stable_frames: usize,
+    motion_trace: Vec<MotionTraceRow>,
+}
+
+impl CameraStableState {
+    fn new() -> Self {
+        Self {
+            prev_motion_frame: None,
+            prev_registration_mask: None,
+            reference_token: None,
+            cumulative_dx: 0.0,
+            cumulative_dy: 0.0,
+            recent_motion: VecDeque::new(),
+            cached_warp: AffineWarp::identity(),
+            warp_active: false,
+            shift_event_active: false,
+            shift_event_stable_frames: 0,
+            motion_trace: Vec::new(),
+        }
+    }
+
+    fn reset(&mut self, reference_token: usize) {
+        self.prev_motion_frame = None;
+        self.prev_registration_mask = None;
+        self.reference_token = Some(reference_token);
+        self.cumulative_dx = 0.0;
+        self.cumulative_dy = 0.0;
+        self.recent_motion.clear();
+        self.cached_warp = AffineWarp::identity();
+        self.warp_active = false;
+        self.shift_event_active = false;
+        self.shift_event_stable_frames = 0;
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CameraStableOutput {
+    aligned_reference: Array3<f32>,
+    peak_map: Option<Array2<f32>>,
+}
+
+fn build_registration_mask(prev_mask: Option<&Array2<u8>>) -> Option<Array2<u8>> {
+    const MIN_DRY_FRACTION: f32 = 0.05;
+
+    let prev_mask = prev_mask?;
+    let (height, width) = prev_mask.dim();
+    let total_pixels = height.saturating_mul(width);
+    if total_pixels == 0 {
+        return None;
+    }
+
+    let mut dry_pixels = 0usize;
+    let dry_mask = prev_mask.mapv(|value| {
+        if value == 0 {
+            dry_pixels += 1;
+            255
+        } else {
+            0
+        }
+    });
+    let dry_fraction = dry_pixels as f32 / total_pixels as f32;
+    (dry_fraction >= MIN_DRY_FRACTION).then_some(dry_mask)
+}
+
+fn build_static_registration_mask(
+    prev_mask: Option<&Array2<u8>>,
+    reference_for_frame: &Array3<f32>,
+    roi_mask: &Array2<u8>,
+) -> Result<Option<Array2<u8>>> {
+    const STRONG_EDGE_PERCENTILE: f32 = 0.90;
+    const BORDER_FRACTION: f32 = 0.08;
+    const MIN_MASK_FRACTION: f32 = 0.02;
+
+    let (height, width, _) = reference_for_frame.dim();
+    let total_pixels = height.saturating_mul(width);
+    if total_pixels == 0 {
+        return Ok(None);
+    }
+
+    let dry_mask = build_registration_mask(prev_mask);
+    let edge_mask = strong_gradient_mask(reference_for_frame, STRONG_EDGE_PERCENTILE)?;
+    let border_mask = build_frame_border_mask((height, width), BORDER_FRACTION);
+
+    let mut combined = Array2::<u8>::zeros((height, width));
+    let mut combined_pixels = 0usize;
+    for y in 0..height {
+        for x in 0..width {
+            let is_dry = dry_mask
+                .as_ref()
+                .map(|mask| mask[(y, x)] > 0)
+                .unwrap_or(true);
+            let outside_roi = roi_mask[(y, x)] == 0;
+            let is_static = border_mask[(y, x)] > 0 || outside_roi || edge_mask[(y, x)] > 0;
+            if is_dry && is_static {
+                combined[(y, x)] = 255;
+                combined_pixels += 1;
+            }
+        }
+    }
+
+    if combined_pixels as f32 / total_pixels as f32 >= MIN_MASK_FRACTION {
+        return Ok(Some(combined));
+    }
+    Ok(dry_mask)
+}
+
+fn build_frame_border_mask(shape: (usize, usize), border_fraction: f32) -> Array2<u8> {
+    let (height, width) = shape;
+    let border_y = ((height as f32 * border_fraction).round() as usize).clamp(1, height.max(1));
+    let border_x = ((width as f32 * border_fraction).round() as usize).clamp(1, width.max(1));
+    let mut mask = Array2::<u8>::zeros((height, width));
+    for y in 0..height {
+        for x in 0..width {
+            if y < border_y
+                || y >= height.saturating_sub(border_y)
+                || x < border_x
+                || x >= width.saturating_sub(border_x)
+            {
+                mask[(y, x)] = 255;
+            }
+        }
+    }
+    mask
+}
+
+fn peak_frame_plane(
+    frame_converted: &Array3<f32>,
+    pre_delta_blur_kernel: usize,
+) -> Result<Array2<f32>> {
+    let frame_l = frame_converted.slice(ndarray::s![.., .., 0]).to_owned();
+    if pre_delta_blur_kernel > 1 {
+        blur_plane(&frame_l, pre_delta_blur_kernel).map_err(Into::into)
+    } else {
+        Ok(frame_l)
+    }
+}
+
 pub fn run() -> Result<()> {
     let args = CliArgs::parse();
     let debug_dump_frames = parse_frame_list(args.debug_dump_frames.as_deref())?;
@@ -387,6 +598,210 @@ pub fn run() -> Result<()> {
         return dump_debug_stages(config, &frames, &output_dir);
     }
     run_config(config)
+}
+
+fn reference_token_for_frame(
+    ref_mode: &ReferenceMode,
+    frame_index: usize,
+    reference_frame_index: usize,
+) -> usize {
+    match ref_mode {
+        ReferenceMode::Running => frame_index,
+        _ => reference_frame_index.max(1),
+    }
+}
+
+fn prepare_camera_stable(
+    frame_index: usize,
+    frame_converted: &Array3<f32>,
+    reference_for_frame: &Array3<f32>,
+    roi_mask: &Array2<u8>,
+    reference_token: usize,
+    peak_state: Option<&Array2<f32>>,
+    config: &Config,
+    state: &mut CameraStableState,
+) -> Result<CameraStableOutput> {
+    if state.reference_token != Some(reference_token) {
+        state.reset(reference_token);
+    }
+
+    let mut peak_base = peak_state.cloned();
+    let mut fit_applied = false;
+    let mut fit_model = None;
+    let mut fit_score = None;
+
+    if config.camera_stable {
+        let (height, width, _) = frame_converted.dim();
+        if let Some(prev_frame) = state.prev_motion_frame.as_ref() {
+            let motion = estimate_translation(frame_converted, prev_frame)?;
+            state.cumulative_dx -= motion.dx;
+            state.cumulative_dy -= motion.dy;
+            state.recent_motion.push_back((-motion.dx, -motion.dy));
+            while state.recent_motion.len() > CAMERA_STABLE_RECENT_WINDOW {
+                state.recent_motion.pop_front();
+            }
+
+            let per_frame_magnitude = motion.dx.hypot(motion.dy);
+            let cumulative_magnitude = state.cumulative_dx.hypot(state.cumulative_dy);
+            let (recent_window_dx, recent_window_dy) = state
+                .recent_motion
+                .iter()
+                .fold((0.0f32, 0.0f32), |(sum_dx, sum_dy), (dx, dy)| {
+                    (sum_dx + *dx, sum_dy + *dy)
+                });
+            let recent_window_magnitude = recent_window_dx.hypot(recent_window_dy);
+            let (cached_warp_dx, cached_warp_dy) = if state.warp_active {
+                state.cached_warp.center_displacement(width, height)
+            } else {
+                (0.0, 0.0)
+            };
+            let cached_translation_error = if state.warp_active {
+                (state.cumulative_dx - cached_warp_dx).hypot(state.cumulative_dy - cached_warp_dy)
+            } else {
+                f32::INFINITY
+            };
+            let per_frame_trigger = per_frame_magnitude > config.motion_per_frame_threshold;
+            if per_frame_trigger {
+                state.shift_event_active = true;
+                state.shift_event_stable_frames = 0;
+            }
+            if recent_window_magnitude > config.cumulative_motion_threshold {
+                state.shift_event_active = true;
+                state.shift_event_stable_frames = 0;
+            }
+            let drift_trigger =
+                state.warp_active && cached_translation_error > config.cumulative_motion_threshold;
+            let needs_fit = state.shift_event_active || drift_trigger;
+
+            if needs_fit {
+                let registration_mask = build_static_registration_mask(
+                    state.prev_registration_mask.as_ref(),
+                    reference_for_frame,
+                    roi_mask,
+                )?;
+                let init_warp = if state.warp_active {
+                    let residual_dx = state.cumulative_dx - cached_warp_dx;
+                    let residual_dy = state.cumulative_dy - cached_warp_dy;
+                    AffineWarp::from_translation(residual_dx, residual_dy)
+                        .compose(&state.cached_warp)
+                } else {
+                    AffineWarp::from_translation(state.cumulative_dx, state.cumulative_dy)
+                };
+                match fit_affine_warp(
+                    frame_converted,
+                    reference_for_frame,
+                    &init_warp,
+                    config.motion_model,
+                    registration_mask.as_ref(),
+                ) {
+                    Ok(fit) => {
+                        state.cached_warp = fit.warp;
+                        let (fitted_dx, fitted_dy) =
+                            state.cached_warp.center_displacement(width, height);
+                        state.cumulative_dx = fitted_dx;
+                        state.cumulative_dy = fitted_dy;
+                        state.warp_active = !state.cached_warp.is_identityish(0.25);
+                        fit_applied = true;
+                        fit_model = Some(fit.model);
+                        fit_score = Some(fit.score);
+                        if config.peak_reference {
+                            peak_base = match config.peak_on_shift {
+                                PeakOnShift::Reset => None,
+                                PeakOnShift::Warp => peak_state
+                                    .map(|peak| apply_warp_plane(peak, &state.cached_warp))
+                                    .transpose()?,
+                            };
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "warning: camera-stable registration failed on frame {frame_index}: {err}"
+                        );
+                    }
+                }
+            }
+
+            let (warp_dx, warp_dy, warp_error) = if state.warp_active {
+                let (warp_dx, warp_dy) = state.cached_warp.center_displacement(width, height);
+                let warp_error =
+                    (state.cumulative_dx - warp_dx).hypot(state.cumulative_dy - warp_dy);
+                (warp_dx, warp_dy, warp_error)
+            } else {
+                (0.0, 0.0, 0.0)
+            };
+
+            if state.shift_event_active {
+                if per_frame_magnitude <= config.motion_per_frame_threshold {
+                    state.shift_event_stable_frames += 1;
+                    if state.shift_event_stable_frames >= 3 {
+                        state.shift_event_active = false;
+                        state.shift_event_stable_frames = 0;
+                    }
+                } else {
+                    state.shift_event_stable_frames = 0;
+                }
+            }
+
+            state.motion_trace.push(MotionTraceRow {
+                frame_index,
+                dx: motion.dx,
+                dy: motion.dy,
+                confidence: motion.confidence,
+                cumulative_dx: state.cumulative_dx,
+                cumulative_dy: state.cumulative_dy,
+                per_frame_magnitude,
+                cumulative_magnitude,
+                recent_window_magnitude,
+                warp_dx,
+                warp_dy,
+                warp_error,
+                fit_applied,
+                fit_model,
+                fit_score,
+                warp_active: state.warp_active,
+            });
+        } else {
+            state.motion_trace.push(MotionTraceRow {
+                frame_index,
+                dx: 0.0,
+                dy: 0.0,
+                confidence: 0.0,
+                cumulative_dx: 0.0,
+                cumulative_dy: 0.0,
+                per_frame_magnitude: 0.0,
+                cumulative_magnitude: 0.0,
+                recent_window_magnitude: 0.0,
+                warp_dx: 0.0,
+                warp_dy: 0.0,
+                warp_error: 0.0,
+                fit_applied: false,
+                fit_model: None,
+                fit_score: None,
+                warp_active: false,
+            });
+        }
+    }
+
+    let aligned_reference = if config.camera_stable && state.warp_active {
+        apply_warp(reference_for_frame, &state.cached_warp)?
+    } else {
+        reference_for_frame.clone()
+    };
+    let peak_map = if config.peak_reference {
+        let peak_frame = peak_frame_plane(frame_converted, config.pre_delta_blur_kernel)?;
+        Some(update_peak_brightness_plane(
+            &peak_frame,
+            peak_base.as_ref(),
+        )?)
+    } else {
+        None
+    };
+    state.prev_motion_frame = Some(frame_converted.clone());
+
+    Ok(CameraStableOutput {
+        aligned_reference,
+        peak_map,
+    })
 }
 
 pub fn run_config(config: Config) -> Result<()> {
@@ -434,21 +849,28 @@ pub fn run_config(config: Config) -> Result<()> {
     let mut dynamic_first_lag: Option<usize> = None;
     let mut dynamic_last_lag: Option<usize> = None;
 
-    let roi_mask = resolve_configured_roi_mask(
-        &config,
+    let roi_margins = resolve_roi_margins(
+        config.roi_margin,
+        config.roi_margin_top,
+        config.roi_margin_bottom,
+        config.roi_margin_left,
+        config.roi_margin_right,
+    );
+    let roi_mask = build_roi_mask(
         (first_frame_converted.dim().0, first_frame_converted.dim().1),
-    )?;
+        roi_margins,
+    );
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let mut peak_brightness_map = if config.peak_reference {
-        Some(
-            first_frame_converted
-                .slice(ndarray::s![.., .., 0])
-                .to_owned(),
-        )
+        Some(peak_frame_plane(
+            &first_frame_converted,
+            config.pre_delta_blur_kernel,
+        )?)
     } else {
         None
     };
+    let mut camera_stable_state = CameraStableState::new();
 
     let mask_dir = config.output_dir.join("masks");
     let overlay_dir = config.output_dir.join("overlays");
@@ -588,13 +1010,19 @@ pub fn run_config(config: Config) -> Result<()> {
 
         if frame_index % config.frame_step == 0 {
             let compute_start = Instant::now();
-            if config.peak_reference {
-                peak_brightness_map = Some(update_peak_brightness(
-                    &frame_converted,
-                    peak_brightness_map.as_ref(),
-                )?);
-            }
+            let camera_stable = prepare_camera_stable(
+                frame_index,
+                &frame_converted,
+                &reference_for_frame,
+                &roi_mask,
+                reference_token_for_frame(&config.ref_mode, frame_index, reference_frame_index),
+                peak_brightness_map.as_ref(),
+                &config,
+                &mut camera_stable_state,
+            )?;
+            peak_brightness_map = camera_stable.peak_map;
             let params = DetectFrontParams {
+                pre_delta_blur_kernel: config.pre_delta_blur_kernel,
                 blur_kernel: config.blur_kernel,
                 morph_kernel: config.morph_kernel,
                 min_area: config.min_area,
@@ -610,18 +1038,17 @@ pub fn run_config(config: Config) -> Result<()> {
             };
             let (mask_raw, heatmap) = detect_front(
                 &frame_converted,
-                &reference_for_frame,
+                &camera_stable.aligned_reference,
                 &roi_mask,
                 &params,
-                peak_brightness_map
-                    .as_ref()
-                    .filter(|_| config.peak_reference),
+                peak_brightness_map.as_ref(),
             )?;
-            let mut mask = apply_locking(&mask_raw, config.lock_frames, lock_state.as_mut())?;
-            if config.roi_mask.is_some() && !is_rectangular_roi_mask(&roi_mask) {
-                clip_mask_to_roi(&mut mask, &roi_mask);
-            }
-            let mask = Arc::new(mask);
+            let mask = Arc::new(apply_locking(
+                &mask_raw,
+                config.lock_frames,
+                lock_state.as_mut(),
+            )?);
+            camera_stable_state.prev_registration_mask = Some((*mask).clone());
             let overlay = Arc::new(create_overlay(&frame_bgr, &mask)?);
             let heatmap = Arc::new(heatmap);
 
@@ -681,8 +1108,9 @@ pub fn run_config(config: Config) -> Result<()> {
                     let time_seconds = (frame_index - 1) as f32 / metadata.fps as f32;
                     dynamic_measurements.push((time_seconds, mask_area as f32));
                     if dynamic_measurements.len() >= config.dynamic_calibration_frames {
-                        dynamic_factor =
-                            vrifa_core::reference::compute_dynamic_factor(&dynamic_measurements);
+                        dynamic_factor = vrifa_core::reference::compute_dynamic_factor(
+                            &dynamic_measurements,
+                        );
                     }
                 }
             }
@@ -705,6 +1133,12 @@ pub fn run_config(config: Config) -> Result<()> {
                 *running = (1.0 - alpha) * *running + alpha * *current;
             }
         }
+    }
+    if config.camera_stable && !camera_stable_state.motion_trace.is_empty() {
+        write_motion_trace(
+            &config.output_dir.join("motion_trace.csv"),
+            &camera_stable_state.motion_trace,
+        )?;
     }
 
     if let Some(writer) = mask_writer.take() {
@@ -743,7 +1177,6 @@ pub fn run_config(config: Config) -> Result<()> {
             metadata.width,
             metadata.height,
             &config.annotation_formats,
-            &AnnotationExportOptions::default(),
         )?;
     }
 
@@ -801,6 +1234,8 @@ pub fn run_config(config: Config) -> Result<()> {
 #[derive(Debug)]
 struct StageDumpFrame {
     frame_converted: Array3<f32>,
+    reference_for_frame: Array3<f32>,
+    aligned_reference: Array3<f32>,
     detect: DetectFrontDebug,
     mask: ndarray::Array2<u8>,
     overlay: Array3<u8>,
@@ -853,23 +1288,31 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
     let mut dynamic_measurements: Vec<(f32, f32)> = Vec::new();
     let mut dynamic_factor: Option<f32> = None;
 
-    let roi_mask = resolve_configured_roi_mask(
-        &config,
+    let roi_margins = resolve_roi_margins(
+        config.roi_margin,
+        config.roi_margin_top,
+        config.roi_margin_bottom,
+        config.roi_margin_left,
+        config.roi_margin_right,
+    );
+    let roi_mask = build_roi_mask(
         (first_frame_converted.dim().0, first_frame_converted.dim().1),
-    )?;
+        roi_margins,
+    );
     let roi_pixels = roi_mask.iter().filter(|value| **value > 0).count();
     let mut lock_state = (config.lock_frames > 0).then(|| LockState::new(roi_mask.dim()));
     let mut peak_brightness_map = if config.peak_reference {
-        Some(
-            first_frame_converted
-                .slice(ndarray::s![.., .., 0])
-                .to_owned(),
-        )
+        Some(peak_frame_plane(
+            &first_frame_converted,
+            config.pre_delta_blur_kernel,
+        )?)
     } else {
         None
     };
+    let mut camera_stable_state = CameraStableState::new();
 
     let params = DetectFrontParams {
+        pre_delta_blur_kernel: config.pre_delta_blur_kernel,
         blur_kernel: config.blur_kernel,
         morph_kernel: config.morph_kernel,
         min_area: config.min_area,
@@ -889,9 +1332,13 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
 
     while let Some((frame_index, frame_bgr)) = reader.read_next()? {
         let frame_converted = convert_to_f32(&frame_bgr, config.colorspace)?;
+        let mut reference_frame_index = 1usize;
         let reference_for_frame = match config.ref_mode {
             ReferenceMode::First => first_frame_converted.clone(),
-            ReferenceMode::Absolute(_) => absolute_reference.clone(),
+            ReferenceMode::Absolute(_) => {
+                reference_frame_index = absolute_index.filter(|index| *index > 0).unwrap_or(1);
+                absolute_reference.clone()
+            }
             ReferenceMode::Running => running_reference.clone(),
             ReferenceMode::Prev(offset) => {
                 if let Some(buffer) = &prev_buffer {
@@ -923,6 +1370,7 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
                     roi_pixels,
                     &dynamic_params,
                 );
+                reference_frame_index = ref_index;
                 fetch_reference_converted(
                     ref_index,
                     dynamic_reader.as_mut(),
@@ -935,26 +1383,27 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
         };
 
         if frame_index % config.frame_step == 0 {
-            if config.peak_reference {
-                peak_brightness_map = Some(update_peak_brightness(
-                    &frame_converted,
-                    peak_brightness_map.as_ref(),
-                )?);
-            }
-
-            let detect = detect_front_debug(
+            let camera_stable = prepare_camera_stable(
+                frame_index,
                 &frame_converted,
                 &reference_for_frame,
                 &roi_mask,
-                &params,
-                peak_brightness_map
-                    .as_ref()
-                    .filter(|_| config.peak_reference),
+                reference_token_for_frame(&config.ref_mode, frame_index, reference_frame_index),
+                peak_brightness_map.as_ref(),
+                &config,
+                &mut camera_stable_state,
             )?;
-            let mut mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
-            if config.roi_mask.is_some() && !is_rectangular_roi_mask(&roi_mask) {
-                clip_mask_to_roi(&mut mask, &roi_mask);
-            }
+            peak_brightness_map = camera_stable.peak_map;
+
+            let detect = detect_front_debug(
+                &frame_converted,
+                &camera_stable.aligned_reference,
+                &roi_mask,
+                &params,
+                peak_brightness_map.as_ref(),
+            )?;
+            let mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
+            camera_stable_state.prev_registration_mask = Some(mask.clone());
 
             if targets.contains(&frame_index) {
                 let overlay = create_overlay(&frame_bgr, &mask)?;
@@ -963,6 +1412,8 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
                     frame_index,
                     &StageDumpFrame {
                         frame_converted: frame_converted.clone(),
+                        reference_for_frame: reference_for_frame.clone(),
+                        aligned_reference: camera_stable.aligned_reference.clone(),
                         detect: detect.clone(),
                         mask,
                         overlay,
@@ -984,8 +1435,9 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
                     let time_seconds = (frame_index - 1) as f32 / metadata.fps as f32;
                     dynamic_measurements.push((time_seconds, mask_area as f32));
                     if dynamic_measurements.len() >= config.dynamic_calibration_frames {
-                        dynamic_factor =
-                            vrifa_core::reference::compute_dynamic_factor(&dynamic_measurements);
+                        dynamic_factor = vrifa_core::reference::compute_dynamic_factor(
+                            &dynamic_measurements,
+                        );
                     }
                 }
             }
@@ -1031,6 +1483,14 @@ fn write_stage_dump_frame(
         &frame_dir.join("frame_converted.npy"),
         &dump.frame_converted,
     )?;
+    save_npy(
+        &frame_dir.join("reference_for_frame.npy"),
+        &dump.reference_for_frame,
+    )?;
+    save_npy(
+        &frame_dir.join("aligned_reference.npy"),
+        &dump.aligned_reference,
+    )?;
     save_npy(&frame_dir.join("delta.npy"), &dump.detect.delta)?;
     save_npy(&frame_dir.join("delta_blur.npy"), &dump.detect.delta_blur)?;
     save_npy(&frame_dir.join("delta_norm.npy"), &dump.detect.delta_norm)?;
@@ -1046,6 +1506,42 @@ where
     T: ndarray_npy::WriteNpyExt,
 {
     write_npy(path, array).with_context(|| format!("writing {}", path.display()))
+}
+
+fn write_motion_trace(path: &Path, rows: &[MotionTraceRow]) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut file = File::create(path).with_context(|| format!("creating {}", path.display()))?;
+    writeln!(
+        file,
+        "frame,dx,dy,confidence,cumulative_dx,cumulative_dy,per_frame_magnitude,cumulative_magnitude,recent_window_magnitude,warp_dx,warp_dy,warp_error,fit_applied,fit_model,fit_score,warp_active"
+    )?;
+    for row in rows {
+        writeln!(
+            file,
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{}",
+            row.frame_index,
+            row.dx,
+            row.dy,
+            row.confidence,
+            row.cumulative_dx,
+            row.cumulative_dy,
+            row.per_frame_magnitude,
+            row.cumulative_magnitude,
+            row.recent_window_magnitude,
+            row.warp_dx,
+            row.warp_dy,
+            row.warp_error,
+            row.fit_applied,
+            row.fit_model.map(MotionModel::name).unwrap_or(""),
+            row.fit_score
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_default(),
+            row.warp_active,
+        )?;
+    }
+    Ok(())
 }
 
 fn convert_to_f32(frame_bgr: &Array3<u8>, colorspace: ColorSpace) -> Result<Array3<f32>> {
@@ -1321,52 +1817,12 @@ fn write_run_summary(
             .collect::<Vec<_>>()
     );
     put!("lock_frames", config.lock_frames);
-    put!(
-        "roi_mask",
-        config
-            .roi_mask
-            .as_ref()
-            .map(|path| path.to_string_lossy().to_string())
-    );
-    put!(
-        "roi_margin",
-        config
-            .roi_mask
-            .is_none()
-            .then_some(yaml_f32(config.roi_margin))
-    );
-    put!(
-        "roi_margin_top",
-        config
-            .roi_mask
-            .is_none()
-            .then(|| config.roi_margin_top.map(yaml_f32))
-            .flatten()
-    );
-    put!(
-        "roi_margin_bottom",
-        config
-            .roi_mask
-            .is_none()
-            .then(|| config.roi_margin_bottom.map(yaml_f32))
-            .flatten()
-    );
-    put!(
-        "roi_margin_left",
-        config
-            .roi_mask
-            .is_none()
-            .then(|| config.roi_margin_left.map(yaml_f32))
-            .flatten()
-    );
-    put!(
-        "roi_margin_right",
-        config
-            .roi_mask
-            .is_none()
-            .then(|| config.roi_margin_right.map(yaml_f32))
-            .flatten()
-    );
+    put!("roi_margin", yaml_f32(config.roi_margin));
+    put!("roi_margin_top", config.roi_margin_top.map(yaml_f32));
+    put!("roi_margin_bottom", config.roi_margin_bottom.map(yaml_f32));
+    put!("roi_margin_left", config.roi_margin_left.map(yaml_f32));
+    put!("roi_margin_right", config.roi_margin_right.map(yaml_f32));
+    put!("pre_delta_blur_kernel", config.pre_delta_blur_kernel);
     put!("blur_kernel", config.blur_kernel);
     put!("skip_blur", config.skip_blur);
     put!("morph_kernel", config.morph_kernel);
@@ -1385,6 +1841,27 @@ fn write_run_summary(
     put!("threshold_offset", yaml_f32(config.threshold_offset));
     put!("darken_only", config.darken_only);
     put!("peak_reference", config.peak_reference);
+    put!("camera_stable", config.camera_stable);
+    put!(
+        "motion_per_frame_threshold",
+        config
+            .camera_stable
+            .then_some(yaml_f32(config.motion_per_frame_threshold))
+    );
+    put!(
+        "cumulative_motion_threshold",
+        config
+            .camera_stable
+            .then_some(yaml_f32(config.cumulative_motion_threshold))
+    );
+    put!(
+        "motion_model",
+        config.camera_stable.then_some(config.motion_model.name())
+    );
+    put!(
+        "peak_on_shift",
+        config.camera_stable.then_some(config.peak_on_shift.name())
+    );
     put!("write_mask_pngs", config.write_mask_pngs);
     put!("write_overlay_pngs", config.write_overlay_pngs);
     put!("write_heatmap_pngs", config.write_heatmap_pngs);
@@ -1411,29 +1888,6 @@ fn yaml_f32(value: f32) -> f64 {
 
 pub fn run_binding_config(config: Config) -> Result<()> {
     run_config(config)
-}
-
-pub fn resolve_configured_roi_mask(
-    config: &Config,
-    shape: (usize, usize),
-) -> Result<ndarray::Array2<u8>> {
-    let roi_margins = resolve_roi_margins(
-        config.roi_margin,
-        config.roi_margin_top,
-        config.roi_margin_bottom,
-        config.roi_margin_left,
-        config.roi_margin_right,
-    );
-    let supplied = if let Some(path) = config.roi_mask.as_deref() {
-        Some(roi_mask::load_roi_mask(path, &config.video_path, shape)?)
-    } else {
-        None
-    };
-    Ok(build_roi_mask_with_override(
-        shape,
-        roi_margins,
-        supplied.as_ref(),
-    ))
 }
 
 pub fn config_from_paths(video_path: PathBuf, output_dir: PathBuf) -> Config {

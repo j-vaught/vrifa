@@ -2,9 +2,9 @@
 // and a 5-frame rolling cumulative trigger.
 //
 // Compile:
-//   typst compile --root vrifa-stable-rs/docs \
-//     vrifa-stable-rs/docs/figures/input_1_motion_trace_windowed_roll5.typ \
-//     vrifa-stable-rs/docs/artifacts/input_1_motion_trace_windowed_roll5.pdf
+//   typst compile --root vrifa-rs/docs \
+//     vrifa-rs/docs/figures/input_1_motion_trace_windowed_roll5.typ \
+//     vrifa-rs/docs/artifacts/input_1_motion_trace_windowed_roll5.pdf
 
 #import "@preview/cetz:0.4.0"
 

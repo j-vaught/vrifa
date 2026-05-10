@@ -5,12 +5,15 @@ pub mod delta;
 pub mod heatmap;
 pub mod lock;
 pub mod morphology;
+pub mod motion;
 pub mod overlay;
 pub mod peak;
 pub mod reference;
+pub mod registration;
 pub mod roi;
 pub mod sampling;
 pub mod threshold;
+pub mod warp;
 
 use ndarray::{Array2, Array3};
 use thiserror::Error;
@@ -18,6 +21,9 @@ use thiserror::Error;
 pub use colorspace::ColorSpace;
 pub use contours::AnnotationBox;
 pub use morphology::{MorphShape, MorphologyParams};
+pub use motion::MotionEstimate;
+pub use registration::MotionModel;
+pub use warp::AffineWarp;
 
 #[derive(Debug, Error)]
 pub enum VrifaError {
@@ -33,6 +39,7 @@ pub type Result<T> = std::result::Result<T, VrifaError>;
 
 #[derive(Clone, Debug)]
 pub struct DetectFrontParams {
+    pub pre_delta_blur_kernel: usize,
     pub blur_kernel: usize,
     pub morph_kernel: usize,
     pub min_area: usize,
@@ -60,6 +67,7 @@ pub struct DetectFrontDebug {
 impl Default for DetectFrontParams {
     fn default() -> Self {
         Self {
+            pre_delta_blur_kernel: 0,
             blur_kernel: 9,
             morph_kernel: 13,
             min_area: 400,
@@ -100,9 +108,23 @@ pub fn detect_front_debug(
     params: &DetectFrontParams,
     peak_brightness_map: Option<&Array2<f32>>,
 ) -> Result<DetectFrontDebug> {
+    let frame_preblur;
+    let reference_preblur;
+    let frame_for_delta = if params.pre_delta_blur_kernel > 1 {
+        frame_preblur = delta::blur_frame(frame_converted, params.pre_delta_blur_kernel)?;
+        &frame_preblur
+    } else {
+        frame_converted
+    };
+    let reference_for_delta = if params.pre_delta_blur_kernel > 1 {
+        reference_preblur = delta::blur_frame(reference_converted, params.pre_delta_blur_kernel)?;
+        &reference_preblur
+    } else {
+        reference_converted
+    };
     let delta = delta::compute_delta(
-        frame_converted,
-        reference_converted,
+        frame_for_delta,
+        reference_for_delta,
         roi_mask,
         &params.channel_weights,
         params.darken_only,
