@@ -205,6 +205,7 @@
   show figure.caption: strong
   set figure.caption(separator:"   ")
   set figure(numbering: "1", supplement: [Fig.])
+  show figure: set block(above: 1.2em, below: 1.2em)
 
   // Configure Tables
   show figure.where(kind: table): set figure.caption(position: top)
