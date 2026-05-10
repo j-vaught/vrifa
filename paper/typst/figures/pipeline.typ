@@ -1,4 +1,4 @@
-// Pipeline diagram — 12-stage VRIFA detection pipeline.
+// Pipeline diagram — 14-stage VRIFA detection pipeline.
 //
 // Compile:
 //   typst compile paper/typst/figures/pipeline.typ paper/typst/figures/pipeline.pdf
@@ -25,9 +25,11 @@
 #let stages = (
   stage("Colorspace",   "colorspace.rs",  atlantic),
   stage("ROI",          "roi.rs",         atlantic),
+  stage("Stabilize",    "registration.rs", atlantic),
+  stage("Pre-blur",     "delta::blur_frame", atlantic),
   stage("Reference",    "reference.rs",   atlantic),
   stage("Peak track",   "peak.rs",        atlantic),
-  stage("Delta",        "delta.rs",       garnet),
+  stage("Delta",        "delta::compute_delta", garnet),
   stage("Threshold",    "threshold.rs",   garnet),
   stage("Morphology",   "morphology.rs",  horseshoe),
   stage("Lock",         "lock.rs",        horseshoe),
@@ -40,11 +42,11 @@
 #cetz.canvas({
   import cetz.draw: *
 
-  let cell-w = 2.6
+  let cell-w = 2.4
   let cell-h = 0.95
-  let gap = 0.5
+  let gap = 0.45
   let row-pad = 0.6
-  let cols = 6
+  let cols = 7
   let rows = 2
 
   // Black-filled stealth arrowhead, reused on every connector.

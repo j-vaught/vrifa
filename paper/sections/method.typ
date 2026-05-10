@@ -8,17 +8,18 @@
 
 == Pipeline overview
 
-The detection algorithm treats each video frame as a comparison against a quiescent reference image of the dry preform. Where resin has wetted the fabric, the local appearance darkens, and the absolute change is largest near the advancing flow front. The pipeline computes that per-pixel difference inside a rectangular region of interest, clips it to admit only darkening so that specular highlights from the vacuum bag are rejected, normalizes the resulting field, thresholds it into a binary candidate mask, cleans the mask with morphological closing and opening, removes small connected components, and finally locks pixels whose wet label has persisted for several consecutive frames. The locked mask is the canonical output, the optional heatmap renders the underlying delta field for visual diagnosis, and the optional overlay draws the mask boundary onto the original Vacuum-Assisted Resin Transfer Molding (VARTM) frame for human review. Figure~@fig:pipeline shows the twelve stages in order.
+The detection algorithm treats each video frame as a comparison against a quiescent reference image of the dry preform. Where resin has wetted the fabric, the local appearance darkens, and the absolute change is largest near the advancing flow front. The pipeline first checks for camera motion against the previous frame and, when motion crosses a configured threshold, registers the live frame back into the reference coordinate system before any difference is computed. The registered frame is then optionally smoothed with a pre-delta blur whose output feeds both the running peak map and the difference computation, so the reference and the comparison see the same bandwidth-limited input. The pipeline then computes the per-pixel difference inside a rectangular region of interest, clips it to admit only darkening so that specular highlights from the vacuum bag are rejected, normalizes the resulting field, thresholds it into a binary candidate mask, cleans the mask with morphological closing and opening, removes small connected components, and finally locks pixels whose wet label has persisted for several consecutive frames. The locked mask is the canonical output, the optional heatmap renders the underlying delta field for visual diagnosis, and the optional overlay draws the mask boundary onto the original Vacuum-Assisted Resin Transfer Molding (VARTM) frame for human review. Figure~@fig:pipeline shows the fourteen stages in order.
 
 #figure(
   image("/typst/figures/pipeline.pdf", width: 95%),
   caption: [
-    Twelve-stage VRIFA pipeline. Each frame flows from decode
-    through an appearance-difference comparison against a chosen
-    reference, into a thresholded and morphologically cleaned
-    mask, and finally through a temporal lock that stabilizes the
-    boundary across frames. The same mask drives the binary,
-    heatmap, and overlay renderers.
+    Fourteen-stage VRIFA pipeline. Each frame flows from decode
+    through an optional camera-shift registration and pre-delta
+    blur, then through an appearance-difference comparison against
+    a chosen reference, into a thresholded and morphologically
+    cleaned mask, and finally through a temporal lock that
+    stabilizes the boundary across frames. The same mask drives
+    the binary, heatmap, and overlay renderers.
   ],
 ) <fig:pipeline>
 
@@ -32,9 +33,13 @@ The first stage decodes each Blue-Green-Red (BGR) frame from the input video. Th
 
 A rectangular region of interest excludes the part frame, manifold flange, and bag wrinkles outside the laminate. The user supplies four fractional margins, one per edge, each clamped to the closed interval from zero to forty-nine hundredths of the corresponding side, and the algorithm builds a binary mask $R$ that is one inside the resulting rectangle and zero elsewhere. A single configuration parameter sets all four margins symmetrically, with per-edge overrides available. All subsequent stages operate only on pixels where $R = 1$.
 
+== Camera-shift detection and registration
+
+A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera in mid-run shifts the projected position of every laminate pixel by some vector that has nothing to do with wetting. The reference frame stops aligning with the live frame, the difference field lights up along high-contrast laminate edges, and the threshold catches that as wet. VRIFA detects the shift and corrects it before the difference is computed. For each frame, a single phase-correlation step on a fixed-resolution downsample of the working channel of the previous and current frames returns a translation $(d_x, d_y)$ and a confidence score. When either the per-frame magnitude $sqrt(d_x^2 + d_y^2)$ or the cumulative drift since the last reset exceeds an operator-set threshold, an iterative-coplanar-correlation refinement fits a translation or affine warp $W_t$ on a static-edge mask of the current ROI, and the live frame is warped through $W_t$ into the reference coordinate system before all downstream stages. The static-edge mask is recomputed at each shift event so the registration is driven by mold and frame edges that do not move with the wet front rather than by the wet region itself. The peak map is reset on registration so the post-warp pixels do not accumulate against pre-warp brightness.
+
 == Peak-brightness reference
 
-VRIFA accumulates a running maximum of the working channel across all frames seen so far. The motivation is that the dry preform is, by definition, the brightest the fabric will ever appear in the working channel. Treating that running maximum as the per-pixel reference instead of a single early frame absorbs the slow lighting drift caused by lamp warm-up and bag deformation, leaving the difference field free to respond to wetting alone. Figure~@fig:peak shows the effect at one tracked pixel of the canonical input clip. The raw $L^*$ value drifts upward as the lamps stabilize, the running peak $P$ tracks that drift monotonically, and the front arrival cleanly separates as a sharp drop of more than thirty units below the peak. A fixed reference would have started at the value reached on frame zero and missed the post-warm-up lift entirely.
+VRIFA accumulates a running maximum of the working channel across all frames seen so far. When the pre-delta blur is enabled the maximum is updated from the blurred working channel rather than the raw channel so the peak map and the delta input share the same bandwidth, which prevents a one-pixel halo of speckle from shifting the peak above the eventual delta input and creating a phantom darkening signal. The motivation for the running maximum is that the dry preform is, by definition, the brightest the fabric will ever appear in the working channel. Treating that running maximum as the per-pixel reference instead of a single early frame absorbs the slow lighting drift caused by lamp warm-up and bag deformation, leaving the difference field free to respond to wetting alone. Figure~@fig:peak shows the effect at one tracked pixel of the canonical input clip. The raw $L^*$ value drifts upward as the lamps stabilize, the running peak $P$ tracks that drift monotonically, and the front arrival cleanly separates as a sharp drop of more than thirty units below the peak. A fixed reference would have started at the value reached on frame zero and missed the post-warm-up lift entirely.
 
 #figure(
   image("/typst/figures/peak_reference.pdf", width: 95%),
@@ -64,7 +69,7 @@ clipped to be non-negative and scaled by a user lag factor $lambda$ (default $1.
 
 == Delta computation
 
-Stage six produces the per-pixel scalar field $D_t$ that drives all downstream decisions. The default darken-only mode operates on the working (first) channel and records how much darker the frame is than its reference,
+Stage eight produces the per-pixel scalar field $D_t$ that drives all downstream decisions. The default darken-only mode operates on the working (first) channel and records how much darker the frame is than its reference,
 
 $ D_t (y, x) = R(y, x) dot.c max(0, w_0 dot.c (G_t^star (y, x) - F_t (y, x, 0))), $ <eq:delta_darken>
 
@@ -110,7 +115,7 @@ The kernel parities are forced odd at runtime so that anchor handling is symmetr
 
 == Temporal locking
 
-Stage eleven imposes hysteresis along the time axis. Each pixel keeps a small per-pixel counter that increments while the cleaned mask reports the pixel as wet and resets to zero on any frame where the cleaned mask says dry. Once the counter reaches the threshold $n_"lock"$ frames, a sticky locked-pixel map is set true at that location and never resets. The output of the stage is the elementwise OR of the cleaned mask with the sticky locked map, so a pixel that has ever been wet for $n_"lock"$ consecutive frames stays wet for the remainder of the run. Figure~@fig:lock illustrates the bookkeeping with a twelve-frame example for $n_"lock" = 3$.
+Stage thirteen imposes hysteresis along the time axis. Each pixel keeps a small per-pixel counter that increments while the cleaned mask reports the pixel as wet and resets to zero on any frame where the cleaned mask says dry. Once the counter reaches the threshold $n_"lock"$ frames, a sticky locked-pixel map is set true at that location and never resets. The output of the stage is the elementwise OR of the cleaned mask with the sticky locked map, so a pixel that has ever been wet for $n_"lock"$ consecutive frames stays wet for the remainder of the run. Figure~@fig:lock illustrates the bookkeeping with a twelve-frame example for $n_"lock" = 3$.
 
 #figure(
   image("/typst/figures/lock_timeline.pdf", width: 95%),
@@ -149,7 +154,13 @@ Table~@tab:defaults collects the parameters exposed by the configuration interfa
     [ref-running-alpha, $alpha$], [0.05], [EMA weight for the running reference.],
     [peak-reference], [true], [Use the running peak map in the working channel.],
     [darken-only], [true], [Clip the delta to non-negative wetting deltas.],
-    [blur-kernel, $k_b$], [9], [Gaussian blur kernel size in pixels.],
+    [camera-stable], [false], [Enable phase-correlation camera-shift detection.],
+    [motion-per-frame-threshold], [1.5], [Per-frame translation magnitude that triggers a registration.],
+    [cumulative-motion-threshold], [3], [Accumulated drift, in pixels, that triggers a registration.],
+    [motion-model], [affine], [Warp model fit on a static-edge mask when a shift is detected.],
+    [peak-on-shift], [reset], [How the peak map is treated when a shift is registered.],
+    [pre-delta-blur-kernel, $k_p$], [0], [Gaussian blur applied to the working frame before peak update and delta. Disabled when zero.],
+    [blur-kernel, $k_b$], [9], [Gaussian blur kernel size in pixels, applied to the delta field.],
     [threshold-offset, $delta_tau$], [-30], [Offset added to Otsu/percentile/manual threshold.],
     [morph-kernel, $k_m$], [13], [Morphology structuring-element size.],
     [morph-shape], [ellipse], [Structuring-element shape.],
@@ -174,6 +185,6 @@ Table~@tab:defaults collects the parameters exposed by the configuration interfa
 
 == Implementation pointer
 
-VRIFA is organized as a Cargo workspace with five crates. The core algorithm crate hosts the stage logic, with one Rust source file per stage. The file names track the stage names used above, namely the colorspace conversion, region-of-interest, peak, reference, delta, morphology, threshold, lock, heatmap, overlay, contour-extraction, and sampling stages, with a small conversion shim that mediates between native array containers and the underlying matrix views used by the computer-vision routines. The input/output crate wraps video decode and encode through standard video-capture and video-writer interfaces, plus an asynchronous PNG writer used for per-frame artifact dumps. The command-line crate is the user-facing binary; it owns argument parsing, run orchestration, the dynamic-reference cache, and the per-frame loop that ties the twelve stages together. The annotations crate handles COCO and YOLO export of the contours produced by the contour-extraction stage. The Python-bindings crate exposes the same stage functions as a PyO3 module, used only by internal-development tooling rather than by end-user workflows.
+VRIFA is organized as a Cargo workspace with five crates. The core algorithm crate hosts the stage logic, with one Rust source file per stage. The file names track the stage names used above, namely the colorspace conversion, region-of-interest, motion-estimation, registration, warp-application, peak, reference, delta, morphology, threshold, lock, heatmap, overlay, contour-extraction, and sampling stages, with a small conversion shim that mediates between native array containers and the underlying matrix views used by the computer-vision routines. The input/output crate wraps video decode and encode through standard video-capture and video-writer interfaces, plus an asynchronous PNG writer used for per-frame artifact dumps. The command-line crate is the user-facing binary; it owns argument parsing, run orchestration, the dynamic-reference cache, and the per-frame loop that ties the fourteen stages together. The annotations crate handles COCO and YOLO export of the contours produced by the contour-extraction stage. The Python-bindings crate exposes the same stage functions as a PyO3 module, used only by internal-development tooling rather than by end-user workflows.
 
 The Implementation section returns to the same crate layout and describes the buffer-reuse strategy, the computer-vision bindings, and the bit-exact stage-parity result that motivates VRIFA being framed as a reference implementation rather than as one detector among many.
