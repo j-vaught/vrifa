@@ -1,14 +1,10 @@
 = Method
 
-// Three-layer Method section. Layer 1 gives plain-English
-// intuition with a pipeline diagram. Layer 2 walks each stage
-// in prose with a small number of load-bearing equations and
-// stage-specific diagrams. Layer 3 maps the stages onto the
-// Rust workspace.
-
 == Pipeline overview
 
-The detection algorithm treats each video frame as a comparison against a quiescent reference image of the dry preform. Where resin has wetted the fabric, the local appearance darkens, and the absolute change is largest near the advancing flow front. The pipeline first checks for camera motion against the previous frame and, when motion crosses a configured threshold, registers the live frame back into the reference coordinate system before any difference is computed. The registered frame is then optionally smoothed with a pre-delta blur whose output feeds both the running peak map and the difference computation, so the reference and the comparison see the same bandwidth-limited input. The pipeline then computes the per-pixel difference inside a rectangular region of interest, clips it to admit only darkening so that specular highlights from the vacuum bag are rejected, normalizes the resulting field, thresholds it into a binary candidate mask, cleans the mask with morphological closing and opening, removes small connected components, and finally locks pixels whose wet label has persisted for several consecutive frames. The locked mask is the canonical output, the optional heatmap renders the underlying delta field for visual diagnosis, and the optional overlay draws the mask boundary onto the original Vacuum-Assisted Resin Transfer Molding (VARTM) frame for human review. Figure~@fig:pipeline shows the fourteen stages in order.
+The integrated pipeline is built from primitives that each prior camera-based VARTM and LCM system uses in some subset. None of the primitives is novel in isolation. The empirical question this paper answers is which subsets are sufficient and what each primitive contributes to the joint result, and the method described below is the configuration that supports that question.
+
+The detection algorithm treats each video frame as a comparison against a reference image of the dry preform. Where resin has wetted the fabric, the local appearance darkens, and the absolute change is largest near the advancing flow front. The pipeline first checks for camera motion against the previous frame and, when motion crosses a configured threshold, registers the live frame back into the reference coordinate system before any difference is computed. The registered frame is optionally smoothed with a pre-delta blur whose output feeds both the running peak map and the difference computation, so the reference and the comparison see the same bandwidth-limited input. The pipeline computes the per-pixel difference inside a rectangular region of interest, clips it to admit only darkening so that specular highlights from the vacuum bag are rejected, normalizes the resulting field, thresholds it into a binary candidate mask, cleans the mask with morphological closing and opening, removes small connected components, and finally locks pixels whose wet label has persisted for several consecutive frames. The locked mask is the canonical output, the optional heatmap renders the underlying delta field for visual diagnosis, and the optional overlay draws the mask boundary onto the original Vacuum-Assisted Resin Transfer Molding (VARTM) frame for human review. Figure~@fig:pipeline shows the fourteen stages in order.
 
 #figure(
   image("/typst/figures/pipeline.pdf", width: 95%),
@@ -27,7 +23,7 @@ The pipeline is deliberately classical, which is what makes it suitable as a ref
 
 == Frame decode and colorspace conversion
 
-The first stage decodes each Blue-Green-Red (BGR) frame from the input video. The second converts that frame into a working colorspace. VRIFA exposes four options, namely the International Commission on Illumination (CIE) 1976 $L^* a^* b^*$ colorspace (CIELAB), Red-Green-Blue (RGB), Hue-Saturation-Value (HSV), and 8-bit grayscale, all routed through standard color converters. CIELAB is the default because resin wetting darkens the lightness channel $L^*$ much more than it shifts chrominance, which makes the single-channel $L^*$ projection used in the difference computation both sufficient and robust. We denote the converted frame at index $t$ by $F_t in bb(R)^(H times W times C)$, where $C$ is the channel count of the chosen colorspace.
+The first stage decodes each Blue-Green-Red (BGR) frame from the input video. The second projects that frame into a working colorspace. The pipeline supports four options, namely the International Commission on Illumination (CIE) 1976 $L^* a^* b^*$ colorspace (CIELAB), Red-Green-Blue (RGB), Hue-Saturation-Value (HSV), and 8-bit grayscale. CIELAB is the colorspace held fixed in the integrated configuration because resin wetting darkens the lightness channel $L^*$ much more than it shifts chrominance, which makes the single-channel $L^*$ projection used in the difference computation both sufficient and robust. The categorical panel of Figure~@fig:ablation_curves reports the IoU cost of switching to each of the alternatives. We denote the converted frame at index $t$ by $F_t in bb(R)^(H times W times C)$, where $C$ is the channel count of the chosen colorspace.
 
 == Region of interest
 
@@ -54,7 +50,7 @@ A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera i
 
 == Peak-brightness reference
 
-VRIFA accumulates a running maximum of the working channel across all frames seen so far. When the pre-delta blur is enabled the maximum is updated from the blurred working channel rather than the raw channel so the peak map and the delta input share the same bandwidth, which prevents a one-pixel halo of speckle from shifting the peak above the eventual delta input and creating a phantom darkening signal. The motivation for the running maximum is that the dry preform is, by definition, the brightest the fabric will ever appear in the working channel. Treating that running maximum as the per-pixel reference instead of a single early frame absorbs the slow lighting drift caused by lamp warm-up and bag deformation, leaving the difference field free to respond to wetting alone. Figure~@fig:peak shows the effect at one tracked pixel of the canonical input clip. The raw $L^*$ value drifts upward as the lamps stabilize, the running peak $P$ tracks that drift monotonically, and the front arrival cleanly separates as a sharp drop of more than thirty units below the peak. A fixed reference would have started at the value reached on frame zero and missed the post-warm-up lift entirely.
+The pipeline accumulates a running maximum of the working channel across all frames seen so far. When the pre-delta blur is enabled the maximum is updated from the blurred working channel rather than the raw channel so the peak map and the delta input share the same bandwidth, which prevents a one-pixel halo of speckle from shifting the peak above the eventual delta input and creating a phantom darkening signal. The motivation for the running maximum is that the dry preform is, by definition, the brightest the fabric will ever appear in the working channel. Treating that running maximum as the per-pixel reference instead of a single early frame absorbs the slow lighting drift caused by lamp warm-up and bag deformation, leaving the difference field free to respond to wetting alone. Figure~@fig:peak shows the effect at one tracked pixel of the canonical input clip. The raw $L^*$ value drifts upward as the lamps stabilize, the running peak $P$ tracks that drift monotonically, and the front arrival cleanly separates as a sharp drop of more than thirty units below the peak. A fixed reference at frame zero would have missed the post-warm-up lift entirely. The IoU cost of removing this primitive on the eleven-sample subset is reported in Table~@tab:ablation.
 
 #figure(
   image("/typst/figures/peak_reference.pdf", width: 95%),
@@ -70,7 +66,7 @@ VRIFA accumulates a running maximum of the working channel across all frames see
   ],
 ) <fig:peak>
 
-The peak map can be disabled through a single configuration parameter for users who want a strictly fixed reference, or who are diagnosing a lighting failure where the assumption of monotone brightness no longer holds.
+The peak map can be disabled through a single configuration parameter, which is the row of Table~@tab:ablation labeled "no peak-brightness reference" and is the largest single $Delta$IoU in the ablation.
 
 == Reference selection
 
@@ -84,11 +80,11 @@ clipped to be non-negative and scaled by a user lag factor $lambda$ (default $1.
 
 == Delta computation
 
-Stage eight produces the per-pixel scalar field $D_t$ that drives all downstream decisions. The default darken-only mode operates on the working (first) channel and records how much darker the frame is than its reference,
+Stage eight produces the per-pixel scalar field $D_t$ that drives all downstream decisions. The integrated configuration's darken-only mode operates on the working (first) channel and records how much darker the frame is than its reference,
 
 $ D_t (y, x) = R(y, x) dot.c max(0, w_0 dot.c (G_t^star (y, x) - F_t (y, x, 0))), $ <eq:delta_darken>
 
-where $G_t^star$ equals the peak map $P_t$ when the peak-reference mode is enabled and otherwise equals the channel-zero slice of $G_t$. The clip to non-negative values discards every pixel that becomes brighter than the reference, which removes specular flashes from the silicone vacuum bag and from condensation, neither of which are wetting events. A full-color mode replaces the difference with the channel-weighted Euclidean distance across all $C$ channels, exposed through a single configuration parameter and intended for HSV and RGB workflows where chrominance shifts are diagnostic. Figure~@fig:darken_only shows the effect of the clip.
+where $G_t^star$ equals the peak map $P_t$ when the peak-reference mode is enabled and otherwise equals the channel-zero slice of $G_t$. The clip to non-negative values discards every pixel that becomes brighter than the reference, which removes specular flashes from the silicone vacuum bag and from condensation, neither of which are wetting events. A full-color mode replaces the difference with the channel-weighted Euclidean distance across all $C$ channels and is intended for HSV and RGB workflows where chrominance shifts are diagnostic. Figure~@fig:darken_only shows the effect of the clip on a single frame; Table~@tab:ablation reports the IoU cost of removing it across the eleven-sample subset.
 
 #figure(
   image("/typst/figures/darken_only_compare.pdf", width: 100%),
@@ -145,7 +141,7 @@ Stage thirteen imposes hysteresis along the time axis. Each pixel keeps a small 
   ],
 ) <fig:lock>
 
-The default $n_"lock" = 3$ trades a small number of frames of recovery latency for boundary stability that downstream consumers need. Setting the lock window to zero disables the stage altogether for users who want raw per-frame masks.
+The integrated configuration uses $n_"lock" = 3$, which trades a small number of frames of recovery latency for boundary stability. Setting the lock window to zero disables the stage altogether and corresponds to the "no temporal lock" row of Table~@tab:ablation, the second-largest single $Delta$IoU in the ablation.
 
 == Heatmap, overlay, and contour export
 
