@@ -25,14 +25,12 @@ venv/
 ENV/
 env/
 test_venv/
-# data/ contents are mostly large videos that stay out of git.
-# Small label-and-verify artifacts that the ablation harness depends on
-# travel with the repo via these explicit exceptions.
+# data/ holds the videos and the cleaned ground-truth labels the
+# ablation harness reads. Videos and ablation outputs live here too;
+# the explicit exceptions below are the small files that travel with
+# the repo.
 data/*
 !data/labels_55.json
-!data/LABELING_PROTOCOL.md
-!data/sample_inventory.json
-!data/raw_label_exports/
 !data/ablation/
 # IDE
 .idea/
