@@ -81,7 +81,7 @@ Every trial in every phase follows the same recipe:
    heatmaps, no videos, no annotation export. (`--write-mask-pngs true`
    plus the others false.)
 4. Output to `$TMPDIR/vrifa_ablation/runs/<trial_id>/<sample>/masks/`.
-5. Run `agreement.py` against `paper/data/labels_55.json`, restricted
+5. Run `agreement.py` against `data/labels_55.json`, restricted
    to the matching sample's frames.
 6. Persist the trial's metrics into a per-trial JSON in
    `$TMPDIR/vrifa_ablation/results/phase<N>/<trial_id>.json`.
@@ -108,7 +108,7 @@ prior-stage per-video winner (or the integrated default for Phase 1).
 | `--lock-frames` | 3 | 0, 3, 10 |
 
 3⁴ = **81 trials per video × 11 videos = 891 trials.** Output:
-`paper/data/ablation/phase1_per_video_best.json`.
+`data/ablation/phase1_per_video_best.json`.
 
 ### Phase 2 — Colorspace + channel weights
 
@@ -275,9 +275,9 @@ $TMPDIR/vrifa_ablation/
     <trial_id>/<sample>/masks/
 ```
 
-**Persistent (committed under `paper/data/ablation/`):**
+**Persistent (committed under `data/ablation/`):**
 ```
-paper/data/ablation/
+data/ablation/
   README.md                   how to read these files
   phase1_per_video_best.json  per-sample winner config + metrics
   phase1_all_trials.csv       all trials with metrics
@@ -289,7 +289,7 @@ paper/data/ablation/
   summary.md                  consolidated report, one row per phase
 ```
 
-`paper/data/ablation/` is added to a fresh `paper/data/.gitignore`
+`data/ablation/` is added to a fresh `data/.gitignore`
 exception so only the JSON/CSV/MD land in git, NOT the transient mask
 PNGs (which never leave `$TMPDIR` anyway).
 
@@ -327,7 +327,7 @@ ssh comech-2422 "jq '.phases_done, .trials_done | length' /tmp/vrifa_ablation/st
 
 When the run finishes, the final summary lands at
 `$TMPDIR/vrifa_ablation/summary.md` and the JSON/CSV are copied into
-`paper/data/ablation/`. The user pulls them home with one rsync.
+`data/ablation/`. The user pulls them home with one rsync.
 
 ## 8. Overnight-robustness checklist
 
@@ -344,7 +344,7 @@ that prevents it.
 | Two workers race on the same `runs/` directory | Each worker creates a UUID-suffixed runs subdir; no two workers ever share a path. |
 | Process pool dies | Driver detects worker pool exit; if `state.json` shows < 100% complete, exits with error 1 so the user sees a non-zero shell prompt instead of a silent stop. |
 | Power loss during state.json write | State writes are atomic (write to `state.json.tmp`, fsync, rename). |
-| Git pollution | `paper/data/.gitignore` already excludes `paper/data/`; ablation outputs that we WANT committed live in `paper/data/ablation/` with an explicit `!ablation/` exception added. Transient masks live in `/tmp` which is never near `git status`. |
+| Git pollution | `data/.gitignore` already excludes `data/`; ablation outputs that we WANT committed live in `data/ablation/` with an explicit `!ablation/` exception added. Transient masks live in `/tmp` which is never near `git status`. |
 | User wants to stop early | `Ctrl-C` (or `kill -TERM` from outside tmux) traps cleanly: workers finish current trial, state.json is updated, partial results are still queryable. |
 | Re-run after a flag-set change | `state.json` records the trial_id, which encodes the full config. Changing a sweep value generates a new trial_id and forces a re-run for that trial only. |
 | Repository changes mid-run (e.g. someone pushes) | Run uses the binary at the path it started with. Source changes don't affect the in-flight run. The driver records `git rev-parse HEAD` at start and refuses to merge results into a different rev unless `--force` is passed. |
@@ -355,7 +355,7 @@ The run is complete when:
 
 1. `state.json` reports `phases_done == [1, 2, 3, 4, 5, 6, 7, 8, 9]` and
    `trials_failed.length == 0` (or the user has reviewed the failures).
-2. `paper/data/ablation/summary.md` exists with one row per phase.
+2. `data/ablation/summary.md` exists with one row per phase.
 3. Each `phase<N>_per_video_best.json` contains 11 entries (or 1 for
    Phase 9), each with `mean_iou`, `ci_low`, `ci_high`, and the winning
    config.

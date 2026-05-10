@@ -1,0 +1,25 @@
+{
+  "samples": [
+    {"slug": "input_1", "file": "input_1.mp4", "frames": 706, "fps": 29.97, "width": 1920, "height": 1080, "duration_s": 23.6, "kind": "high-resolution standard-rate"},
+    {"slug": "input_2", "file": "input_2.mp4", "frames": 100, "fps": 3.33, "width": 1920, "height": 1088, "duration_s": 30.0, "kind": "high-resolution time-lapse"},
+    {"slug": "input_3", "file": "input_3.mp4", "frames": 200, "fps": 3.33, "width": 1920, "height": 1088, "duration_s": 60.1, "kind": "high-resolution time-lapse"},
+    {"slug": "input_4", "file": "input_4.mp4", "frames": 8100, "fps": 30.0, "width": 1048, "height": 524, "duration_s": 270.0, "kind": "cropped operator-view"},
+    {"slug": "input_5", "file": "input_5.mp4", "frames": 8100, "fps": 30.0, "width": 1048, "height": 524, "duration_s": 270.0, "kind": "cropped operator-view"},
+    {"slug": "input_6", "file": "input_6.mp4", "frames": 8100, "fps": 30.0, "width": 1048, "height": 524, "duration_s": 270.0, "kind": "cropped operator-view"},
+    {"slug": "input_7", "file": "input_7.mp4", "frames": 8100, "fps": 30.0, "width": 1048, "height": 524, "duration_s": 270.0, "kind": "cropped operator-view"},
+    {"slug": "input_8", "file": "input_8.mp4", "frames": 12600, "fps": 30.0, "width": 1048, "height": 524, "duration_s": 420.0, "kind": "cropped operator-view"},
+    {"slug": "input_9", "file": "input_9.mp4", "frames": 15469, "fps": 30.0, "width": 1048, "height": 524, "duration_s": 515.6, "kind": "cropped operator-view"},
+    {"slug": "input_10", "file": "input_10.mp4", "frames": 11426, "fps": 30.0, "width": 1048, "height": 524, "duration_s": 380.9, "kind": "cropped operator-view"},
+    {"slug": "input_11", "file": "input_11.mp4", "frames": 14876, "fps": 30.0, "width": 1048, "height": 524, "duration_s": 495.9, "kind": "cropped operator-view"}
+  ],
+  "summary": {
+    "n_samples": 11,
+    "n_total_frames": 95683,
+    "high_resolution_full_rate": 1,
+    "high_resolution_time_lapse": 2,
+    "cropped_operator_view": 8,
+    "labeling_subset_per_sample": 5,
+    "labeling_total": 55,
+    "labeling_strategy": "Stratified at 5/25/50/75/95% of total frame count per sample."
+  }
+}

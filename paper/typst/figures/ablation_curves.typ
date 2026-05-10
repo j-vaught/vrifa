@@ -1,6 +1,6 @@
 // IoU vs parameter curves from the input_1 ablation.
 //
-// Source: paper/data/ablation_results.json (phase 1 + phase 2).
+// Source: data/ablation_results.json (phase 1 + phase 2).
 // Data is embedded inline so the figure compiles standalone.
 
 #import "@preview/cetz:0.4.0"
