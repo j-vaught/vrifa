@@ -9,7 +9,6 @@
 //============================================================
 
 #import "lib.typ": *
-#import "@preview/droplet:0.3.1": dropcap
 
 #show: aiaa.with(
   title: "Vision-Based Flow-Front Assessment in Vacuum-Assisted Resin Transfer Molding",
