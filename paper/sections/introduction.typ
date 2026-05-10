@@ -3,20 +3,21 @@
 = Introduction
 
 #figure(
-  // image("/typst/figures/teaser.pdf", width: 95%),
-  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
-    _Teaser placeholder._ Three columns showing one canonical input
-    frame at fill position 50%. Left: raw BGR input. Center:
-    integrated-configuration overlay with the locked-mask boundary
-    drawn in garnet. Right: ground-truth human polygon overlaid in
-    rose for comparison. A small chip in the upper-right corner
-    shows mean IoU and 95% bootstrap confidence interval over the
-    eleven-sample subset. Replaced once the agreement run produces
-    the final overlay frames.
-  ],
+  image("/typst/figures/teaser.pdf", width: 100%),
   caption: [
-    The integrated pipeline produces per-pixel wet-versus-dry masks
-    against a multi-mold labeled benchmark.
+    Per-frame boundary comparison on the canonical reference video at
+    three fill positions ($25 %$, $50 %$, $95 %$ of total frames).
+    Column 1 shows the raw input frame. Columns 2--4 show, on a black
+    backdrop, the predicted boundary from each of three classical-CV
+    pipelines overlaid against the ground-truth polygon (white):
+    Lekanidis & Vosniakos 2020 in green, Almazán-Lázaro 2022 in
+    magenta, and the integrated pipeline of this work in cyan. The
+    integrated pipeline tracks the GT boundary at every fill
+    position; the prior pipelines emit boundary masks that drift
+    from the front (Lekanidis traces internal distribution-medium
+    pattern; Almazán fires on bag wrinkles and lighting drift).
+    Region IoU and boundary $F_1$ for the same comparison are
+    reported in Table~@tab:headline_vs_baselines.
   ],
 ) <fig:teaser>
 
