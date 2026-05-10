@@ -12,6 +12,56 @@ __device__ int reflect101(int value, int limit) {
     return value;
 }
 
+__device__ int clamp_replicate(int value, int limit) {
+    if (limit <= 1) {
+        return 0;
+    }
+    if (value < 0) {
+        return 0;
+    }
+    if (value >= limit) {
+        return limit - 1;
+    }
+    return value;
+}
+
+__device__ float cubic_weight(float value) {
+    const float a = -0.75f;
+    value = fabsf(value);
+    if (value <= 1.0f) {
+        return ((a + 2.0f) * value - (a + 3.0f)) * value * value + 1.0f;
+    }
+    if (value < 2.0f) {
+        return ((a * value - 5.0f * a) * value + 8.0f * a) * value - 4.0f * a;
+    }
+    return 0.0f;
+}
+
+__device__ float sample_bicubic_replicate(
+    const float* input,
+    int width,
+    int height,
+    float x,
+    float y
+) {
+    int base_x = static_cast<int>(floorf(x));
+    int base_y = static_cast<int>(floorf(y));
+    float sum = 0.0f;
+    float weight_sum = 0.0f;
+    for (int dy = -1; dy <= 2; ++dy) {
+        int yy = clamp_replicate(base_y + dy, height);
+        float wy = cubic_weight(y - static_cast<float>(base_y + dy));
+        for (int dx = -1; dx <= 2; ++dx) {
+            int xx = clamp_replicate(base_x + dx, width);
+            float wx = cubic_weight(x - static_cast<float>(base_x + dx));
+            float weight = wx * wy;
+            sum += input[yy * width + xx] * weight;
+            weight_sum += weight;
+        }
+    }
+    return weight_sum != 0.0f ? (sum / weight_sum) : 0.0f;
+}
+
 extern "C" __global__ void bgr_to_lab_lut(
     const unsigned char* input,
     const unsigned int* lut,
@@ -77,6 +127,21 @@ extern "C" __global__ void update_peak_brightness(
     output[index] = current_l > previous ? current_l : previous;
 }
 
+extern "C" __global__ void update_peak_brightness_plane(
+    const float* frame_l,
+    const float* previous_peak,
+    float* output,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    float current_l = frame_l[index];
+    float previous = previous_peak[index];
+    output[index] = current_l > previous ? current_l : previous;
+}
+
 extern "C" __global__ void compute_delta_darken_only(
     const unsigned int* frame_lab,
     const float* reference_plane,
@@ -91,6 +156,25 @@ extern "C" __global__ void compute_delta_darken_only(
     }
     float l_star = static_cast<float>(frame_lab[index] & 0xffu);
     float raw = (reference_plane[index] - l_star) * channel_weight;
+    if (raw < 0.0f) {
+        raw = 0.0f;
+    }
+    output[index] = roi_mask[index] ? raw : 0.0f;
+}
+
+extern "C" __global__ void compute_delta_darken_only_plane(
+    const float* frame_l,
+    const float* reference_plane,
+    const unsigned char* roi_mask,
+    float* output,
+    float channel_weight,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    float raw = (reference_plane[index] - frame_l[index]) * channel_weight;
     if (raw < 0.0f) {
         raw = 0.0f;
     }
@@ -124,6 +208,30 @@ extern "C" __global__ void gaussian_blur_f32(
         }
     }
     output[index] = sum;
+}
+
+extern "C" __global__ void warp_affine_f32(
+    const float* input,
+    float* output,
+    int width,
+    int height,
+    float m00,
+    float m01,
+    float m02,
+    float m10,
+    float m11,
+    float m12,
+    int pixel_count
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= pixel_count) {
+        return;
+    }
+    int y = index / width;
+    int x = index - (y * width);
+    float src_x = m00 * static_cast<float>(x) + m01 * static_cast<float>(y) + m02;
+    float src_y = m10 * static_cast<float>(x) + m11 * static_cast<float>(y) + m12;
+    output[index] = sample_bicubic_replicate(input, width, height, src_x, src_y);
 }
 
 extern "C" __global__ void reduce_minmax_nonnegative(

@@ -1,8 +1,11 @@
 use anyhow::Result;
 use ndarray::{Array2, Array3};
 use serde::{Deserialize, Serialize};
+use vrifa_core::delta::blur_plane;
 use vrifa_core::morphology::MorphShape;
+use vrifa_core::peak::update_peak_brightness_plane;
 use vrifa_core::roi::RoiMargins;
+use vrifa_core::warp::{apply_warp_plane, AffineWarp};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BackendKind {
@@ -71,6 +74,71 @@ pub trait PeakImageBackend: ImageBackend {
         roi_mask: &Self::DeviceMaskU8,
         channel_weight: f32,
     ) -> Result<Self::DevicePlaneF32>;
+
+    fn blur_plane_f32_device(
+        &self,
+        plane: &Self::DevicePlaneF32,
+        kernel: usize,
+    ) -> Result<Self::DevicePlaneF32> {
+        let plane = self.download_plane_f32(plane)?;
+        let blurred = blur_plane(&plane, kernel)?;
+        self.upload_plane_f32(&blurred)
+    }
+
+    fn warp_plane_f32_device(
+        &self,
+        plane: &Self::DevicePlaneF32,
+        matrix: &AffineWarp,
+    ) -> Result<Self::DevicePlaneF32> {
+        let plane = self.download_plane_f32(plane)?;
+        let warped = apply_warp_plane(&plane, matrix)?;
+        self.upload_plane_f32(&warped)
+    }
+
+    fn update_peak_brightness_plane_device(
+        &self,
+        frame_l: &Self::DevicePlaneF32,
+        previous_peak: Option<&Self::DevicePlaneF32>,
+    ) -> Result<Self::DevicePlaneF32> {
+        let frame_l = self.download_plane_f32(frame_l)?;
+        let previous_peak = previous_peak
+            .map(|plane| self.download_plane_f32(plane))
+            .transpose()?;
+        let peak = update_peak_brightness_plane(&frame_l, previous_peak.as_ref())?;
+        self.upload_plane_f32(&peak)
+    }
+
+    fn compute_delta_darken_only_planes_device(
+        &self,
+        frame_l: &Self::DevicePlaneF32,
+        reference_plane: &Self::DevicePlaneF32,
+        roi_mask: &Self::DeviceMaskU8,
+        channel_weight: f32,
+    ) -> Result<Self::DevicePlaneF32> {
+        let frame_l = self.download_plane_f32(frame_l)?;
+        let reference_plane = self.download_plane_f32(reference_plane)?;
+        let roi_mask = self.download_mask_u8(roi_mask)?;
+        anyhow::ensure!(
+            frame_l.dim() == reference_plane.dim(),
+            "reference plane shape does not match frame"
+        );
+        anyhow::ensure!(
+            frame_l.dim() == roi_mask.dim(),
+            "ROI mask shape does not match frame"
+        );
+
+        let (height, width) = frame_l.dim();
+        let mut delta = Array2::<f32>::zeros((height, width));
+        for y in 0..height {
+            for x in 0..width {
+                let raw = (reference_plane[(y, x)] - frame_l[(y, x)]) * channel_weight;
+                let value = if raw > 0.0 { raw } else { 0.0 };
+                delta[(y, x)] = value * roi_mask[(y, x)] as f32;
+            }
+        }
+
+        self.upload_plane_f32(&delta)
+    }
 
     fn blur_and_normalize_delta(
         &self,
