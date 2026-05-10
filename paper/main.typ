@@ -51,29 +51,36 @@
   abstract: [
     Vacuum-Assisted Resin Transfer Molding (VARTM) operators read the
     visible advance of the resin flow front under the transparent
-    vacuum bag as their primary process indicator. Prior vision
-    systems for VARTM and Liquid Composite Molding use the same
-    classical visual primitives, namely reference-frame differencing,
-    Otsu thresholding, and morphological cleanup, but each system
-    uses a different subset, no system reports the joint and
-    individual contribution of those primitives, and no labeled
+    vacuum bag as their primary spatial process indicator. Prior
+    camera-based systems for VARTM and Liquid Composite Molding use
+    the same classical visual primitives, namely reference-frame
+    differencing, Otsu thresholding, and morphological cleanup, but
+    each system uses a different subset, no system reports the joint
+    and individual contribution of those primitives, and no labeled
     video benchmark exists against which to attribute that
-    contribution. This work presents an integrated classical
-    computer-vision pipeline that combines a peak-brightness
-    reference, a darken-only difference, region-of-interest
-    restriction, dynamic-lag reference selection, morphological
-    cleanup, and persistence-based temporal locking, evaluated on a
+    contribution. This work presents three things. The first is an
+    integrated classical computer-vision pipeline that combines a
+    peak-brightness reference, a darken-only difference,
+    region-of-interest restriction, dynamic-lag reference selection,
+    morphological cleanup, persistence-based temporal locking, and
+    run-time camera-shift registration, evaluated on a
     fifty-five-frame hand-labeled subset spanning eleven distinct
-    VARTM infusion runs. The integrated configuration reaches mask
-    Intersection-over-Union of $X.X X X$ (95 % bootstrap confidence
-    interval $[a, b]$) and boundary $F_1$ of $Y.Y Y Y$
-    (CI $[c, d]$). A per-sample component-removal ablation on the
-    same subset characterizes the marginal IoU effect of each named
-    primitive, both as an eleven-sample mean and broken down per
-    sample so that primitives whose contribution depends on infusion
-    regime are visible rather than averaged away. The pipeline runs
-    at thirty frames per second on a single CPU and at $K$ frames
-    per second on a CUDA implementation across the eleven samples.
+    VARTM infusion runs and reaching mask Intersection-over-Union of
+    $X.X X X$ (95 % bootstrap confidence interval $[a, b]$) and
+    boundary $F_1$ of $Y.Y Y Y$ (CI $[c, d]$). The second is a
+    per-sample component-removal ablation on the same subset that
+    characterizes the marginal IoU effect of each named primitive,
+    both as an eleven-sample mean and broken down per sample so that
+    primitives whose contribution depends on infusion regime are
+    visible rather than averaged away. The third is a regime-indexed
+    configuration lookup, derived from the per-sample ablation, that
+    recommends preprocessing settings for each pipeline component as
+    a function of run circumstances (illumination drift, fabric
+    type, fill rate, frame rate, camera stability) so a practitioner
+    on a different bench can select an empirically-grounded starting
+    point rather than a default. The pipeline runs at thirty frames
+    per second on a single CPU and at $K$ frames per second on a
+    CUDA implementation across the eleven samples.
   ],
 )
 
