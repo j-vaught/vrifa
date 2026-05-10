@@ -233,13 +233,14 @@
   // Display the paper's contents.
   body
 
-  // Display bibliography.
+  // Display bibliography on a new page.
 
   // Style bibliography.
   show std.bibliography: set text(9pt)
   // show std.bibliography: set block(spacing: 0.5em)
   set std.bibliography(title: text(10pt)[References], style: "american-institute-of-aeronautics-and-astronautics")
 
+  pagebreak(weak: true)
   bibliography
 
   // if bibliography-file != none {
