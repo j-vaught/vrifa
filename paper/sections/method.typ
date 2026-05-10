@@ -138,9 +138,9 @@ The last two display stages exist for inspection and label export. The heatmap r
 
 For machine-readable export, the contour-extraction stage emits Common Objects in Context (COCO) and YOLO-format polygons for every connected component of the locked mask. Polygon segmentation is computed with a standard contour-extraction routine, optionally simplified by the Douglas-Peucker algorithm with tolerance $epsilon$, and optionally densified to a maximum edge length so that downstream rasterization preserves curvature. The annotation-sampling utility selects which frames receive labels using one of three modes, namely all-frame, evenly-spaced count, or fixed-stride, with deduplication of consecutive ties so that the integer-truncated linear-spacing exactly reproduces the standard reference behaviour.
 
-== Hyperparameter defaults
+== Configuration values held fixed across all experiments
 
-Table~@tab:defaults collects the parameters exposed by the configuration interface together with the values used for every result reported in this paper. Defaults were chosen during development and held fixed across all runs in the evaluation set, so the reported metrics reflect the algorithm as a user would see it on a fresh checkout rather than the outcome of a per-video search.
+Table~@tab:defaults lists the configuration values held fixed across every experiment reported in this paper, including the per-component ablation. The values were chosen during development on a held-out subset disjoint from the labeled evaluation set, were not retuned per video or per metric, and are reproduced here so that any reader can recover the exact operating point of every reported number. The ablation in Section~5 reports what happens when each row is changed in isolation.
 
 #figure(
   table(
@@ -175,16 +175,11 @@ Table~@tab:defaults collects the parameters exposed by the configuration interfa
     [dynamic-ref-cache-size], [32], [Frames cached for the dynamic-reference reader.],
   ),
   caption: [
-    Hyperparameter defaults shipped in the VRIFA configuration
-    interface and used for every result in this paper. Symbols
-    match the variables introduced above; the only equation that
-    depends on them explicitly is the dynamic-mode lag of
-    Eq.~@eq:dynlag.
+    Configuration values held fixed across every experiment reported
+    in this paper. Symbols match the variables introduced in the
+    preceding subsections. The only equation that depends on them
+    explicitly is the dynamic-mode lag of Eq.~@eq:dynlag. The
+    component-removal ablation in Section~5 reports the IoU effect
+    of changing each row in isolation.
   ],
 ) <tab:defaults>
-
-== Implementation pointer
-
-VRIFA is organized as a Cargo workspace with five crates. The core algorithm crate hosts the stage logic, with one Rust source file per stage. The file names track the stage names used above, namely the colorspace conversion, region-of-interest, motion-estimation, registration, warp-application, peak, reference, delta, morphology, threshold, lock, heatmap, overlay, contour-extraction, and sampling stages, with a small conversion shim that mediates between native array containers and the underlying matrix views used by the computer-vision routines. The input/output crate wraps video decode and encode through standard video-capture and video-writer interfaces, plus an asynchronous PNG writer used for per-frame artifact dumps. The command-line crate is the user-facing binary; it owns argument parsing, run orchestration, the dynamic-reference cache, and the per-frame loop that ties the fourteen stages together. The annotations crate handles COCO and YOLO export of the contours produced by the contour-extraction stage. The Python-bindings crate exposes the same stage functions as a PyO3 module, used only by internal-development tooling rather than by end-user workflows.
-
-The Implementation section returns to the same crate layout and describes the buffer-reuse strategy, the computer-vision bindings, and the bit-exact stage-parity result that motivates VRIFA being framed as a reference implementation rather than as one detector among many.
