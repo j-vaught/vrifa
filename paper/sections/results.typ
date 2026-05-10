@@ -71,22 +71,41 @@ The eleven samples described in Section~5 differ substantially in resolution, fr
 // overall mean and (per the protocol of Section~3) whether the
 // contingency tuning pass was applied.
 
+== Hyperparameter sensitivity around the operating point
+
+The component-removal ablation reports the cost of disabling each named primitive completely. A separate set of single-axis sweeps reports the IoU response inside the neighborhood of the values held fixed in Table~@tab:defaults, so a reader can judge how flat the operating point is and how steep the cliffs are along each axis. Figure~@fig:ablation_curves shows the response on the high-resolution canonical reference video for the threshold offset $delta_tau$, the minimum component area $a_"min"$, the morphology kernel $k_m$, the delta-blur kernel $k_b$, the lock window $n_"lock"$, and a categorical panel for colorspace, darken-only, peak-reference, blur, and reference-mode. The curves are not the headline numbers, which average over all eleven samples, but they show how each axis behaves around the operating point on a single sample where the response is well isolated.
+
+#figure(
+  image("/typst/figures/ablation_curves.pdf", width: 95%),
+  caption: [
+    Single-axis IoU response on the canonical reference video as each
+    parameter is varied with all other parameters held at the values
+    in Table~@tab:defaults. Dashed grey marks the IoU at the held-
+    fixed operating point; dotted green marks the joint optimum
+    located by the wider sweep. The categorical panel reports IoU
+    when each of the named binary or discrete components is toggled
+    individually. Joint multi-component effects are reported in the
+    component-removal ablation table earlier in this section.
+  ],
+) <fig:ablation_curves>
+
 == Qualitative montage
 
 #figure(
-  // image("../typst/figures/montage.pdf"),
+  // image("/typst/figures/montage.pdf"),
   rect(width: 100%, height: 2.4in, stroke: 0.5pt, inset: 8pt)[
-    _Frame montage placeholder._ Two rows of three raw / overlay
-    pairs: input_1 frames 50, 200, 500 (top); input_2 frames 30, 60,
-    90 (bottom). Plus three labeled-vs-predicted comparisons drawn
-    from cropped operator-view samples.
+    _Frame montage placeholder._ Three columns per labeled frame
+    (raw input, predicted overlay, human polygon) drawn from four
+    representative samples spanning the resolution and frame-rate
+    regimes documented in Section~3. Replaced once the predicted
+    overlays are regenerated from the integrated configuration.
   ],
   caption: [
-    Frame montage at the parity-validated anchor frames. Top two
-    rows show raw input alongside the VRIFA overlay for the high-
-    resolution `input_1` and `input_2` reference videos. Bottom row
-    shows three labeled-versus-predicted comparisons drawn from the
-    cropped operator-view samples to surface failure modes that the
-    high-resolution videos do not exhibit.
+    Qualitative montage of labeled frames. Each row shows one frame
+    from a different sample (high-resolution standard-rate, high-
+    resolution time-lapse, and two cropped operator-view samples),
+    with raw input, predicted overlay, and human polygon side by
+    side. The figure exists to let the reader judge the IoU number
+    against an actual frame rather than against summary statistics.
   ],
 ) <fig:montage>
