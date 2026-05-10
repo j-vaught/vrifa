@@ -4,14 +4,14 @@ The agreement between the predicted mask and the human-labeled ground truth is m
 
 Bootstrap 95 % confidence intervals are reported for every metric, computed from $10,!000$ resamples of the per-frame metric values with replacement. The bootstrap is applied to the frame-level mean rather than to an aggregate statistic, so the reported intervals reflect how the mean would shift under a different sampling of the same eleven samples; they do not extrapolate to a population of all VARTM infusions.
 
-== Integrated configuration vs. naive baseline
+== Integrated configuration vs. published classical-CV baselines
 
-The integrated configuration is the configuration described in Section~3 and held fixed across every result reported in this section, with the mode menus pinned in their respective per-subsection tables and the scalar values listed in Table~@tab:scalars. The naive baseline runs the same pipeline with every named component disabled, namely no peak-brightness reference, no darken-only clip, no temporal lock, no morphological cleanup, and no dynamic-lag reference selection. The naive baseline retains only the colorspace projection, the ROI restriction, and the Otsu threshold against the first-frame reference, which is the minimum that any prior camera-based VARTM system reports doing. The contrast between the two rows is the empirical answer to the question "does the joint configuration matter for IoU on this benchmark."
+The integrated configuration is the configuration described in Section~3 and held fixed across every result reported in this section, with the mode menus pinned in their respective per-subsection tables and the scalar values listed in Table~@tab:scalars. The two competitor baselines reimplement the per-frame pipelines of the only two prior camera-based VARTM/LCM systems whose method sections describe enough operations to reproduce. The Lekanidis-Vosniakos 2020 baseline @LekanidisVosniakos2020IJMMS is a Matlab-style chain of ROI crop, Gaussian blur ($sigma = 2$), grayscale conversion, contrast stretch, Otsu binarization, foreground-background swap, closing on a disk-13 structuring element, Sobel edge detection, opening with a 120-pixel area threshold, and dilation. The Almazán-Lázaro 2022 baseline @AlmazanLazaro2022JMP is a per-frame chain of ROI crop, Scaramuzza-style lens-distortion correction @Scaramuzza2006Toolbox, histogram equalization, first-frame absolute differencing, grayscale conversion, a $5 times 5$ mean filter, Sobel-gradient segmentation, paired erosion and dilation, and small-area removal. Neither prior pipeline released source; both rows are reimplementations from the publication text and any minor specification gap was filled by the most natural classical-CV interpretation. Table~@tab:headline_vs_baselines reports the agreement of all three rows on the fifty-five-frame labeling subset; the contrast is the empirical answer to the question "does the joint integrated configuration close an IoU gap that the two prior pipelines leave open."
 
 #figure(
   // TODO populate from data/agreement_metrics.json once the
   // 11-sample agreement run completes against the integrated
-  // configuration and the naive baseline.
+  // configuration and the two reimplemented competitor baselines.
   table(
     columns: (auto, auto, auto, auto, auto, auto),
     align: (left, right, right, right, right, right),
@@ -23,24 +23,26 @@ The integrated configuration is the configuration described in Section~3 and hel
       [*IoU*], [*Dice*], [*B-$F_1$*], [*Boundary px*], [*Box IoU*],
     ),
     table.hline(stroke: 0.5pt),
-    [Integrated], [_TBD_], [_TBD_], [_TBD_], [_TBD_], [_TBD_],
-    [Naive baseline], [_TBD_], [_TBD_], [_TBD_], [_TBD_], [_TBD_],
+    [Integrated (this work)],                        [_TBD_], [_TBD_], [_TBD_], [_TBD_], [_TBD_],
+    [Lekanidis & Vosniakos 2020 (reimplemented)],    [_TBD_], [_TBD_], [_TBD_], [_TBD_], [_TBD_],
+    [Almazán-Lázaro 2022 (reimplemented)],           [_TBD_], [_TBD_], [_TBD_], [_TBD_], [_TBD_],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
-    Integrated configuration vs. naive baseline on the
-    fifty-five-frame labeling subset. The naive baseline runs the
-    same pipeline with every named component disabled, retaining only
-    the colorspace projection, ROI restriction, and Otsu threshold
-    against the first-frame reference, which is the minimum any prior
-    camera-based VARTM system reports doing. Each cell carries a
-    bootstrap 95 % confidence interval over $10,!000$ resamples of
-    the per-frame mean; intervals omitted from the table for
+    Integrated configuration versus two reimplemented classical-CV
+    competitor pipelines on the fifty-five-frame labeling subset.
+    Lekanidis-Vosniakos 2020 and Almazán-Lázaro 2022 are
+    reimplementations from the published method sections since
+    neither paper releases source. Each cell carries a bootstrap
+    95% confidence interval over $10,!000$ resamples of the
+    per-frame mean; intervals are omitted from the table for
     readability and reported in the per-metric breakdown of
     Table~@tab:agreement_overall. B-$F_1$ is mean boundary $F_1$
     across $tau in {1, 3, 5}$ pixels.
   ],
-) <tab:headline_vs_naive>
+) <tab:headline_vs_baselines>
+
+The IoU gap between the integrated configuration and the two competitor baselines is attributable to specific components the prior pipelines do not include. Lekanidis-Vosniakos 2020 has Otsu and morphology but no peak-brightness reference, no darken-only clip, no temporal lock, no dynamic-lag reference, and no run-time camera-shift registration; Almazán-Lázaro 2022 adds Scaramuzza-style lens-distortion calibration but does not use an explicit threshold (relying on Sobel-gradient segmentation), has no peak reference, no darken-only clip, no temporal lock, and no dynamic-lag reference. The component-removal ablation in the next subsection isolates the IoU contribution of each component the integrated configuration adds.
 
 #figure(
   table(
