@@ -29,6 +29,27 @@ Table~@tab:runtime reports per-sample wall-clock for the integrated configuratio
   ],
 ) <tab:runtime>
 
+#figure(
+  // image("/typst/figures/runtime_bars.pdf", width: 95%),
+  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
+    _Three-implementation runtime bar chart placeholder._ Three
+    grouped horizontal bars per sample (Python reference in warm
+    grey, CPU implementation in atlantic, CUDA implementation in
+    garnet) for the eleven-sample subset. Bar length is wall-clock
+    seconds, with a secondary axis showing frames per second.
+    Samples ordered top-to-bottom by frame count so the longest
+    runs are at the top of the chart and the speedup pattern is
+    visible across regimes. Companion visualization to
+    Table~@tab:runtime; cut from the final paper if the table alone
+    is sufficient.
+  ],
+  caption: [
+    Wall-clock per sample on three implementations of the same
+    algorithm. Bars are grouped by sample so the per-sample
+    speedup pattern is visible at a glance.
+  ],
+) <fig:runtime_bars>
+
 == Validation
 
 The CPU implementation was validated against the Python reference by dumping eight intermediate tensors per frame, namely the converted frame, the raw delta, the blurred delta, the normalized delta, the binary mask, the cleaned mask, the overlay, and the heatmap, on six diagnostic frames spanning two distinct samples. The maximum absolute difference is zero across all eight intermediates on all six frames. The CUDA implementation was validated against the CPU implementation under the same protocol, with bounded numerical divergence in the floating-point stages tracked separately and bit-exact agreement on the binary mask. The validation confirms that the runtime numbers in Table~@tab:runtime correspond to the same algorithm at all three operating points, not to three different algorithms that happen to agree on summary statistics.

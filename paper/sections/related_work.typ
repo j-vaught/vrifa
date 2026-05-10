@@ -31,3 +31,39 @@ The integrated pipeline stays deliberately within well-understood classical oper
 == Where this work fits
 
 The three families above all touch the flow front, but none of them reports the question this paper answers. The control family treats segmentation as a black box and reports downstream control quality, not segmentation quality. The observation family reports excellent agreement at sensor electrodes and gratings, but interpolates between them rather than measuring per-pixel front geometry from video. The modeling family assumes a per-pixel front exists and consumes it, which is precisely the artifact the upstream segmenter must produce. Within the camera-based subset of the observation family, prior systems differ in which subset of the available primitives they use and report only end-to-end behavior on a single mold. None reports the joint contribution of the components in use, none reports the marginal cost of any component left out, and none evaluates against a labeled video benchmark spanning more than one mold. This paper supplies that evidence on eleven distinct infusion runs and on a 55-frame hand-labeled subset.
+
+#figure(
+  // image("/typst/figures/competitor_pipelines.pdf", width: 100%),
+  rect(width: 100%, height: 2.4in, stroke: 0.5pt, inset: 8pt)[
+    _Competitor-pipeline comparison placeholder._ Three-row diagram
+    showing the per-frame stage sequence of the two prior camera-CV
+    pipelines that report enough method detail to reproduce, and
+    the integrated pipeline of this work. Top row: Lekanidis and
+    Vosniakos 2020 (IJMMS) -- decode, ROI crop, Gaussian blur,
+    grayscale, contrast stretch, Otsu binarize, foreground swap,
+    closing on disk-13 SE, Sobel edge, opening with area threshold
+    120, dilation. Middle row: Almazán-Lázaro 2022 (J Manuf
+    Processes) -- decode, ROI crop, Scaramuzza distortion correction,
+    histogram equalization, first-frame absolute difference,
+    grayscale, 5-by-5 mean filter, Sobel gradient, erosion, dilation,
+    small-area removal. Bottom row: this work (16 stages from
+    fig:pipeline). Each row is a horizontal chain of named
+    operations drawn in the same brand palette as fig:pipeline; boxes
+    that appear only in the integrated pipeline (peak-brightness
+    reference, darken-only clip, dynamic-lag reference, post-delta
+    blur as a discrete stage, paired close+open with min-area
+    filter, temporal lock, run-time camera-shift registration) are
+    bordered in garnet so the reader sees what the integrated
+    pipeline adds at a glance. Boxes in the prior pipelines that
+    have no analogue in this work (Almazán's Scaramuzza
+    lens-distortion calibration) are bordered in atlantic.
+  ],
+  caption: [
+    Per-frame stage comparison of the three classical-CV pipelines
+    for VARTM/LCM that report enough method detail to reproduce.
+    Boxes bordered in garnet are present only in the integrated
+    pipeline.
+  ],
+) <fig:competitor_pipelines>
+
+The lens-distortion-calibration step that Almazán-Lázaro and co-workers apply once at setup time @Scaramuzza2006Toolbox is the only operation in either prior pipeline that has no analogue in this work, and the run-time camera-shift registration described in Section~3 is the only operation in this work that has no analogue in either prior pipeline. The two are complementary axes; a deployed system would benefit from both.

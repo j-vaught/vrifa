@@ -36,6 +36,26 @@ The evaluation rests on eleven Vacuum-Assisted Resin Transfer Molding (VARTM) in
 
 The labeling subset is constructed by sampling five frames from every clip at the $5%$, $25%$, $50%$, $75%$, and $95%$ positions of total frame count, rounded to the nearest integer index. The sampling is stratified within each sample so that the fifty-five-frame ground-truth set covers every clip equally rather than concentrating in a single high-frame-count recording. The resulting set spans early-fill, early-mid, mid, mid-late, and late-fill stages within each clip, and across clips it spans the four resolution and frame-rate regimes described above.
 
+#figure(
+  // image("/typst/figures/sample_montage.pdf", width: 100%),
+  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
+    _Sample-montage placeholder._ Eleven thumbnails (one per sample)
+    at fill position 50%, arranged in a 3-row by 4-column grid with
+    one cell intentionally empty. The thumbnails range from the
+    high-resolution standard-rate `input_1` (1920 by 1080) through
+    the high-resolution time-lapse `input_2` and `input_3` (3.33
+    fps) to the eight cropped operator-view recordings `input_4`
+    through `input_11` (1048 by 524 at 30 fps). The figure exists
+    to make the breadth of the eleven-sample inventory visible at a
+    glance: different fabrics, lighting setups, fill speeds, and
+    camera framings.
+  ],
+  caption: [
+    Thumbnail of every sample in the inventory at fill position
+    50%. Sorted by sample index left-to-right, top-to-bottom.
+  ],
+) <fig:sample_montage>
+
 == Labeling protocol
 
 Each anchor frame is labeled by a single human annotator under the protocol committed at `data/LABELING_PROTOCOL.md`. The annotator marks one polygon per frame indicating the resin-wetted region, defined as the area where resin has visibly transitioned the fabric from dry to saturated. Specular reflections from the silicone vacuum bag, vacuum-bag wrinkles and creases that pre-date the front, fabric-weave shadows that pre-date the front, and pooled resin in inlet runners outside the laminate boundary are explicitly excluded. The annotator distinguishes real wetting from transient appearance changes by scrubbing forward a few frames and confirming that the candidate region's brightness has changed monotonically. Real wetting darkens once and stays dark; reflections and wrinkles oscillate. The labeling tool is the browser-based polygon editor at #link("https://www.makesense.ai")[makesense.ai], chosen for its ability to import a flat directory of PNGs and export Common Objects in Context (COCO) JSON without intermediate format conversion. Fifty-five labeled images are exported as a single COCO file at `data/labels.json`. Figure~@fig:labeling shows a representative labeled frame.

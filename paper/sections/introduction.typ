@@ -2,6 +2,46 @@
 
 = Introduction
 
+#figure(
+  // image("/typst/figures/teaser.pdf", width: 95%),
+  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
+    _Teaser placeholder._ Three columns showing one canonical input
+    frame at fill position 50%. Left: raw BGR input. Center:
+    integrated-configuration overlay with the locked-mask boundary
+    drawn in garnet. Right: ground-truth human polygon overlaid in
+    rose for comparison. A small chip in the upper-right corner
+    shows mean IoU and 95% bootstrap confidence interval over the
+    eleven-sample subset. Replaced once the agreement run produces
+    the final overlay frames.
+  ],
+  caption: [
+    The integrated pipeline produces per-pixel wet-versus-dry masks
+    against a multi-mold labeled benchmark.
+  ],
+) <fig:teaser>
+
+#figure(
+  // image("/typst/figures/problem_motivation.pdf", width: 95%),
+  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
+    _Problem-motivation placeholder._ Two-column comparison.
+    Left: schematic of an embedded SMARTweave grid bonded into the
+    lay-up, showing the per-cell wetness samples a dielectric grid
+    can recover at its own pitch and the perturbation it introduces
+    into the laminate. Right: single webcam looking down through
+    the transparent vacuum bag, with the per-pixel front geometry
+    the camera recovers and zero perturbation of the part. Numbers
+    along the bottom note approximate hardware costs (\$10--50 for
+    the camera, \$100s--\$50k for the embedded sensor stack).
+  ],
+  caption: [
+    Why a camera. Embedded sensor grids alter the local
+    permeability they measure and quantize the front to their own
+    pitch; a camera through the transparent bag is non-perturbative
+    and pixel-resolved at one to three orders of magnitude lower
+    hardware cost.
+  ],
+) <fig:problem_motivation>
+
 #dropcap(
   height: 2,
   hanging-indent: 0em,

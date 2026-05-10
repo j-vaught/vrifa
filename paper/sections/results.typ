@@ -67,7 +67,30 @@ The integrated configuration is the configuration described in Section~3 and hel
 
 == Per-sample breakdown
 
-The eleven samples in Section~4 differ substantially in resolution, frame rate, illumination, and operator framing. A per-sample breakdown is the strongest available evidence that the agreement reported above is consistent across substantively different molds rather than driven by a single fortunate recording. Table~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean.
+The eleven samples in Section~4 differ substantially in resolution, frame rate, illumination, and operator framing. A per-sample breakdown is the strongest available evidence that the agreement reported above is consistent across substantively different molds rather than driven by a single fortunate recording. Table~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Figure~@fig:per_sample_iou_bars visualises the same data with bootstrap whiskers for quick comparison across samples.
+
+#figure(
+  // image("/typst/figures/per_sample_iou_bars.pdf", width: 95%),
+  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
+    _Per-sample agreement placeholder._ Horizontal bar chart with
+    one row per sample (`input_1` through `input_11`); bar length
+    is mean mask IoU across the five labeled frames of that sample;
+    whisker is the bootstrap 95% confidence interval over $10,!000$
+    resamples of the per-frame mean. Samples sorted ascending by
+    mean IoU so the worst-performing infusion appears at the top of
+    the chart. A vertical garnet line marks the overall eleven-
+    sample mean IoU; rows whose CI does not cross that line are
+    visually distinguished. Bar fill is atlantic for the high-
+    resolution clips and warm grey for the cropped operator-view
+    clips so the resolution-and-rate regime per sample is legible at
+    a glance.
+  ],
+  caption: [
+    Per-sample mask IoU sorted ascending. Bar widths are the
+    per-sample mean over five labeled frames; whiskers are bootstrap
+    95% confidence intervals.
+  ],
+) <fig:per_sample_iou_bars>
 
 #figure(
   table(
