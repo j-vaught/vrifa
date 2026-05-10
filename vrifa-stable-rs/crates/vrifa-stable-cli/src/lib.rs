@@ -422,12 +422,15 @@ struct MotionTraceRow {
     cumulative_dy: f32,
     per_frame_magnitude: f32,
     cumulative_magnitude: f32,
+    recent_window_magnitude: f32,
     warp_dx: f32,
     warp_dy: f32,
     warp_error: f32,
     fit_applied: bool,
     warp_active: bool,
 }
+
+const CAMERA_STABLE_RECENT_WINDOW: usize = 5;
 
 #[derive(Clone, Debug)]
 struct CameraStableState {
@@ -436,6 +439,7 @@ struct CameraStableState {
     reference_token: Option<usize>,
     cumulative_dx: f32,
     cumulative_dy: f32,
+    recent_motion: VecDeque<(f32, f32)>,
     cached_warp: AffineWarp,
     warp_active: bool,
     shift_event_active: bool,
@@ -451,6 +455,7 @@ impl CameraStableState {
             reference_token: None,
             cumulative_dx: 0.0,
             cumulative_dy: 0.0,
+            recent_motion: VecDeque::new(),
             cached_warp: AffineWarp::identity(),
             warp_active: false,
             shift_event_active: false,
@@ -465,6 +470,7 @@ impl CameraStableState {
         self.reference_token = Some(reference_token);
         self.cumulative_dx = 0.0;
         self.cumulative_dy = 0.0;
+        self.recent_motion.clear();
         self.cached_warp = AffineWarp::identity();
         self.warp_active = false;
         self.shift_event_active = false;
@@ -546,9 +552,20 @@ fn prepare_camera_stable(
             let motion = estimate_translation(frame_converted, prev_frame)?;
             state.cumulative_dx -= motion.dx;
             state.cumulative_dy -= motion.dy;
+            state.recent_motion.push_back((-motion.dx, -motion.dy));
+            while state.recent_motion.len() > CAMERA_STABLE_RECENT_WINDOW {
+                state.recent_motion.pop_front();
+            }
 
             let per_frame_magnitude = motion.dx.hypot(motion.dy);
             let cumulative_magnitude = state.cumulative_dx.hypot(state.cumulative_dy);
+            let (recent_window_dx, recent_window_dy) = state
+                .recent_motion
+                .iter()
+                .fold((0.0f32, 0.0f32), |(sum_dx, sum_dy), (dx, dy)| {
+                    (sum_dx + *dx, sum_dy + *dy)
+                });
+            let recent_window_magnitude = recent_window_dx.hypot(recent_window_dy);
             let (cached_warp_dx, cached_warp_dy) = if state.warp_active {
                 state.cached_warp.center_displacement(width, height)
             } else {
@@ -561,6 +578,10 @@ fn prepare_camera_stable(
             };
             let per_frame_trigger = per_frame_magnitude > config.motion_per_frame_threshold;
             if per_frame_trigger {
+                state.shift_event_active = true;
+                state.shift_event_stable_frames = 0;
+            }
+            if recent_window_magnitude > config.cumulative_motion_threshold {
                 state.shift_event_active = true;
                 state.shift_event_stable_frames = 0;
             }
@@ -643,6 +664,7 @@ fn prepare_camera_stable(
                 cumulative_dy: state.cumulative_dy,
                 per_frame_magnitude,
                 cumulative_magnitude,
+                recent_window_magnitude,
                 warp_dx,
                 warp_dy,
                 warp_error,
@@ -659,6 +681,7 @@ fn prepare_camera_stable(
                 cumulative_dy: 0.0,
                 per_frame_magnitude: 0.0,
                 cumulative_magnitude: 0.0,
+                recent_window_magnitude: 0.0,
                 warp_dx: 0.0,
                 warp_dy: 0.0,
                 warp_error: 0.0,
@@ -1395,12 +1418,12 @@ fn write_motion_trace(path: &Path, rows: &[MotionTraceRow]) -> Result<()> {
     let mut file = File::create(path).with_context(|| format!("creating {}", path.display()))?;
     writeln!(
         file,
-        "frame,dx,dy,confidence,cumulative_dx,cumulative_dy,per_frame_magnitude,cumulative_magnitude,warp_dx,warp_dy,warp_error,fit_applied,warp_active"
+        "frame,dx,dy,confidence,cumulative_dx,cumulative_dy,per_frame_magnitude,cumulative_magnitude,recent_window_magnitude,warp_dx,warp_dy,warp_error,fit_applied,warp_active"
     )?;
     for row in rows {
         writeln!(
             file,
-            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}",
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}",
             row.frame_index,
             row.dx,
             row.dy,
@@ -1409,6 +1432,7 @@ fn write_motion_trace(path: &Path, rows: &[MotionTraceRow]) -> Result<()> {
             row.cumulative_dy,
             row.per_frame_magnitude,
             row.cumulative_magnitude,
+            row.recent_window_magnitude,
             row.warp_dx,
             row.warp_dy,
             row.warp_error,

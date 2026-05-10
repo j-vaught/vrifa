@@ -1,0 +1,7208 @@
+{
+  "fps": 29.97,
+  "frame_count": 706,
+  "motion_per_frame_threshold": 1.5,
+  "cumulative_motion_threshold": 3.0,
+  "rows": [
+    {
+      "frame": 1,
+      "seconds": 0.0,
+      "dx": 0.0,
+      "dy": 0.0,
+      "magnitude": 0.0,
+      "recent_window_magnitude": 0.0,
+      "confidence": 0.0,
+      "fit_applied": false
+    },
+    {
+      "frame": 2,
+      "seconds": 0.033367,
+      "dx": -0.622923,
+      "dy": -0.096796,
+      "magnitude": 0.630399,
+      "recent_window_magnitude": 0.630399,
+      "confidence": 0.65467,
+      "fit_applied": false
+    },
+    {
+      "frame": 3,
+      "seconds": 0.066733,
+      "dx": -0.095678,
+      "dy": -0.125397,
+      "magnitude": 0.157729,
+      "recent_window_magnitude": 0.752168,
+      "confidence": 0.549031,
+      "fit_applied": false
+    },
+    {
+      "frame": 4,
+      "seconds": 0.1001,
+      "dx": -0.387071,
+      "dy": 0.270525,
+      "magnitude": 0.472237,
+      "recent_window_magnitude": 1.106727,
+      "confidence": 0.52748,
+      "fit_applied": false
+    },
+    {
+      "frame": 5,
+      "seconds": 0.133467,
+      "dx": 0.089991,
+      "dy": -0.300116,
+      "magnitude": 0.313318,
+      "recent_window_magnitude": 1.046423,
+      "confidence": 0.64125,
+      "fit_applied": false
+    },
+    {
+      "frame": 6,
+      "seconds": 0.166834,
+      "dx": 0.651905,
+      "dy": 0.075938,
+      "magnitude": 0.656312,
+      "recent_window_magnitude": 0.404048,
+      "confidence": 0.961585,
+      "fit_applied": false
+    },
+    {
+      "frame": 7,
+      "seconds": 0.2002,
+      "dx": -0.078257,
+      "dy": -0.064917,
+      "magnitude": 0.101677,
+      "recent_window_magnitude": 0.231188,
+      "confidence": 0.972088,
+      "fit_applied": false
+    },
+    {
+      "frame": 8,
+      "seconds": 0.233567,
+      "dx": -0.020357,
+      "dy": -0.006186,
+      "magnitude": 0.021276,
+      "recent_window_magnitude": 0.257405,
+      "confidence": 0.99791,
+      "fit_applied": false
+    },
+    {
+      "frame": 9,
+      "seconds": 0.266934,
+      "dx": 0.139063,
+      "dy": -0.01404,
+      "magnitude": 0.13977,
+      "recent_window_magnitude": 0.841275,
+      "confidence": 0.998326,
+      "fit_applied": false
+    },
+    {
+      "frame": 10,
+      "seconds": 0.3003,
+      "dx": -0.003088,
+      "dy": 0.022874,
+      "magnitude": 0.023082,
+      "recent_window_magnitude": 0.689401,
+      "confidence": 0.997496,
+      "fit_applied": false
+    },
+    {
+      "frame": 11,
+      "seconds": 0.333667,
+      "dx": 0.044107,
+      "dy": 0.001016,
+      "magnitude": 0.044118,
+      "recent_window_magnitude": 0.101927,
+      "confidence": 0.995712,
+      "fit_applied": false
+    },
+    {
+      "frame": 12,
+      "seconds": 0.367034,
+      "dx": -0.17669,
+      "dy": 0.023639,
+      "magnitude": 0.178264,
+      "recent_window_magnitude": 0.032144,
+      "confidence": 0.990991,
+      "fit_applied": false
+    },
+    {
+      "frame": 13,
+      "seconds": 0.4004,
+      "dx": 0.022796,
+      "dy": 0.03706,
+      "magnitude": 0.04351,
+      "recent_window_magnitude": 0.075252,
+      "confidence": 0.994807,
+      "fit_applied": false
+    },
+    {
+      "frame": 14,
+      "seconds": 0.433767,
+      "dx": 0.151168,
+      "dy": 0.034424,
+      "magnitude": 0.155037,
+      "recent_window_magnitude": 0.125021,
+      "confidence": 0.989325,
+      "fit_applied": false
+    },
+    {
+      "frame": 15,
+      "seconds": 0.467134,
+      "dx": -0.031136,
+      "dy": -0.08656,
+      "magnitude": 0.09199,
+      "recent_window_magnitude": 0.014025,
+      "confidence": 0.989579,
+      "fit_applied": false
+    },
+    {
+      "frame": 16,
+      "seconds": 0.500501,
+      "dx": 0.047552,
+      "dy": 0.010502,
+      "magnitude": 0.048698,
+      "recent_window_magnitude": 0.023472,
+      "confidence": 0.984909,
+      "fit_applied": false
+    },
+    {
+      "frame": 17,
+      "seconds": 0.533867,
+      "dx": 0.077974,
+      "dy": 0.183052,
+      "magnitude": 0.198968,
+      "recent_window_magnitude": 0.322287,
+      "confidence": 0.993308,
+      "fit_applied": false
+    },
+    {
+      "frame": 18,
+      "seconds": 0.567234,
+      "dx": -0.032193,
+      "dy": -0.010697,
+      "magnitude": 0.033924,
+      "recent_window_magnitude": 0.250226,
+      "confidence": 1.006932,
+      "fit_applied": false
+    },
+    {
+      "frame": 19,
+      "seconds": 0.600601,
+      "dx": 0.087006,
+      "dy": 0.126914,
+      "magnitude": 0.153874,
+      "recent_window_magnitude": 0.268486,
+      "confidence": 0.990666,
+      "fit_applied": false
+    },
+    {
+      "frame": 20,
+      "seconds": 0.633967,
+      "dx": -0.827992,
+      "dy": -0.052072,
+      "magnitude": 0.829628,
+      "recent_window_magnitude": 0.697039,
+      "confidence": 0.989146,
+      "fit_applied": false
+    },
+    {
+      "frame": 21,
+      "seconds": 0.667334,
+      "dx": -0.326774,
+      "dy": 0.017869,
+      "magnitude": 0.327262,
+      "recent_window_magnitude": 1.055794,
+      "confidence": 0.998951,
+      "fit_applied": false
+    },
+    {
+      "frame": 22,
+      "seconds": 0.700701,
+      "dx": -0.001448,
+      "dy": 0.024578,
+      "magnitude": 0.02462,
+      "recent_window_magnitude": 1.106547,
+      "confidence": 0.995978,
+      "fit_applied": false
+    },
+    {
+      "frame": 23,
+      "seconds": 0.734067,
+      "dx": 0.138421,
+      "dy": 0.019303,
+      "magnitude": 0.139761,
+      "recent_window_magnitude": 0.940756,
+      "confidence": 0.989083,
+      "fit_applied": false
+    },
+    {
+      "frame": 24,
+      "seconds": 0.767434,
+      "dx": 0.176845,
+      "dy": -0.060392,
+      "magnitude": 0.186873,
+      "recent_window_magnitude": 0.842475,
+      "confidence": 0.995438,
+      "fit_applied": false
+    },
+    {
+      "frame": 25,
+      "seconds": 0.800801,
+      "dx": -0.131667,
+      "dy": 0.009979,
+      "magnitude": 0.132044,
+      "recent_window_magnitude": 0.145066,
+      "confidence": 0.990452,
+      "fit_applied": false
+    },
+    {
+      "frame": 26,
+      "seconds": 0.834168,
+      "dx": 0.744083,
+      "dy": 0.006247,
+      "magnitude": 0.744109,
+      "recent_window_magnitude": 0.926235,
+      "confidence": 0.985878,
+      "fit_applied": false
+    },
+    {
+      "frame": 27,
+      "seconds": 0.867534,
+      "dx": 0.309829,
+      "dy": -0.021523,
+      "magnitude": 0.310576,
+      "recent_window_magnitude": 1.238381,
+      "confidence": 0.994482,
+      "fit_applied": false
+    },
+    {
+      "frame": 28,
+      "seconds": 0.900901,
+      "dx": -0.010209,
+      "dy": 0.020982,
+      "magnitude": 0.023334,
+      "recent_window_magnitude": 1.0898,
+      "confidence": 0.991475,
+      "fit_applied": false
+    },
+    {
+      "frame": 29,
+      "seconds": 0.934268,
+      "dx": -0.042636,
+      "dy": 0.026465,
+      "magnitude": 0.050182,
+      "recent_window_magnitude": 0.870423,
+      "confidence": 0.99453,
+      "fit_applied": false
+    },
+    {
+      "frame": 30,
+      "seconds": 0.967634,
+      "dx": -0.064697,
+      "dy": -0.046981,
+      "magnitude": 0.079956,
+      "recent_window_magnitude": 0.936488,
+      "confidence": 0.991143,
+      "fit_applied": false
+    },
+    {
+      "frame": 31,
+      "seconds": 1.001001,
+      "dx": 0.273888,
+      "dy": 0.034636,
+      "magnitude": 0.276069,
+      "recent_window_magnitude": 0.466373,
+      "confidence": 0.991379,
+      "fit_applied": false
+    },
+    {
+      "frame": 32,
+      "seconds": 1.034368,
+      "dx": -0.442833,
+      "dy": -0.005976,
+      "magnitude": 0.442874,
+      "recent_window_magnitude": 0.287965,
+      "confidence": 0.995413,
+      "fit_applied": false
+    },
+    {
+      "frame": 33,
+      "seconds": 1.067734,
+      "dx": -0.102701,
+      "dy": 0.015042,
+      "magnitude": 0.103797,
+      "recent_window_magnitude": 0.379688,
+      "confidence": 0.999068,
+      "fit_applied": false
+    },
+    {
+      "frame": 34,
+      "seconds": 1.101101,
+      "dx": 0.108667,
+      "dy": 0.004961,
+      "magnitude": 0.108781,
+      "recent_window_magnitude": 0.227683,
+      "confidence": 0.99399,
+      "fit_applied": false
+    },
+    {
+      "frame": 35,
+      "seconds": 1.134468,
+      "dx": -0.069181,
+      "dy": -0.033076,
+      "magnitude": 0.076681,
+      "recent_window_magnitude": 0.232683,
+      "confidence": 0.99542,
+      "fit_applied": false
+    },
+    {
+      "frame": 36,
+      "seconds": 1.167835,
+      "dx": 0.230764,
+      "dy": 0.07296,
+      "magnitude": 0.242023,
+      "recent_window_magnitude": 0.280514,
+      "confidence": 0.999339,
+      "fit_applied": false
+    },
+    {
+      "frame": 37,
+      "seconds": 1.201201,
+      "dx": -0.170698,
+      "dy": 0.01091,
+      "magnitude": 0.171047,
+      "recent_window_magnitude": 0.070867,
+      "confidence": 1.000324,
+      "fit_applied": false
+    },
+    {
+      "frame": 38,
+      "seconds": 1.234568,
+      "dx": 0.290507,
+      "dy": 0.018791,
+      "magnitude": 0.291114,
+      "recent_window_magnitude": 0.397118,
+      "confidence": 0.990801,
+      "fit_applied": false
+    },
+    {
+      "frame": 39,
+      "seconds": 1.267935,
+      "dx": -0.061037,
+      "dy": 0.017846,
+      "magnitude": 0.063592,
+      "recent_window_magnitude": 0.237066,
+      "confidence": 1.000046,
+      "fit_applied": false
+    },
+    {
+      "frame": 40,
+      "seconds": 1.301301,
+      "dx": 0.071062,
+      "dy": 0.073714,
+      "magnitude": 0.10239,
+      "recent_window_magnitude": 0.409576,
+      "confidence": 0.996905,
+      "fit_applied": false
+    },
+    {
+      "frame": 41,
+      "seconds": 1.334668,
+      "dx": -0.156868,
+      "dy": -0.032822,
+      "magnitude": 0.160265,
+      "recent_window_magnitude": 0.092479,
+      "confidence": 0.998265,
+      "fit_applied": false
+    },
+    {
+      "frame": 42,
+      "seconds": 1.368035,
+      "dx": -1.117892,
+      "dy": -0.060445,
+      "magnitude": 1.119525,
+      "recent_window_magnitude": 0.974378,
+      "confidence": 1.001907,
+      "fit_applied": false
+    },
+    {
+      "frame": 43,
+      "seconds": 1.401401,
+      "dx": 0.071787,
+      "dy": -0.019896,
+      "magnitude": 0.074493,
+      "recent_window_magnitude": 1.193143,
+      "confidence": 0.999016,
+      "fit_applied": false
+    },
+    {
+      "frame": 44,
+      "seconds": 1.434768,
+      "dx": -0.082309,
+      "dy": -0.043202,
+      "magnitude": 0.092958,
+      "recent_window_magnitude": 1.21703,
+      "confidence": 0.994489,
+      "fit_applied": false
+    },
+    {
+      "frame": 45,
+      "seconds": 1.468135,
+      "dx": -0.040039,
+      "dy": -0.014682,
+      "magnitude": 0.042645,
+      "recent_window_magnitude": 1.336313,
+      "confidence": 0.997907,
+      "fit_applied": false
+    },
+    {
+      "frame": 46,
+      "seconds": 1.501502,
+      "dx": 0.0158,
+      "dy": -0.020464,
+      "magnitude": 0.025854,
+      "recent_window_magnitude": 1.163525,
+      "confidence": 0.994488,
+      "fit_applied": false
+    },
+    {
+      "frame": 47,
+      "seconds": 1.534868,
+      "dx": -0.030078,
+      "dy": -0.001803,
+      "magnitude": 0.030132,
+      "recent_window_magnitude": 0.119219,
+      "confidence": 0.9952,
+      "fit_applied": false
+    },
+    {
+      "frame": 48,
+      "seconds": 1.568235,
+      "dx": 0.080501,
+      "dy": -0.045262,
+      "magnitude": 0.092353,
+      "recent_window_magnitude": 0.137398,
+      "confidence": 0.991772,
+      "fit_applied": false
+    },
+    {
+      "frame": 49,
+      "seconds": 1.601602,
+      "dx": 0.03273,
+      "dy": -0.019712,
+      "magnitude": 0.038208,
+      "recent_window_magnitude": 0.117725,
+      "confidence": 0.998402,
+      "fit_applied": false
+    },
+    {
+      "frame": 50,
+      "seconds": 1.634968,
+      "dx": 0.075724,
+      "dy": -0.039651,
+      "magnitude": 0.085477,
+      "recent_window_magnitude": 0.215902,
+      "confidence": 0.99595,
+      "fit_applied": false
+    },
+    {
+      "frame": 51,
+      "seconds": 1.668335,
+      "dx": 0.069125,
+      "dy": -0.02171,
+      "magnitude": 0.072454,
+      "recent_window_magnitude": 0.261542,
+      "confidence": 0.992968,
+      "fit_applied": false
+    },
+    {
+      "frame": 52,
+      "seconds": 1.701702,
+      "dx": 0.101619,
+      "dy": -0.039722,
+      "magnitude": 0.109106,
+      "recent_window_magnitude": 0.396179,
+      "confidence": 0.999092,
+      "fit_applied": false
+    },
+    {
+      "frame": 53,
+      "seconds": 1.735068,
+      "dx": -0.020805,
+      "dy": -0.007092,
+      "magnitude": 0.02198,
+      "recent_window_magnitude": 0.288309,
+      "confidence": 0.996915,
+      "fit_applied": false
+    },
+    {
+      "frame": 54,
+      "seconds": 1.768435,
+      "dx": 0.070103,
+      "dy": 0.059837,
+      "magnitude": 0.092167,
+      "recent_window_magnitude": 0.299689,
+      "confidence": 0.993286,
+      "fit_applied": false
+    },
+    {
+      "frame": 55,
+      "seconds": 1.801802,
+      "dx": 0.07418,
+      "dy": 0.022238,
+      "magnitude": 0.077442,
+      "recent_window_magnitude": 0.294534,
+      "confidence": 0.998562,
+      "fit_applied": false
+    },
+    {
+      "frame": 56,
+      "seconds": 1.835169,
+      "dx": 0.07778,
+      "dy": -0.051782,
+      "magnitude": 0.09344,
+      "recent_window_magnitude": 0.303327,
+      "confidence": 0.994845,
+      "fit_applied": false
+    },
+    {
+      "frame": 57,
+      "seconds": 1.868535,
+      "dx": 0.072167,
+      "dy": -0.018425,
+      "magnitude": 0.074482,
+      "recent_window_magnitude": 0.273467,
+      "confidence": 0.997907,
+      "fit_applied": false
+    },
+    {
+      "frame": 58,
+      "seconds": 1.901902,
+      "dx": 0.014855,
+      "dy": -0.004898,
+      "magnitude": 0.015642,
+      "recent_window_magnitude": 0.309164,
+      "confidence": 0.99782,
+      "fit_applied": false
+    },
+    {
+      "frame": 59,
+      "seconds": 1.935269,
+      "dx": -0.032211,
+      "dy": -0.008974,
+      "magnitude": 0.033438,
+      "recent_window_magnitude": 0.215821,
+      "confidence": 0.998272,
+      "fit_applied": false
+    },
+    {
+      "frame": 60,
+      "seconds": 1.968635,
+      "dx": -0.15394,
+      "dy": -0.060118,
+      "magnitude": 0.165262,
+      "recent_window_magnitude": 0.145769,
+      "confidence": 0.995378,
+      "fit_applied": false
+    },
+    {
+      "frame": 61,
+      "seconds": 2.002002,
+      "dx": -0.067487,
+      "dy": -0.017585,
+      "magnitude": 0.06974,
+      "recent_window_magnitude": 0.199652,
+      "confidence": 0.99962,
+      "fit_applied": false
+    },
+    {
+      "frame": 62,
+      "seconds": 2.035369,
+      "dx": -0.096888,
+      "dy": 0.008557,
+      "magnitude": 0.097265,
+      "recent_window_magnitude": 0.345785,
+      "confidence": 0.997395,
+      "fit_applied": false
+    },
+    {
+      "frame": 63,
+      "seconds": 2.068735,
+      "dx": 0.07539,
+      "dy": -0.047739,
+      "magnitude": 0.089234,
+      "recent_window_magnitude": 0.302556,
+      "confidence": 0.995592,
+      "fit_applied": false
+    },
+    {
+      "frame": 64,
+      "seconds": 2.102102,
+      "dx": -0.019494,
+      "dy": -0.067486,
+      "magnitude": 0.070245,
+      "recent_window_magnitude": 0.320712,
+      "confidence": 0.998945,
+      "fit_applied": false
+    },
+    {
+      "frame": 65,
+      "seconds": 2.135469,
+      "dx": -0.061871,
+      "dy": -0.032841,
+      "magnitude": 0.070046,
+      "recent_window_magnitude": 0.231727,
+      "confidence": 0.99872,
+      "fit_applied": false
+    },
+    {
+      "frame": 66,
+      "seconds": 2.168836,
+      "dx": -0.058003,
+      "dy": 0.012277,
+      "magnitude": 0.059288,
+      "recent_window_magnitude": 0.205099,
+      "confidence": 0.993317,
+      "fit_applied": false
+    },
+    {
+      "frame": 67,
+      "seconds": 2.202202,
+      "dx": -0.673177,
+      "dy": -0.037607,
+      "magnitude": 0.674227,
+      "recent_window_magnitude": 0.757273,
+      "confidence": 0.992429,
+      "fit_applied": false
+    },
+    {
+      "frame": 68,
+      "seconds": 2.235569,
+      "dx": 0.025555,
+      "dy": -0.131561,
+      "magnitude": 0.13402,
+      "recent_window_magnitude": 0.827958,
+      "confidence": 0.995539,
+      "fit_applied": false
+    },
+    {
+      "frame": 69,
+      "seconds": 2.268936,
+      "dx": -0.837664,
+      "dy": 0.197286,
+      "magnitude": 0.860583,
+      "recent_window_magnitude": 1.605179,
+      "confidence": 0.997907,
+      "fit_applied": false
+    },
+    {
+      "frame": 70,
+      "seconds": 2.302302,
+      "dx": -0.140372,
+      "dy": 0.019432,
+      "magnitude": 0.14171,
+      "recent_window_magnitude": 1.684725,
+      "confidence": 0.994987,
+      "fit_applied": false
+    },
+    {
+      "frame": 71,
+      "seconds": 2.335669,
+      "dx": -1.485749,
+      "dy": 0.018416,
+      "magnitude": 1.485864,
+      "recent_window_magnitude": 3.112108,
+      "confidence": 0.998105,
+      "fit_applied": true
+    },
+    {
+      "frame": 72,
+      "seconds": 2.369036,
+      "dx": 0.007475,
+      "dy": 0.013477,
+      "magnitude": 0.015411,
+      "recent_window_magnitude": 2.433573,
+      "confidence": 1.003057,
+      "fit_applied": true
+    },
+    {
+      "frame": 73,
+      "seconds": 2.402402,
+      "dx": 0.047692,
+      "dy": -0.005825,
+      "magnitude": 0.048047,
+      "recent_window_magnitude": 2.420824,
+      "confidence": 1.002277,
+      "fit_applied": true
+    },
+    {
+      "frame": 74,
+      "seconds": 2.435769,
+      "dx": 0.084458,
+      "dy": 0.002323,
+      "magnitude": 0.08449,
+      "recent_window_magnitude": 1.487265,
+      "confidence": 1.000929,
+      "fit_applied": false
+    },
+    {
+      "frame": 75,
+      "seconds": 2.469136,
+      "dx": 0.007019,
+      "dy": 0.00773,
+      "magnitude": 0.010441,
+      "recent_window_magnitude": 1.339592,
+      "confidence": 0.99791,
+      "fit_applied": false
+    },
+    {
+      "frame": 76,
+      "seconds": 2.502503,
+      "dx": -0.035105,
+      "dy": 0.027712,
+      "magnitude": 0.044725,
+      "recent_window_magnitude": 0.120432,
+      "confidence": 1.000725,
+      "fit_applied": false
+    },
+    {
+      "frame": 77,
+      "seconds": 2.535869,
+      "dx": -0.001705,
+      "dy": 0.000992,
+      "magnitude": 0.001973,
+      "recent_window_magnitude": 0.107527,
+      "confidence": 0.99992,
+      "fit_applied": false
+    },
+    {
+      "frame": 78,
+      "seconds": 2.569236,
+      "dx": 0.127721,
+      "dy": 0.01353,
+      "magnitude": 0.128435,
+      "recent_window_magnitude": 0.189735,
+      "confidence": 0.99803,
+      "fit_applied": false
+    },
+    {
+      "frame": 79,
+      "seconds": 2.602603,
+      "dx": 0.016587,
+      "dy": 0.045313,
+      "magnitude": 0.048253,
+      "recent_window_magnitude": 0.14897,
+      "confidence": 1.000276,
+      "fit_applied": false
+    },
+    {
+      "frame": 80,
+      "seconds": 2.635969,
+      "dx": 0.008271,
+      "dy": 0.015045,
+      "magnitude": 0.017168,
+      "recent_window_magnitude": 0.154685,
+      "confidence": 1.000054,
+      "fit_applied": false
+    },
+    {
+      "frame": 81,
+      "seconds": 2.669336,
+      "dx": -0.024526,
+      "dy": -0.020487,
+      "magnitude": 0.031957,
+      "recent_window_magnitude": 0.137558,
+      "confidence": 1.000087,
+      "fit_applied": false
+    },
+    {
+      "frame": 82,
+      "seconds": 2.702703,
+      "dx": 0.043001,
+      "dy": -0.028165,
+      "magnitude": 0.051404,
+      "recent_window_magnitude": 0.172905,
+      "confidence": 0.997332,
+      "fit_applied": false
+    },
+    {
+      "frame": 83,
+      "seconds": 2.736069,
+      "dx": -0.027897,
+      "dy": -0.002569,
+      "magnitude": 0.028015,
+      "recent_window_magnitude": 0.017938,
+      "confidence": 0.996186,
+      "fit_applied": false
+    },
+    {
+      "frame": 84,
+      "seconds": 2.769436,
+      "dx": 0.03518,
+      "dy": -0.027637,
+      "magnitude": 0.044738,
+      "recent_window_magnitude": 0.07232,
+      "confidence": 1.001494,
+      "fit_applied": false
+    },
+    {
+      "frame": 85,
+      "seconds": 2.802803,
+      "dx": 0.017246,
+      "dy": 0.011068,
+      "magnitude": 0.020492,
+      "recent_window_magnitude": 0.08028,
+      "confidence": 1.00076,
+      "fit_applied": false
+    },
+    {
+      "frame": 86,
+      "seconds": 2.83617,
+      "dx": 0.046289,
+      "dy": -0.043389,
+      "magnitude": 0.063445,
+      "recent_window_magnitude": 0.145533,
+      "confidence": 0.999266,
+      "fit_applied": false
+    },
+    {
+      "frame": 87,
+      "seconds": 2.869536,
+      "dx": 0.043408,
+      "dy": -0.021589,
+      "magnitude": 0.048481,
+      "recent_window_magnitude": 0.141856,
+      "confidence": 1.001401,
+      "fit_applied": false
+    },
+    {
+      "frame": 88,
+      "seconds": 2.902903,
+      "dx": 0.033634,
+      "dy": -0.035619,
+      "magnitude": 0.048989,
+      "recent_window_magnitude": 0.211231,
+      "confidence": 1.001295,
+      "fit_applied": false
+    },
+    {
+      "frame": 89,
+      "seconds": 2.93627,
+      "dx": -0.019412,
+      "dy": -0.005037,
+      "magnitude": 0.020054,
+      "recent_window_magnitude": 0.1537,
+      "confidence": 1.001165,
+      "fit_applied": false
+    },
+    {
+      "frame": 90,
+      "seconds": 2.969636,
+      "dx": -0.040115,
+      "dy": 0.01305,
+      "magnitude": 0.042184,
+      "recent_window_magnitude": 0.112441,
+      "confidence": 0.998073,
+      "fit_applied": false
+    },
+    {
+      "frame": 91,
+      "seconds": 3.003003,
+      "dx": 0.029554,
+      "dy": 0.020839,
+      "magnitude": 0.036162,
+      "recent_window_magnitude": 0.054951,
+      "confidence": 0.998648,
+      "fit_applied": false
+    },
+    {
+      "frame": 92,
+      "seconds": 3.03637,
+      "dx": -0.029585,
+      "dy": -0.000792,
+      "magnitude": 0.029596,
+      "recent_window_magnitude": 0.027004,
+      "confidence": 0.999254,
+      "fit_applied": false
+    },
+    {
+      "frame": 93,
+      "seconds": 3.069736,
+      "dx": -0.006364,
+      "dy": -0.026332,
+      "magnitude": 0.027091,
+      "recent_window_magnitude": 0.065945,
+      "confidence": 0.998364,
+      "fit_applied": false
+    },
+    {
+      "frame": 94,
+      "seconds": 3.103103,
+      "dx": -0.041067,
+      "dy": -0.010474,
+      "magnitude": 0.042382,
+      "recent_window_magnitude": 0.087656,
+      "confidence": 0.99716,
+      "fit_applied": false
+    },
+    {
+      "frame": 95,
+      "seconds": 3.13647,
+      "dx": -0.007776,
+      "dy": -0.009052,
+      "magnitude": 0.011933,
+      "recent_window_magnitude": 0.060972,
+      "confidence": 1.00029,
+      "fit_applied": false
+    },
+    {
+      "frame": 96,
+      "seconds": 3.169837,
+      "dx": -0.045683,
+      "dy": -0.01667,
+      "magnitude": 0.04863,
+      "recent_window_magnitude": 0.14503,
+      "confidence": 0.999064,
+      "fit_applied": false
+    },
+    {
+      "frame": 97,
+      "seconds": 3.203203,
+      "dx": -0.078049,
+      "dy": -0.008575,
+      "magnitude": 0.078518,
+      "recent_window_magnitude": 0.192549,
+      "confidence": 0.99774,
+      "fit_applied": false
+    },
+    {
+      "frame": 98,
+      "seconds": 3.23657,
+      "dx": -0.023766,
+      "dy": -0.027543,
+      "magnitude": 0.036379,
+      "recent_window_magnitude": 0.209236,
+      "confidence": 0.997987,
+      "fit_applied": false
+    },
+    {
+      "frame": 99,
+      "seconds": 3.269937,
+      "dx": -0.020929,
+      "dy": -0.001112,
+      "magnitude": 0.020959,
+      "recent_window_magnitude": 0.187112,
+      "confidence": 0.997981,
+      "fit_applied": false
+    },
+    {
+      "frame": 100,
+      "seconds": 3.303303,
+      "dx": 0.087262,
+      "dy": 0.025529,
+      "magnitude": 0.09092,
+      "recent_window_magnitude": 0.085981,
+      "confidence": 1.001249,
+      "fit_applied": false
+    },
+    {
+      "frame": 101,
+      "seconds": 3.33667,
+      "dx": 0.00636,
+      "dy": 0.013838,
+      "magnitude": 0.01523,
+      "recent_window_magnitude": 0.029201,
+      "confidence": 0.998438,
+      "fit_applied": false
+    },
+    {
+      "frame": 102,
+      "seconds": 3.370037,
+      "dx": -0.00917,
+      "dy": 0.04335,
+      "magnitude": 0.044309,
+      "recent_window_magnitude": 0.067106,
+      "confidence": 0.996082,
+      "fit_applied": false
+    },
+    {
+      "frame": 103,
+      "seconds": 3.403403,
+      "dx": -0.01098,
+      "dy": 0.058689,
+      "magnitude": 0.059707,
+      "recent_window_magnitude": 0.149809,
+      "confidence": 0.999038,
+      "fit_applied": false
+    },
+    {
+      "frame": 104,
+      "seconds": 3.43677,
+      "dx": 0.027843,
+      "dy": -0.013469,
+      "magnitude": 0.03093,
+      "recent_window_magnitude": 0.163194,
+      "confidence": 0.998517,
+      "fit_applied": false
+    },
+    {
+      "frame": 105,
+      "seconds": 3.470137,
+      "dx": 0.013645,
+      "dy": 0.022667,
+      "magnitude": 0.026457,
+      "recent_window_magnitude": 0.128104,
+      "confidence": 0.995764,
+      "fit_applied": false
+    },
+    {
+      "frame": 106,
+      "seconds": 3.503504,
+      "dx": 0.013154,
+      "dy": 0.019702,
+      "magnitude": 0.023689,
+      "recent_window_magnitude": 0.135405,
+      "confidence": 0.998849,
+      "fit_applied": false
+    },
+    {
+      "frame": 107,
+      "seconds": 3.53687,
+      "dx": 0.045508,
+      "dy": -0.024467,
+      "magnitude": 0.051668,
+      "recent_window_magnitude": 0.10925,
+      "confidence": 0.998347,
+      "fit_applied": false
+    },
+    {
+      "frame": 108,
+      "seconds": 3.570237,
+      "dx": 0.042747,
+      "dy": 0.00804,
+      "magnitude": 0.043497,
+      "recent_window_magnitude": 0.14344,
+      "confidence": 0.998695,
+      "fit_applied": false
+    },
+    {
+      "frame": 109,
+      "seconds": 3.603604,
+      "dx": -0.007089,
+      "dy": 0.022992,
+      "magnitude": 0.02406,
+      "recent_window_magnitude": 0.118537,
+      "confidence": 0.999083,
+      "fit_applied": false
+    },
+    {
+      "frame": 110,
+      "seconds": 3.63697,
+      "dx": -0.000874,
+      "dy": 0.058099,
+      "magnitude": 0.058105,
+      "recent_window_magnitude": 0.125896,
+      "confidence": 0.996431,
+      "fit_applied": false
+    },
+    {
+      "frame": 111,
+      "seconds": 3.670337,
+      "dx": 0.019885,
+      "dy": 0.016644,
+      "magnitude": 0.025931,
+      "recent_window_magnitude": 0.129021,
+      "confidence": 0.998793,
+      "fit_applied": false
+    },
+    {
+      "frame": 112,
+      "seconds": 3.703704,
+      "dx": 0.013064,
+      "dy": 0.008349,
+      "magnitude": 0.015504,
+      "recent_window_magnitude": 0.132709,
+      "confidence": 0.999597,
+      "fit_applied": false
+    },
+    {
+      "frame": 113,
+      "seconds": 3.73707,
+      "dx": 0.009552,
+      "dy": 0.002327,
+      "magnitude": 0.009832,
+      "recent_window_magnitude": 0.113778,
+      "confidence": 0.99937,
+      "fit_applied": false
+    },
+    {
+      "frame": 114,
+      "seconds": 3.770437,
+      "dx": -0.013011,
+      "dy": -0.058299,
+      "magnitude": 0.059733,
+      "recent_window_magnitude": 0.039425,
+      "confidence": 0.999108,
+      "fit_applied": false
+    },
+    {
+      "frame": 115,
+      "seconds": 3.803804,
+      "dx": 0.056826,
+      "dy": 0.008033,
+      "magnitude": 0.057391,
+      "recent_window_magnitude": 0.089315,
+      "confidence": 0.9981,
+      "fit_applied": false
+    },
+    {
+      "frame": 116,
+      "seconds": 3.837171,
+      "dx": -0.016518,
+      "dy": 0.005868,
+      "magnitude": 0.017529,
+      "recent_window_magnitude": 0.060237,
+      "confidence": 0.999423,
+      "fit_applied": false
+    },
+    {
+      "frame": 117,
+      "seconds": 3.870537,
+      "dx": -0.007148,
+      "dy": 0.01577,
+      "magnitude": 0.017314,
+      "recent_window_magnitude": 0.039673,
+      "confidence": 0.998913,
+      "fit_applied": false
+    },
+    {
+      "frame": 118,
+      "seconds": 3.903904,
+      "dx": 0.016211,
+      "dy": 0.040306,
+      "magnitude": 0.043444,
+      "recent_window_magnitude": 0.038189,
+      "confidence": 0.999566,
+      "fit_applied": false
+    },
+    {
+      "frame": 119,
+      "seconds": 3.937271,
+      "dx": 0.060746,
+      "dy": 0.008184,
+      "magnitude": 0.061295,
+      "recent_window_magnitude": 0.135036,
+      "confidence": 0.999409,
+      "fit_applied": false
+    },
+    {
+      "frame": 120,
+      "seconds": 3.970637,
+      "dx": 0.062791,
+      "dy": 0.010133,
+      "magnitude": 0.063603,
+      "recent_window_magnitude": 0.141126,
+      "confidence": 0.997143,
+      "fit_applied": false
+    },
+    {
+      "frame": 121,
+      "seconds": 4.004004,
+      "dx": 0.06293,
+      "dy": 0.000706,
+      "magnitude": 0.062934,
+      "recent_window_magnitude": 0.209456,
+      "confidence": 0.996279,
+      "fit_applied": false
+    },
+    {
+      "frame": 122,
+      "seconds": 4.037371,
+      "dx": 0.017063,
+      "dy": 0.029615,
+      "magnitude": 0.034179,
+      "recent_window_magnitude": 0.237059,
+      "confidence": 1.001373,
+      "fit_applied": false
+    },
+    {
+      "frame": 123,
+      "seconds": 4.070737,
+      "dx": 0.02272,
+      "dy": 0.016324,
+      "magnitude": 0.027976,
+      "recent_window_magnitude": 0.235391,
+      "confidence": 0.999163,
+      "fit_applied": false
+    },
+    {
+      "frame": 124,
+      "seconds": 4.104104,
+      "dx": 0.004801,
+      "dy": -0.00728,
+      "magnitude": 0.00872,
+      "recent_window_magnitude": 0.177352,
+      "confidence": 0.997717,
+      "fit_applied": false
+    },
+    {
+      "frame": 125,
+      "seconds": 4.137471,
+      "dx": 0.023725,
+      "dy": -0.005163,
+      "magnitude": 0.02428,
+      "recent_window_magnitude": 0.135622,
+      "confidence": 0.998749,
+      "fit_applied": false
+    },
+    {
+      "frame": 126,
+      "seconds": 4.170838,
+      "dx": 0.076047,
+      "dy": -0.002018,
+      "magnitude": 0.076074,
+      "recent_window_magnitude": 0.147748,
+      "confidence": 0.998145,
+      "fit_applied": false
+    },
+    {
+      "frame": 127,
+      "seconds": 4.204204,
+      "dx": 0.023699,
+      "dy": -0.010007,
+      "magnitude": 0.025725,
+      "recent_window_magnitude": 0.151211,
+      "confidence": 0.999405,
+      "fit_applied": false
+    },
+    {
+      "frame": 128,
+      "seconds": 4.237571,
+      "dx": 0.019018,
+      "dy": -0.022405,
+      "magnitude": 0.029388,
+      "recent_window_magnitude": 0.154568,
+      "confidence": 0.998737,
+      "fit_applied": false
+    },
+    {
+      "frame": 129,
+      "seconds": 4.270938,
+      "dx": -0.007835,
+      "dy": 0.006621,
+      "magnitude": 0.010258,
+      "recent_window_magnitude": 0.138633,
+      "confidence": 0.999429,
+      "fit_applied": false
+    },
+    {
+      "frame": 130,
+      "seconds": 4.304304,
+      "dx": -0.018834,
+      "dy": 0.036448,
+      "magnitude": 0.041026,
+      "recent_window_magnitude": 0.092501,
+      "confidence": 0.999228,
+      "fit_applied": false
+    },
+    {
+      "frame": 131,
+      "seconds": 4.337671,
+      "dx": -0.020745,
+      "dy": 0.005027,
+      "magnitude": 0.021345,
+      "recent_window_magnitude": 0.016372,
+      "confidence": 0.999572,
+      "fit_applied": false
+    },
+    {
+      "frame": 132,
+      "seconds": 4.371038,
+      "dx": 0.005447,
+      "dy": 0.01386,
+      "magnitude": 0.014892,
+      "recent_window_magnitude": 0.045727,
+      "confidence": 0.999795,
+      "fit_applied": false
+    },
+    {
+      "frame": 133,
+      "seconds": 4.404404,
+      "dx": -0.03017,
+      "dy": 0.011476,
+      "magnitude": 0.032279,
+      "recent_window_magnitude": 0.102937,
+      "confidence": 0.999966,
+      "fit_applied": false
+    },
+    {
+      "frame": 134,
+      "seconds": 4.437771,
+      "dx": 0.026211,
+      "dy": -0.025649,
+      "magnitude": 0.036673,
+      "recent_window_magnitude": 0.056082,
+      "confidence": 0.99898,
+      "fit_applied": false
+    },
+    {
+      "frame": 135,
+      "seconds": 4.471138,
+      "dx": 0.028599,
+      "dy": -0.015229,
+      "magnitude": 0.032401,
+      "recent_window_magnitude": 0.014066,
+      "confidence": 0.999026,
+      "fit_applied": false
+    },
+    {
+      "frame": 136,
+      "seconds": 4.504505,
+      "dx": 0.001036,
+      "dy": -0.009435,
+      "magnitude": 0.009492,
+      "recent_window_magnitude": 0.039906,
+      "confidence": 1.000195,
+      "fit_applied": false
+    },
+    {
+      "frame": 137,
+      "seconds": 4.537871,
+      "dx": 0.010369,
+      "dy": -0.005554,
+      "magnitude": 0.011762,
+      "recent_window_magnitude": 0.057182,
+      "confidence": 1.00083,
+      "fit_applied": false
+    },
+    {
+      "frame": 138,
+      "seconds": 4.571238,
+      "dx": 0.065748,
+      "dy": 0.001147,
+      "magnitude": 0.065758,
+      "recent_window_magnitude": 0.142858,
+      "confidence": 1.000239,
+      "fit_applied": false
+    },
+    {
+      "frame": 139,
+      "seconds": 4.604605,
+      "dx": 0.038358,
+      "dy": 0.019547,
+      "magnitude": 0.043051,
+      "recent_window_magnitude": 0.144424,
+      "confidence": 0.997637,
+      "fit_applied": false
+    },
+    {
+      "frame": 140,
+      "seconds": 4.637971,
+      "dx": 0.018752,
+      "dy": 0.033512,
+      "magnitude": 0.038401,
+      "recent_window_magnitude": 0.139873,
+      "confidence": 1.000429,
+      "fit_applied": false
+    },
+    {
+      "frame": 141,
+      "seconds": 4.671338,
+      "dx": 0.022321,
+      "dy": 0.011319,
+      "magnitude": 0.025027,
+      "recent_window_magnitude": 0.166707,
+      "confidence": 0.999427,
+      "fit_applied": false
+    },
+    {
+      "frame": 142,
+      "seconds": 4.704705,
+      "dx": 0.052145,
+      "dy": 0.014546,
+      "magnitude": 0.054135,
+      "recent_window_magnitude": 0.21295,
+      "confidence": 0.999234,
+      "fit_applied": false
+    },
+    {
+      "frame": 143,
+      "seconds": 4.738071,
+      "dx": 0.01847,
+      "dy": 0.006632,
+      "magnitude": 0.019625,
+      "recent_window_magnitude": 0.172723,
+      "confidence": 0.999849,
+      "fit_applied": false
+    },
+    {
+      "frame": 144,
+      "seconds": 4.771438,
+      "dx": 0.021811,
+      "dy": -0.03321,
+      "magnitude": 0.039732,
+      "recent_window_magnitude": 0.137469,
+      "confidence": 0.997223,
+      "fit_applied": false
+    },
+    {
+      "frame": 145,
+      "seconds": 4.804805,
+      "dx": 0.002599,
+      "dy": -0.010197,
+      "magnitude": 0.010523,
+      "recent_window_magnitude": 0.117852,
+      "confidence": 0.999368,
+      "fit_applied": false
+    },
+    {
+      "frame": 146,
+      "seconds": 4.838172,
+      "dx": -0.009928,
+      "dy": -0.038126,
+      "magnitude": 0.039398,
+      "recent_window_magnitude": 0.104329,
+      "confidence": 0.9989,
+      "fit_applied": false
+    },
+    {
+      "frame": 147,
+      "seconds": 4.871538,
+      "dx": 0.009955,
+      "dy": -0.005975,
+      "magnitude": 0.01161,
+      "recent_window_magnitude": 0.091554,
+      "confidence": 0.997583,
+      "fit_applied": false
+    },
+    {
+      "frame": 148,
+      "seconds": 4.904905,
+      "dx": -0.072939,
+      "dy": -0.034011,
+      "magnitude": 0.080479,
+      "recent_window_magnitude": 0.130841,
+      "confidence": 0.999439,
+      "fit_applied": false
+    },
+    {
+      "frame": 149,
+      "seconds": 4.938272,
+      "dx": 0.014466,
+      "dy": -0.01893,
+      "magnitude": 0.023825,
+      "recent_window_magnitude": 0.12091,
+      "confidence": 1.00018,
+      "fit_applied": false
+    },
+    {
+      "frame": 150,
+      "seconds": 4.971638,
+      "dx": -0.034347,
+      "dy": -0.023834,
+      "magnitude": 0.041806,
+      "recent_window_magnitude": 0.152387,
+      "confidence": 1.000712,
+      "fit_applied": false
+    },
+    {
+      "frame": 151,
+      "seconds": 5.005005,
+      "dx": -0.020837,
+      "dy": -0.023183,
+      "magnitude": 0.031171,
+      "recent_window_magnitude": 0.148244,
+      "confidence": 1.000187,
+      "fit_applied": false
+    },
+    {
+      "frame": 152,
+      "seconds": 5.038372,
+      "dx": 0.001408,
+      "dy": 0.005197,
+      "magnitude": 0.005384,
+      "recent_window_magnitude": 0.146901,
+      "confidence": 0.999528,
+      "fit_applied": false
+    },
+    {
+      "frame": 153,
+      "seconds": 5.071738,
+      "dx": 0.012584,
+      "dy": 0.008567,
+      "magnitude": 0.015223,
+      "recent_window_magnitude": 0.05863,
+      "confidence": 0.99966,
+      "fit_applied": false
+    },
+    {
+      "frame": 154,
+      "seconds": 5.105105,
+      "dx": -0.041857,
+      "dy": 0.019734,
+      "magnitude": 0.046276,
+      "recent_window_magnitude": 0.084144,
+      "confidence": 0.997321,
+      "fit_applied": false
+    },
+    {
+      "frame": 155,
+      "seconds": 5.138472,
+      "dx": -0.018169,
+      "dy": 0.02981,
+      "magnitude": 0.034911,
+      "recent_window_magnitude": 0.077987,
+      "confidence": 0.997817,
+      "fit_applied": false
+    },
+    {
+      "frame": 156,
+      "seconds": 5.171839,
+      "dx": -0.006134,
+      "dy": 0.010258,
+      "magnitude": 0.011952,
+      "recent_window_magnitude": 0.090185,
+      "confidence": 0.997991,
+      "fit_applied": false
+    },
+    {
+      "frame": 157,
+      "seconds": 5.205205,
+      "dx": 0.002067,
+      "dy": 0.002266,
+      "magnitude": 0.003068,
+      "recent_window_magnitude": 0.087421,
+      "confidence": 0.999988,
+      "fit_applied": false
+    },
+    {
+      "frame": 158,
+      "seconds": 5.238572,
+      "dx": -0.002661,
+      "dy": 0.020661,
+      "magnitude": 0.020832,
+      "recent_window_magnitude": 0.106303,
+      "confidence": 0.99875,
+      "fit_applied": false
+    },
+    {
+      "frame": 159,
+      "seconds": 5.271939,
+      "dx": -0.000627,
+      "dy": 0.0289,
+      "magnitude": 0.028907,
+      "recent_window_magnitude": 0.095374,
+      "confidence": 0.999306,
+      "fit_applied": false
+    },
+    {
+      "frame": 160,
+      "seconds": 5.305305,
+      "dx": -0.00968,
+      "dy": -0.002579,
+      "magnitude": 0.010017,
+      "recent_window_magnitude": 0.061896,
+      "confidence": 0.999675,
+      "fit_applied": false
+    },
+    {
+      "frame": 161,
+      "seconds": 5.338672,
+      "dx": 0.001202,
+      "dy": 0.061341,
+      "magnitude": 0.061352,
+      "recent_window_magnitude": 0.111013,
+      "confidence": 0.994702,
+      "fit_applied": false
+    },
+    {
+      "frame": 162,
+      "seconds": 5.372039,
+      "dx": 0.019035,
+      "dy": 0.00424,
+      "magnitude": 0.019502,
+      "recent_window_magnitude": 0.112797,
+      "confidence": 1.000211,
+      "fit_applied": false
+    },
+    {
+      "frame": 163,
+      "seconds": 5.405405,
+      "dx": 0.005967,
+      "dy": 0.005309,
+      "magnitude": 0.007987,
+      "recent_window_magnitude": 0.098502,
+      "confidence": 1.000022,
+      "fit_applied": false
+    },
+    {
+      "frame": 164,
+      "seconds": 5.438772,
+      "dx": -0.037903,
+      "dy": 0.009217,
+      "magnitude": 0.039007,
+      "recent_window_magnitude": 0.080422,
+      "confidence": 0.998294,
+      "fit_applied": false
+    },
+    {
+      "frame": 165,
+      "seconds": 5.472139,
+      "dx": 0.017075,
+      "dy": -0.001813,
+      "magnitude": 0.017171,
+      "recent_window_magnitude": 0.078479,
+      "confidence": 0.998346,
+      "fit_applied": false
+    },
+    {
+      "frame": 166,
+      "seconds": 5.505506,
+      "dx": 0.024889,
+      "dy": 0.003783,
+      "magnitude": 0.025175,
+      "recent_window_magnitude": 0.035703,
+      "confidence": 1.001176,
+      "fit_applied": false
+    },
+    {
+      "frame": 167,
+      "seconds": 5.538872,
+      "dx": -0.01713,
+      "dy": 0.011807,
+      "magnitude": 0.020804,
+      "recent_window_magnitude": 0.029181,
+      "confidence": 0.999653,
+      "fit_applied": false
+    },
+    {
+      "frame": 168,
+      "seconds": 5.572239,
+      "dx": 0.03018,
+      "dy": 0.042753,
+      "magnitude": 0.052332,
+      "recent_window_magnitude": 0.067937,
+      "confidence": 0.995896,
+      "fit_applied": false
+    },
+    {
+      "frame": 169,
+      "seconds": 5.605606,
+      "dx": -0.007498,
+      "dy": 0.011709,
+      "magnitude": 0.013904,
+      "recent_window_magnitude": 0.083153,
+      "confidence": 0.999104,
+      "fit_applied": false
+    },
+    {
+      "frame": 170,
+      "seconds": 5.638972,
+      "dx": 0.012431,
+      "dy": 0.017275,
+      "magnitude": 0.021283,
+      "recent_window_magnitude": 0.097283,
+      "confidence": 1.000261,
+      "fit_applied": false
+    },
+    {
+      "frame": 171,
+      "seconds": 5.672339,
+      "dx": 0.025925,
+      "dy": 0.014933,
+      "magnitude": 0.029918,
+      "recent_window_magnitude": 0.107822,
+      "confidence": 0.999514,
+      "fit_applied": false
+    },
+    {
+      "frame": 172,
+      "seconds": 5.705706,
+      "dx": -0.007912,
+      "dy": 0.024578,
+      "magnitude": 0.02582,
+      "recent_window_magnitude": 0.123282,
+      "confidence": 0.998416,
+      "fit_applied": false
+    },
+    {
+      "frame": 173,
+      "seconds": 5.739072,
+      "dx": 0.013212,
+      "dy": 0.0046,
+      "magnitude": 0.01399,
+      "recent_window_magnitude": 0.081549,
+      "confidence": 1.000997,
+      "fit_applied": false
+    },
+    {
+      "frame": 174,
+      "seconds": 5.772439,
+      "dx": 0.009252,
+      "dy": 0.022626,
+      "magnitude": 0.024445,
+      "recent_window_magnitude": 0.099284,
+      "confidence": 0.998722,
+      "fit_applied": false
+    },
+    {
+      "frame": 175,
+      "seconds": 5.805806,
+      "dx": 0.010597,
+      "dy": 0.009164,
+      "magnitude": 0.01401,
+      "recent_window_magnitude": 0.091486,
+      "confidence": 0.999815,
+      "fit_applied": false
+    },
+    {
+      "frame": 176,
+      "seconds": 5.839173,
+      "dx": 0.006399,
+      "dy": 0.013536,
+      "magnitude": 0.014972,
+      "recent_window_magnitude": 0.080908,
+      "confidence": 0.999438,
+      "fit_applied": false
+    },
+    {
+      "frame": 177,
+      "seconds": 5.872539,
+      "dx": 0.000271,
+      "dy": 0.004747,
+      "magnitude": 0.004754,
+      "recent_window_magnitude": 0.067585,
+      "confidence": 1.000122,
+      "fit_applied": false
+    },
+    {
+      "frame": 178,
+      "seconds": 5.905906,
+      "dx": -0.002302,
+      "dy": 0.018582,
+      "magnitude": 0.018724,
+      "recent_window_magnitude": 0.072801,
+      "confidence": 1.00099,
+      "fit_applied": false
+    },
+    {
+      "frame": 179,
+      "seconds": 5.939273,
+      "dx": -0.003393,
+      "dy": 0.008168,
+      "magnitude": 0.008845,
+      "recent_window_magnitude": 0.055419,
+      "confidence": 1.000108,
+      "fit_applied": false
+    },
+    {
+      "frame": 180,
+      "seconds": 5.972639,
+      "dx": 0.001256,
+      "dy": 0.022687,
+      "magnitude": 0.022722,
+      "recent_window_magnitude": 0.067757,
+      "confidence": 0.999082,
+      "fit_applied": false
+    },
+    {
+      "frame": 181,
+      "seconds": 6.006006,
+      "dx": -0.020518,
+      "dy": 0.007057,
+      "magnitude": 0.021697,
+      "recent_window_magnitude": 0.066029,
+      "confidence": 0.998324,
+      "fit_applied": false
+    },
+    {
+      "frame": 182,
+      "seconds": 6.039373,
+      "dx": -0.020741,
+      "dy": 0.03044,
+      "magnitude": 0.036835,
+      "recent_window_magnitude": 0.098214,
+      "confidence": 0.99866,
+      "fit_applied": false
+    },
+    {
+      "frame": 183,
+      "seconds": 6.072739,
+      "dx": -0.003275,
+      "dy": 0.01739,
+      "magnitude": 0.017696,
+      "recent_window_magnitude": 0.097622,
+      "confidence": 1.000506,
+      "fit_applied": false
+    },
+    {
+      "frame": 184,
+      "seconds": 6.106106,
+      "dx": -0.01925,
+      "dy": 0.019256,
+      "magnitude": 0.027228,
+      "recent_window_magnitude": 0.115264,
+      "confidence": 0.998984,
+      "fit_applied": false
+    },
+    {
+      "frame": 185,
+      "seconds": 6.139473,
+      "dx": 0.002468,
+      "dy": 0.006046,
+      "magnitude": 0.00653,
+      "recent_window_magnitude": 0.100945,
+      "confidence": 0.99998,
+      "fit_applied": false
+    },
+    {
+      "frame": 186,
+      "seconds": 6.17284,
+      "dx": -0.027939,
+      "dy": 0.022293,
+      "magnitude": 0.035743,
+      "recent_window_magnitude": 0.117603,
+      "confidence": 0.999804,
+      "fit_applied": false
+    },
+    {
+      "frame": 187,
+      "seconds": 6.206206,
+      "dx": 0.033803,
+      "dy": 0.001925,
+      "magnitude": 0.033858,
+      "recent_window_magnitude": 0.068398,
+      "confidence": 0.998324,
+      "fit_applied": false
+    },
+    {
+      "frame": 188,
+      "seconds": 6.239573,
+      "dx": -0.002288,
+      "dy": 0.015775,
+      "magnitude": 0.01594,
+      "recent_window_magnitude": 0.066616,
+      "confidence": 0.999446,
+      "fit_applied": false
+    },
+    {
+      "frame": 189,
+      "seconds": 6.27294,
+      "dx": -0.006002,
+      "dy": 0.013554,
+      "magnitude": 0.014823,
+      "recent_window_magnitude": 0.059592,
+      "confidence": 1.000159,
+      "fit_applied": false
+    },
+    {
+      "frame": 190,
+      "seconds": 6.306306,
+      "dx": -0.020743,
+      "dy": 0.003613,
+      "magnitude": 0.021055,
+      "recent_window_magnitude": 0.061676,
+      "confidence": 0.999814,
+      "fit_applied": false
+    },
+    {
+      "frame": 191,
+      "seconds": 6.339673,
+      "dx": -0.013091,
+      "dy": 0.016094,
+      "magnitude": 0.020746,
+      "recent_window_magnitude": 0.051635,
+      "confidence": 0.998722,
+      "fit_applied": false
+    },
+    {
+      "frame": 192,
+      "seconds": 6.37304,
+      "dx": -0.016212,
+      "dy": 0.018791,
+      "magnitude": 0.024818,
+      "recent_window_magnitude": 0.089462,
+      "confidence": 0.998378,
+      "fit_applied": false
+    },
+    {
+      "frame": 193,
+      "seconds": 6.406406,
+      "dx": -0.004932,
+      "dy": 0.004826,
+      "magnitude": 0.006901,
+      "recent_window_magnitude": 0.083388,
+      "confidence": 0.999825,
+      "fit_applied": false
+    },
+    {
+      "frame": 194,
+      "seconds": 6.439773,
+      "dx": -0.044765,
+      "dy": -0.010795,
+      "magnitude": 0.046049,
+      "recent_window_magnitude": 0.104913,
+      "confidence": 1.000564,
+      "fit_applied": false
+    },
+    {
+      "frame": 195,
+      "seconds": 6.47314,
+      "dx": 0.006357,
+      "dy": -0.000949,
+      "magnitude": 0.006428,
+      "recent_window_magnitude": 0.07784,
+      "confidence": 1.000196,
+      "fit_applied": false
+    },
+    {
+      "frame": 196,
+      "seconds": 6.506507,
+      "dx": -0.005779,
+      "dy": 0.009309,
+      "magnitude": 0.010957,
+      "recent_window_magnitude": 0.068679,
+      "confidence": 0.99906,
+      "fit_applied": false
+    },
+    {
+      "frame": 197,
+      "seconds": 6.539873,
+      "dx": -0.002198,
+      "dy": -0.00798,
+      "magnitude": 0.008277,
+      "recent_window_magnitude": 0.05162,
+      "confidence": 0.999472,
+      "fit_applied": false
+    },
+    {
+      "frame": 198,
+      "seconds": 6.57324,
+      "dx": -0.013612,
+      "dy": -0.008332,
+      "magnitude": 0.01596,
+      "recent_window_magnitude": 0.062858,
+      "confidence": 0.998521,
+      "fit_applied": false
+    },
+    {
+      "frame": 199,
+      "seconds": 6.606607,
+      "dx": 0.004094,
+      "dy": -0.009747,
+      "magnitude": 0.010572,
+      "recent_window_magnitude": 0.020912,
+      "confidence": 0.998758,
+      "fit_applied": false
+    },
+    {
+      "frame": 200,
+      "seconds": 6.639973,
+      "dx": -0.017838,
+      "dy": 0.019679,
+      "magnitude": 0.026561,
+      "recent_window_magnitude": 0.035454,
+      "confidence": 0.995662,
+      "fit_applied": false
+    },
+    {
+      "frame": 201,
+      "seconds": 6.67334,
+      "dx": -0.004826,
+      "dy": 0.004023,
+      "magnitude": 0.006283,
+      "recent_window_magnitude": 0.03446,
+      "confidence": 0.999212,
+      "fit_applied": false
+    },
+    {
+      "frame": 202,
+      "seconds": 6.706707,
+      "dx": -0.021079,
+      "dy": -0.009815,
+      "magnitude": 0.023252,
+      "recent_window_magnitude": 0.053426,
+      "confidence": 0.997216,
+      "fit_applied": false
+    },
+    {
+      "frame": 203,
+      "seconds": 6.740073,
+      "dx": -0.011854,
+      "dy": -0.015346,
+      "magnitude": 0.019391,
+      "recent_window_magnitude": 0.052708,
+      "confidence": 0.999349,
+      "fit_applied": false
+    },
+    {
+      "frame": 204,
+      "seconds": 6.77344,
+      "dx": -0.007034,
+      "dy": 0.018229,
+      "magnitude": 0.019539,
+      "recent_window_magnitude": 0.064838,
+      "confidence": 0.997041,
+      "fit_applied": false
+    },
+    {
+      "frame": 205,
+      "seconds": 6.806807,
+      "dx": -0.007575,
+      "dy": 0.003263,
+      "magnitude": 0.008248,
+      "recent_window_magnitude": 0.052369,
+      "confidence": 0.999642,
+      "fit_applied": false
+    },
+    {
+      "frame": 206,
+      "seconds": 6.840174,
+      "dx": 0.061487,
+      "dy": 0.010503,
+      "magnitude": 0.062378,
+      "recent_window_magnitude": 0.01553,
+      "confidence": 0.997874,
+      "fit_applied": false
+    },
+    {
+      "frame": 207,
+      "seconds": 6.87354,
+      "dx": -0.026729,
+      "dy": 0.004122,
+      "magnitude": 0.027045,
+      "recent_window_magnitude": 0.022366,
+      "confidence": 0.998065,
+      "fit_applied": false
+    },
+    {
+      "frame": 208,
+      "seconds": 6.906907,
+      "dx": -0.019294,
+      "dy": -0.007928,
+      "magnitude": 0.02086,
+      "recent_window_magnitude": 0.028201,
+      "confidence": 0.997057,
+      "fit_applied": false
+    },
+    {
+      "frame": 209,
+      "seconds": 6.940274,
+      "dx": 0.01582,
+      "dy": 0.009477,
+      "magnitude": 0.018441,
+      "recent_window_magnitude": 0.030657,
+      "confidence": 0.99999,
+      "fit_applied": false
+    },
+    {
+      "frame": 210,
+      "seconds": 6.97364,
+      "dx": 0.028692,
+      "dy": 0.024263,
+      "magnitude": 0.037576,
+      "recent_window_magnitude": 0.072334,
+      "confidence": 1.000018,
+      "fit_applied": false
+    },
+    {
+      "frame": 211,
+      "seconds": 7.007007,
+      "dx": 0.036287,
+      "dy": 0.008489,
+      "magnitude": 0.037267,
+      "recent_window_magnitude": 0.051823,
+      "confidence": 0.996892,
+      "fit_applied": false
+    },
+    {
+      "frame": 212,
+      "seconds": 7.040374,
+      "dx": -0.030812,
+      "dy": 0.003451,
+      "magnitude": 0.031005,
+      "recent_window_magnitude": 0.048654,
+      "confidence": 1.000873,
+      "fit_applied": false
+    },
+    {
+      "frame": 213,
+      "seconds": 7.07374,
+      "dx": -0.009111,
+      "dy": 0.007406,
+      "magnitude": 0.011742,
+      "recent_window_magnitude": 0.067,
+      "confidence": 0.999679,
+      "fit_applied": false
+    },
+    {
+      "frame": 214,
+      "seconds": 7.107107,
+      "dx": -0.053901,
+      "dy": -0.018029,
+      "magnitude": 0.056836,
+      "recent_window_magnitude": 0.038554,
+      "confidence": 0.999895,
+      "fit_applied": false
+    },
+    {
+      "frame": 215,
+      "seconds": 7.140474,
+      "dx": -0.032251,
+      "dy": 0.025216,
+      "magnitude": 0.040938,
+      "recent_window_magnitude": 0.093626,
+      "confidence": 0.999539,
+      "fit_applied": false
+    },
+    {
+      "frame": 216,
+      "seconds": 7.173841,
+      "dx": -0.027141,
+      "dy": -0.015534,
+      "magnitude": 0.031272,
+      "recent_window_magnitude": 0.153236,
+      "confidence": 0.999884,
+      "fit_applied": false
+    },
+    {
+      "frame": 217,
+      "seconds": 7.207207,
+      "dx": 0.002024,
+      "dy": 0.000986,
+      "magnitude": 0.002251,
+      "recent_window_magnitude": 0.12038,
+      "confidence": 1.00002,
+      "fit_applied": false
+    },
+    {
+      "frame": 218,
+      "seconds": 7.240574,
+      "dx": -0.081323,
+      "dy": 0.008062,
+      "magnitude": 0.081722,
+      "recent_window_magnitude": 0.192594,
+      "confidence": 0.999795,
+      "fit_applied": false
+    },
+    {
+      "frame": 219,
+      "seconds": 7.273941,
+      "dx": -0.091869,
+      "dy": 0.013438,
+      "magnitude": 0.092847,
+      "recent_window_magnitude": 0.232794,
+      "confidence": 0.99843,
+      "fit_applied": false
+    },
+    {
+      "frame": 220,
+      "seconds": 7.307307,
+      "dx": 0.00347,
+      "dy": 0.018757,
+      "magnitude": 0.019075,
+      "recent_window_magnitude": 0.196529,
+      "confidence": 0.999172,
+      "fit_applied": false
+    },
+    {
+      "frame": 221,
+      "seconds": 7.340674,
+      "dx": -0.006761,
+      "dy": -0.010442,
+      "magnitude": 0.01244,
+      "recent_window_magnitude": 0.177158,
+      "confidence": 0.99959,
+      "fit_applied": false
+    },
+    {
+      "frame": 222,
+      "seconds": 7.374041,
+      "dx": -0.049805,
+      "dy": 0.028999,
+      "magnitude": 0.057633,
+      "recent_window_magnitude": 0.233807,
+      "confidence": 0.997187,
+      "fit_applied": false
+    },
+    {
+      "frame": 223,
+      "seconds": 7.407407,
+      "dx": -0.052599,
+      "dy": 0.023605,
+      "magnitude": 0.057653,
+      "recent_window_magnitude": 0.211094,
+      "confidence": 0.998104,
+      "fit_applied": false
+    },
+    {
+      "frame": 224,
+      "seconds": 7.440774,
+      "dx": -0.047562,
+      "dy": 0.013445,
+      "magnitude": 0.049425,
+      "recent_window_magnitude": 0.170346,
+      "confidence": 0.99834,
+      "fit_applied": false
+    },
+    {
+      "frame": 225,
+      "seconds": 7.474141,
+      "dx": 2.2e-05,
+      "dy": -0.006384,
+      "magnitude": 0.006384,
+      "recent_window_magnitude": 0.164254,
+      "confidence": 0.999674,
+      "fit_applied": false
+    },
+    {
+      "frame": 226,
+      "seconds": 7.507508,
+      "dx": -0.028176,
+      "dy": 0.017309,
+      "magnitude": 0.033068,
+      "recent_window_magnitude": 0.19404,
+      "confidence": 0.99722,
+      "fit_applied": false
+    },
+    {
+      "frame": 227,
+      "seconds": 7.540874,
+      "dx": -0.024301,
+      "dy": 0.003458,
+      "magnitude": 0.024546,
+      "recent_window_magnitude": 0.16105,
+      "confidence": 0.999067,
+      "fit_applied": false
+    },
+    {
+      "frame": 228,
+      "seconds": 7.574241,
+      "dx": -0.017345,
+      "dy": 0.012048,
+      "magnitude": 0.021118,
+      "recent_window_magnitude": 0.123951,
+      "confidence": 0.998555,
+      "fit_applied": false
+    },
+    {
+      "frame": 229,
+      "seconds": 7.607608,
+      "dx": 0.044335,
+      "dy": 0.007879,
+      "magnitude": 0.045029,
+      "recent_window_magnitude": 0.042727,
+      "confidence": 0.999756,
+      "fit_applied": false
+    },
+    {
+      "frame": 230,
+      "seconds": 7.640974,
+      "dx": -0.021202,
+      "dy": 0.008853,
+      "magnitude": 0.022976,
+      "recent_window_magnitude": 0.068079,
+      "confidence": 0.999868,
+      "fit_applied": false
+    },
+    {
+      "frame": 231,
+      "seconds": 7.674341,
+      "dx": 0.005342,
+      "dy": 0.027463,
+      "magnitude": 0.027977,
+      "recent_window_magnitude": 0.061136,
+      "confidence": 0.999432,
+      "fit_applied": false
+    },
+    {
+      "frame": 232,
+      "seconds": 7.707708,
+      "dx": -0.009089,
+      "dy": 0.023447,
+      "magnitude": 0.025147,
+      "recent_window_magnitude": 0.079715,
+      "confidence": 0.999407,
+      "fit_applied": false
+    },
+    {
+      "frame": 233,
+      "seconds": 7.741074,
+      "dx": -0.014137,
+      "dy": -0.005085,
+      "magnitude": 0.015024,
+      "recent_window_magnitude": 0.062775,
+      "confidence": 0.999974,
+      "fit_applied": false
+    },
+    {
+      "frame": 234,
+      "seconds": 7.774441,
+      "dx": -0.042288,
+      "dy": -0.002297,
+      "magnitude": 0.04235,
+      "recent_window_magnitude": 0.096775,
+      "confidence": 0.997825,
+      "fit_applied": false
+    },
+    {
+      "frame": 235,
+      "seconds": 7.807808,
+      "dx": 0.004816,
+      "dy": -0.008057,
+      "magnitude": 0.009386,
+      "recent_window_magnitude": 0.065745,
+      "confidence": 0.997202,
+      "fit_applied": false
+    },
+    {
+      "frame": 236,
+      "seconds": 7.841175,
+      "dx": 0.03674,
+      "dy": 0.004766,
+      "magnitude": 0.037048,
+      "recent_window_magnitude": 0.027149,
+      "confidence": 0.999293,
+      "fit_applied": false
+    },
+    {
+      "frame": 237,
+      "seconds": 7.874541,
+      "dx": -0.006099,
+      "dy": -0.00051,
+      "magnitude": 0.00612,
+      "recent_window_magnitude": 0.023763,
+      "confidence": 0.999723,
+      "fit_applied": false
+    },
+    {
+      "frame": 238,
+      "seconds": 7.907908,
+      "dx": -0.05297,
+      "dy": 0.045386,
+      "magnitude": 0.069755,
+      "recent_window_magnitude": 0.071552,
+      "confidence": 0.997195,
+      "fit_applied": false
+    },
+    {
+      "frame": 239,
+      "seconds": 7.941275,
+      "dx": 0.02029,
+      "dy": -0.003801,
+      "magnitude": 0.020643,
+      "recent_window_magnitude": 0.037886,
+      "confidence": 0.999527,
+      "fit_applied": false
+    },
+    {
+      "frame": 240,
+      "seconds": 7.974641,
+      "dx": -0.051434,
+      "dy": 0.030022,
+      "magnitude": 0.059555,
+      "recent_window_magnitude": 0.092814,
+      "confidence": 0.996502,
+      "fit_applied": false
+    },
+    {
+      "frame": 241,
+      "seconds": 8.008008,
+      "dx": 0.01669,
+      "dy": 0.009386,
+      "magnitude": 0.019148,
+      "recent_window_magnitude": 0.10901,
+      "confidence": 0.998716,
+      "fit_applied": false
+    },
+    {
+      "frame": 242,
+      "seconds": 8.041375,
+      "dx": 0.010705,
+      "dy": 0.022023,
+      "magnitude": 0.024487,
+      "recent_window_magnitude": 0.117599,
+      "confidence": 0.995281,
+      "fit_applied": false
+    },
+    {
+      "frame": 243,
+      "seconds": 8.074741,
+      "dx": -0.012447,
+      "dy": 0.001948,
+      "magnitude": 0.012599,
+      "recent_window_magnitude": 0.061741,
+      "confidence": 0.998401,
+      "fit_applied": false
+    },
+    {
+      "frame": 244,
+      "seconds": 8.108108,
+      "dx": 0.03524,
+      "dy": 0.049173,
+      "magnitude": 0.060496,
+      "recent_window_magnitude": 0.112559,
+      "confidence": 0.996415,
+      "fit_applied": false
+    },
+    {
+      "frame": 245,
+      "seconds": 8.141475,
+      "dx": 0.019452,
+      "dy": 0.001997,
+      "magnitude": 0.019555,
+      "recent_window_magnitude": 0.109521,
+      "confidence": 0.999005,
+      "fit_applied": false
+    },
+    {
+      "frame": 246,
+      "seconds": 8.174842,
+      "dx": 0.01472,
+      "dy": 0.009486,
+      "magnitude": 0.017512,
+      "recent_window_magnitude": 0.108356,
+      "confidence": 0.997031,
+      "fit_applied": false
+    },
+    {
+      "frame": 247,
+      "seconds": 8.208208,
+      "dx": -0.030601,
+      "dy": 0.034024,
+      "magnitude": 0.04576,
+      "recent_window_magnitude": 0.10016,
+      "confidence": 0.999225,
+      "fit_applied": false
+    },
+    {
+      "frame": 248,
+      "seconds": 8.241575,
+      "dx": 0.060143,
+      "dy": 0.002833,
+      "magnitude": 0.06021,
+      "recent_window_magnitude": 0.138928,
+      "confidence": 0.99983,
+      "fit_applied": false
+    },
+    {
+      "frame": 249,
+      "seconds": 8.274942,
+      "dx": 0.000457,
+      "dy": 0.005968,
+      "magnitude": 0.005986,
+      "recent_window_magnitude": 0.084068,
+      "confidence": 1.000213,
+      "fit_applied": false
+    },
+    {
+      "frame": 250,
+      "seconds": 8.308308,
+      "dx": 0.020593,
+      "dy": -0.004375,
+      "magnitude": 0.021052,
+      "recent_window_magnitude": 0.081016,
+      "confidence": 0.999558,
+      "fit_applied": false
+    },
+    {
+      "frame": 251,
+      "seconds": 8.341675,
+      "dx": -0.039283,
+      "dy": -0.05888,
+      "magnitude": 0.070782,
+      "recent_window_magnitude": 0.023351,
+      "confidence": 0.99197,
+      "fit_applied": false
+    },
+    {
+      "frame": 252,
+      "seconds": 8.375042,
+      "dx": 0.012624,
+      "dy": 0.000881,
+      "magnitude": 0.012654,
+      "recent_window_magnitude": 0.076445,
+      "confidence": 0.999408,
+      "fit_applied": false
+    },
+    {
+      "frame": 253,
+      "seconds": 8.408408,
+      "dx": 0.008901,
+      "dy": 0.006141,
+      "magnitude": 0.010814,
+      "recent_window_magnitude": 0.050372,
+      "confidence": 0.999885,
+      "fit_applied": false
+    },
+    {
+      "frame": 254,
+      "seconds": 8.441775,
+      "dx": -0.005658,
+      "dy": -0.003304,
+      "magnitude": 0.006552,
+      "recent_window_magnitude": 0.059603,
+      "confidence": 0.996599,
+      "fit_applied": false
+    },
+    {
+      "frame": 255,
+      "seconds": 8.475142,
+      "dx": 0.011425,
+      "dy": 0.002554,
+      "magnitude": 0.011707,
+      "recent_window_magnitude": 0.053957,
+      "confidence": 0.998815,
+      "fit_applied": false
+    },
+    {
+      "frame": 256,
+      "seconds": 8.508509,
+      "dx": -0.010872,
+      "dy": 0.006227,
+      "magnitude": 0.012529,
+      "recent_window_magnitude": 0.020636,
+      "confidence": 0.999034,
+      "fit_applied": false
+    },
+    {
+      "frame": 257,
+      "seconds": 8.541875,
+      "dx": 0.010012,
+      "dy": 0.00156,
+      "magnitude": 0.010133,
+      "recent_window_magnitude": 0.019088,
+      "confidence": 0.99982,
+      "fit_applied": false
+    },
+    {
+      "frame": 258,
+      "seconds": 8.575242,
+      "dx": -0.001055,
+      "dy": -0.032213,
+      "magnitude": 0.032231,
+      "recent_window_magnitude": 0.025469,
+      "confidence": 0.997572,
+      "fit_applied": false
+    },
+    {
+      "frame": 259,
+      "seconds": 8.608609,
+      "dx": 0.013789,
+      "dy": -0.008659,
+      "magnitude": 0.016283,
+      "recent_window_magnitude": 0.038406,
+      "confidence": 0.999898,
+      "fit_applied": false
+    },
+    {
+      "frame": 260,
+      "seconds": 8.641975,
+      "dx": -0.014533,
+      "dy": -4.8e-05,
+      "magnitude": 0.014533,
+      "recent_window_magnitude": 0.03324,
+      "confidence": 0.996797,
+      "fit_applied": false
+    },
+    {
+      "frame": 261,
+      "seconds": 8.675342,
+      "dx": 0.006555,
+      "dy": -0.011705,
+      "magnitude": 0.013415,
+      "recent_window_magnitude": 0.053158,
+      "confidence": 0.999304,
+      "fit_applied": false
+    },
+    {
+      "frame": 262,
+      "seconds": 8.708709,
+      "dx": -0.037092,
+      "dy": 0.015583,
+      "magnitude": 0.040233,
+      "recent_window_magnitude": 0.049171,
+      "confidence": 0.998775,
+      "fit_applied": false
+    },
+    {
+      "frame": 263,
+      "seconds": 8.742075,
+      "dx": -0.016723,
+      "dy": -0.000128,
+      "magnitude": 0.016724,
+      "recent_window_magnitude": 0.048259,
+      "confidence": 0.999802,
+      "fit_applied": false
+    },
+    {
+      "frame": 264,
+      "seconds": 8.775442,
+      "dx": 0.005483,
+      "dy": 0.009925,
+      "magnitude": 0.011339,
+      "recent_window_magnitude": 0.057936,
+      "confidence": 0.999818,
+      "fit_applied": false
+    },
+    {
+      "frame": 265,
+      "seconds": 8.808809,
+      "dx": 0.018643,
+      "dy": 0.001848,
+      "magnitude": 0.018735,
+      "recent_window_magnitude": 0.02786,
+      "confidence": 0.999976,
+      "fit_applied": false
+    },
+    {
+      "frame": 266,
+      "seconds": 8.842176,
+      "dx": -0.018708,
+      "dy": -0.011784,
+      "magnitude": 0.02211,
+      "recent_window_magnitude": 0.050802,
+      "confidence": 0.998936,
+      "fit_applied": false
+    },
+    {
+      "frame": 267,
+      "seconds": 8.875542,
+      "dx": 0.003243,
+      "dy": 0.001132,
+      "magnitude": 0.003435,
+      "recent_window_magnitude": 0.008123,
+      "confidence": 0.998835,
+      "fit_applied": false
+    },
+    {
+      "frame": 268,
+      "seconds": 8.908909,
+      "dx": -0.002869,
+      "dy": 0.026195,
+      "magnitude": 0.026352,
+      "recent_window_magnitude": 0.027924,
+      "confidence": 0.999874,
+      "fit_applied": false
+    },
+    {
+      "frame": 269,
+      "seconds": 8.942276,
+      "dx": 0.010814,
+      "dy": 0.002193,
+      "magnitude": 0.011034,
+      "recent_window_magnitude": 0.022524,
+      "confidence": 0.999915,
+      "fit_applied": false
+    },
+    {
+      "frame": 270,
+      "seconds": 8.975642,
+      "dx": 0.027864,
+      "dy": 0.012237,
+      "magnitude": 0.030433,
+      "recent_window_magnitude": 0.036226,
+      "confidence": 0.99676,
+      "fit_applied": false
+    },
+    {
+      "frame": 271,
+      "seconds": 9.009009,
+      "dx": 0.012546,
+      "dy": 0.014739,
+      "magnitude": 0.019356,
+      "recent_window_magnitude": 0.076514,
+      "confidence": 0.998161,
+      "fit_applied": false
+    },
+    {
+      "frame": 272,
+      "seconds": 9.042376,
+      "dx": 0.005,
+      "dy": 0.006886,
+      "magnitude": 0.00851,
+      "recent_window_magnitude": 0.081988,
+      "confidence": 0.999732,
+      "fit_applied": false
+    },
+    {
+      "frame": 273,
+      "seconds": 9.075742,
+      "dx": 0.01806,
+      "dy": 0.005859,
+      "magnitude": 0.018986,
+      "recent_window_magnitude": 0.085294,
+      "confidence": 0.999875,
+      "fit_applied": false
+    },
+    {
+      "frame": 274,
+      "seconds": 9.109109,
+      "dx": -0.070932,
+      "dy": 0.020685,
+      "magnitude": 0.073886,
+      "recent_window_magnitude": 0.060866,
+      "confidence": 0.998638,
+      "fit_applied": false
+    },
+    {
+      "frame": 275,
+      "seconds": 9.142476,
+      "dx": 0.030786,
+      "dy": 0.014498,
+      "magnitude": 0.034029,
+      "recent_window_magnitude": 0.062832,
+      "confidence": 0.999402,
+      "fit_applied": false
+    },
+    {
+      "frame": 276,
+      "seconds": 9.175843,
+      "dx": -0.057368,
+      "dy": 0.02063,
+      "magnitude": 0.060965,
+      "recent_window_magnitude": 0.101211,
+      "confidence": 0.995974,
+      "fit_applied": false
+    },
+    {
+      "frame": 277,
+      "seconds": 9.209209,
+      "dx": 0.003019,
+      "dy": 0.012457,
+      "magnitude": 0.012818,
+      "recent_window_magnitude": 0.106478,
+      "confidence": 0.998955,
+      "fit_applied": false
+    },
+    {
+      "frame": 278,
+      "seconds": 9.242576,
+      "dx": 0.019362,
+      "dy": -0.019584,
+      "magnitude": 0.027539,
+      "recent_window_magnitude": 0.089528,
+      "confidence": 0.996719,
+      "fit_applied": false
+    },
+    {
+      "frame": 279,
+      "seconds": 9.275943,
+      "dx": -0.000981,
+      "dy": 0.013966,
+      "magnitude": 0.014,
+      "recent_window_magnitude": 0.042287,
+      "confidence": 0.99796,
+      "fit_applied": false
+    },
+    {
+      "frame": 280,
+      "seconds": 9.309309,
+      "dx": 0.025568,
+      "dy": -0.030445,
+      "magnitude": 0.039757,
+      "recent_window_magnitude": 0.010817,
+      "confidence": 0.996806,
+      "fit_applied": false
+    },
+    {
+      "frame": 281,
+      "seconds": 9.342676,
+      "dx": 0.010061,
+      "dy": -0.001763,
+      "magnitude": 0.010215,
+      "recent_window_magnitude": 0.062417,
+      "confidence": 0.999568,
+      "fit_applied": false
+    },
+    {
+      "frame": 282,
+      "seconds": 9.376043,
+      "dx": 0.000363,
+      "dy": -0.022085,
+      "magnitude": 0.022088,
+      "recent_window_magnitude": 0.080906,
+      "confidence": 0.995957,
+      "fit_applied": false
+    },
+    {
+      "frame": 283,
+      "seconds": 9.409409,
+      "dx": -0.024552,
+      "dy": -0.00787,
+      "magnitude": 0.025782,
+      "recent_window_magnitude": 0.049319,
+      "confidence": 0.998795,
+      "fit_applied": false
+    },
+    {
+      "frame": 284,
+      "seconds": 9.442776,
+      "dx": -0.041618,
+      "dy": -0.021976,
+      "magnitude": 0.047064,
+      "recent_window_magnitude": 0.089387,
+      "confidence": 0.998922,
+      "fit_applied": false
+    },
+    {
+      "frame": 285,
+      "seconds": 9.476143,
+      "dx": 0.019121,
+      "dy": -0.009127,
+      "magnitude": 0.021188,
+      "recent_window_magnitude": 0.072718,
+      "confidence": 1.000256,
+      "fit_applied": false
+    },
+    {
+      "frame": 286,
+      "seconds": 9.50951,
+      "dx": 0.000479,
+      "dy": 0.008734,
+      "magnitude": 0.008747,
+      "recent_window_magnitude": 0.069806,
+      "confidence": 0.99808,
+      "fit_applied": false
+    },
+    {
+      "frame": 287,
+      "seconds": 9.542876,
+      "dx": -0.002879,
+      "dy": -0.014374,
+      "magnitude": 0.01466,
+      "recent_window_magnitude": 0.066599,
+      "confidence": 0.999229,
+      "fit_applied": false
+    },
+    {
+      "frame": 288,
+      "seconds": 9.576243,
+      "dx": -0.061891,
+      "dy": 0.026964,
+      "magnitude": 0.067509,
+      "recent_window_magnitude": 0.087337,
+      "confidence": 0.998994,
+      "fit_applied": false
+    },
+    {
+      "frame": 289,
+      "seconds": 9.60961,
+      "dx": -0.01612,
+      "dy": -0.002209,
+      "magnitude": 0.016271,
+      "recent_window_magnitude": 0.062098,
+      "confidence": 1.00006,
+      "fit_applied": false
+    },
+    {
+      "frame": 290,
+      "seconds": 9.642976,
+      "dx": 0.011342,
+      "dy": -0.008832,
+      "magnitude": 0.014375,
+      "recent_window_magnitude": 0.069829,
+      "confidence": 0.999354,
+      "fit_applied": false
+    },
+    {
+      "frame": 291,
+      "seconds": 9.676343,
+      "dx": -0.043714,
+      "dy": -0.021126,
+      "magnitude": 0.048551,
+      "recent_window_magnitude": 0.114941,
+      "confidence": 0.997933,
+      "fit_applied": false
+    },
+    {
+      "frame": 292,
+      "seconds": 9.70971,
+      "dx": -0.008113,
+      "dy": 0.011395,
+      "magnitude": 0.013988,
+      "recent_window_magnitude": 0.118657,
+      "confidence": 0.999963,
+      "fit_applied": false
+    },
+    {
+      "frame": 293,
+      "seconds": 9.743076,
+      "dx": 0.21329,
+      "dy": 0.038914,
+      "magnitude": 0.216811,
+      "recent_window_magnitude": 0.157732,
+      "confidence": 0.992806,
+      "fit_applied": false
+    },
+    {
+      "frame": 294,
+      "seconds": 9.776443,
+      "dx": 0.017642,
+      "dy": -0.021132,
+      "magnitude": 0.027529,
+      "recent_window_magnitude": 0.190449,
+      "confidence": 0.999317,
+      "fit_applied": false
+    },
+    {
+      "frame": 295,
+      "seconds": 9.80981,
+      "dx": 0.026305,
+      "dy": 0.011854,
+      "magnitude": 0.028853,
+      "recent_window_magnitude": 0.206373,
+      "confidence": 0.999682,
+      "fit_applied": false
+    },
+    {
+      "frame": 296,
+      "seconds": 9.843177,
+      "dx": -0.000739,
+      "dy": 0.003519,
+      "magnitude": 0.003595,
+      "recent_window_magnitude": 0.252349,
+      "confidence": 0.999488,
+      "fit_applied": false
+    },
+    {
+      "frame": 297,
+      "seconds": 9.876543,
+      "dx": -0.025242,
+      "dy": -0.035737,
+      "magnitude": 0.043752,
+      "recent_window_magnitude": 0.231271,
+      "confidence": 0.997981,
+      "fit_applied": false
+    },
+    {
+      "frame": 298,
+      "seconds": 9.90991,
+      "dx": 0.006136,
+      "dy": -0.003466,
+      "magnitude": 0.007047,
+      "recent_window_magnitude": 0.051015,
+      "confidence": 0.998583,
+      "fit_applied": false
+    },
+    {
+      "frame": 299,
+      "seconds": 9.943277,
+      "dx": 0.021544,
+      "dy": 0.000693,
+      "magnitude": 0.021555,
+      "recent_window_magnitude": 0.036326,
+      "confidence": 0.999644,
+      "fit_applied": false
+    },
+    {
+      "frame": 300,
+      "seconds": 9.976643,
+      "dx": -0.010843,
+      "dy": -0.002533,
+      "magnitude": 0.011135,
+      "recent_window_magnitude": 0.038622,
+      "confidence": 0.999847,
+      "fit_applied": false
+    },
+    {
+      "frame": 301,
+      "seconds": 10.01001,
+      "dx": 0.037867,
+      "dy": 0.001512,
+      "magnitude": 0.037898,
+      "recent_window_magnitude": 0.049303,
+      "confidence": 0.998687,
+      "fit_applied": false
+    },
+    {
+      "frame": 302,
+      "seconds": 10.043377,
+      "dx": 0.045813,
+      "dy": -0.019011,
+      "magnitude": 0.049601,
+      "recent_window_magnitude": 0.103072,
+      "confidence": 0.998908,
+      "fit_applied": false
+    },
+    {
+      "frame": 303,
+      "seconds": 10.076743,
+      "dx": -0.02554,
+      "dy": 0.014159,
+      "magnitude": 0.029202,
+      "recent_window_magnitude": 0.069036,
+      "confidence": 0.999206,
+      "fit_applied": false
+    },
+    {
+      "frame": 304,
+      "seconds": 10.11011,
+      "dx": 0.026892,
+      "dy": -0.014713,
+      "magnitude": 0.030654,
+      "recent_window_magnitude": 0.076993,
+      "confidence": 0.999472,
+      "fit_applied": false
+    },
+    {
+      "frame": 305,
+      "seconds": 10.143477,
+      "dx": -0.017166,
+      "dy": 0.010248,
+      "magnitude": 0.019992,
+      "recent_window_magnitude": 0.068315,
+      "confidence": 0.999508,
+      "fit_applied": false
+    },
+    {
+      "frame": 306,
+      "seconds": 10.176844,
+      "dx": 0.02015,
+      "dy": 0.002824,
+      "magnitude": 0.020347,
+      "recent_window_magnitude": 0.050568,
+      "confidence": 0.999305,
+      "fit_applied": false
+    },
+    {
+      "frame": 307,
+      "seconds": 10.21021,
+      "dx": -0.016306,
+      "dy": -0.011118,
+      "magnitude": 0.019735,
+      "recent_window_magnitude": 0.012051,
+      "confidence": 0.998254,
+      "fit_applied": false
+    },
+    {
+      "frame": 308,
+      "seconds": 10.243577,
+      "dx": 0.065956,
+      "dy": 0.002502,
+      "magnitude": 0.066003,
+      "recent_window_magnitude": 0.080185,
+      "confidence": 0.995823,
+      "fit_applied": false
+    },
+    {
+      "frame": 309,
+      "seconds": 10.276944,
+      "dx": 0.019096,
+      "dy": -0.003499,
+      "magnitude": 0.019414,
+      "recent_window_magnitude": 0.071736,
+      "confidence": 0.994502,
+      "fit_applied": false
+    },
+    {
+      "frame": 310,
+      "seconds": 10.31031,
+      "dx": 0.011325,
+      "dy": 0.0055,
+      "magnitude": 0.01259,
+      "recent_window_magnitude": 0.100292,
+      "confidence": 0.996593,
+      "fit_applied": false
+    },
+    {
+      "frame": 311,
+      "seconds": 10.343677,
+      "dx": 0.040356,
+      "dy": -0.027465,
+      "magnitude": 0.048816,
+      "recent_window_magnitude": 0.125156,
+      "confidence": 0.995074,
+      "fit_applied": false
+    },
+    {
+      "frame": 312,
+      "seconds": 10.377044,
+      "dx": -0.012771,
+      "dy": 0.008868,
+      "magnitude": 0.015548,
+      "recent_window_magnitude": 0.12476,
+      "confidence": 0.998662,
+      "fit_applied": false
+    },
+    {
+      "frame": 313,
+      "seconds": 10.41041,
+      "dx": -0.003124,
+      "dy": -0.001372,
+      "magnitude": 0.003412,
+      "recent_window_magnitude": 0.057748,
+      "confidence": 0.999685,
+      "fit_applied": false
+    },
+    {
+      "frame": 314,
+      "seconds": 10.443777,
+      "dx": -0.031506,
+      "dy": -0.000924,
+      "magnitude": 0.031519,
+      "recent_window_magnitude": 0.015978,
+      "confidence": 0.998313,
+      "fit_applied": false
+    },
+    {
+      "frame": 315,
+      "seconds": 10.477144,
+      "dx": 0.055347,
+      "dy": 0.004858,
+      "magnitude": 0.055559,
+      "recent_window_magnitude": 0.050894,
+      "confidence": 0.99326,
+      "fit_applied": false
+    },
+    {
+      "frame": 316,
+      "seconds": 10.510511,
+      "dx": 0.030243,
+      "dy": -0.007898,
+      "magnitude": 0.031257,
+      "recent_window_magnitude": 0.038352,
+      "confidence": 0.997279,
+      "fit_applied": false
+    },
+    {
+      "frame": 317,
+      "seconds": 10.543877,
+      "dx": 0.02592,
+      "dy": 0.014277,
+      "magnitude": 0.029592,
+      "recent_window_magnitude": 0.077398,
+      "confidence": 0.999335,
+      "fit_applied": false
+    },
+    {
+      "frame": 318,
+      "seconds": 10.577244,
+      "dx": 0.001304,
+      "dy": 0.003233,
+      "magnitude": 0.003486,
+      "recent_window_magnitude": 0.082429,
+      "confidence": 1.00001,
+      "fit_applied": false
+    },
+    {
+      "frame": 319,
+      "seconds": 10.610611,
+      "dx": 5.5e-05,
+      "dy": -0.000932,
+      "magnitude": 0.000934,
+      "recent_window_magnitude": 0.113678,
+      "confidence": 0.9999,
+      "fit_applied": false
+    },
+    {
+      "frame": 320,
+      "seconds": 10.643977,
+      "dx": 0.032789,
+      "dy": -0.005419,
+      "magnitude": 0.033233,
+      "recent_window_magnitude": 0.090369,
+      "confidence": 0.999929,
+      "fit_applied": false
+    },
+    {
+      "frame": 321,
+      "seconds": 10.677344,
+      "dx": -0.130251,
+      "dy": 0.013195,
+      "magnitude": 0.130917,
+      "recent_window_magnitude": 0.074289,
+      "confidence": 0.988627,
+      "fit_applied": false
+    },
+    {
+      "frame": 322,
+      "seconds": 10.710711,
+      "dx": -0.013821,
+      "dy": -0.000494,
+      "magnitude": 0.013829,
+      "recent_window_magnitude": 0.110341,
+      "confidence": 1.000054,
+      "fit_applied": false
+    },
+    {
+      "frame": 323,
+      "seconds": 10.744077,
+      "dx": -0.003977,
+      "dy": 0.00939,
+      "magnitude": 0.010197,
+      "recent_window_magnitude": 0.116275,
+      "confidence": 0.999982,
+      "fit_applied": false
+    },
+    {
+      "frame": 324,
+      "seconds": 10.777444,
+      "dx": 0.007354,
+      "dy": 0.012866,
+      "magnitude": 0.01482,
+      "recent_window_magnitude": 0.111875,
+      "confidence": 0.999433,
+      "fit_applied": false
+    },
+    {
+      "frame": 325,
+      "seconds": 10.810811,
+      "dx": 0.030459,
+      "dy": 0.005502,
+      "magnitude": 0.030952,
+      "recent_window_magnitude": 0.117425,
+      "confidence": 0.999667,
+      "fit_applied": false
+    },
+    {
+      "frame": 326,
+      "seconds": 10.844178,
+      "dx": 0.015172,
+      "dy": 0.011847,
+      "magnitude": 0.01925,
+      "recent_window_magnitude": 0.05261,
+      "confidence": 0.998721,
+      "fit_applied": false
+    },
+    {
+      "frame": 327,
+      "seconds": 10.877544,
+      "dx": 0.017068,
+      "dy": 0.000491,
+      "magnitude": 0.017076,
+      "recent_window_magnitude": 0.07729,
+      "confidence": 0.999506,
+      "fit_applied": false
+    },
+    {
+      "frame": 328,
+      "seconds": 10.910911,
+      "dx": -0.020209,
+      "dy": 0.032354,
+      "magnitude": 0.038147,
+      "recent_window_magnitude": 0.08038,
+      "confidence": 1.000084,
+      "fit_applied": false
+    },
+    {
+      "frame": 329,
+      "seconds": 10.944278,
+      "dx": 0.008623,
+      "dy": 0.015017,
+      "magnitude": 0.017317,
+      "recent_window_magnitude": 0.082855,
+      "confidence": 1.00002,
+      "fit_applied": false
+    },
+    {
+      "frame": 330,
+      "seconds": 10.977644,
+      "dx": -0.003896,
+      "dy": -0.005564,
+      "magnitude": 0.006792,
+      "recent_window_magnitude": 0.056679,
+      "confidence": 0.999615,
+      "fit_applied": false
+    },
+    {
+      "frame": 331,
+      "seconds": 11.011011,
+      "dx": 0.01247,
+      "dy": -0.00404,
+      "magnitude": 0.013108,
+      "recent_window_magnitude": 0.040758,
+      "confidence": 0.999518,
+      "fit_applied": false
+    },
+    {
+      "frame": 332,
+      "seconds": 11.044378,
+      "dx": -0.028656,
+      "dy": 0.004652,
+      "magnitude": 0.029031,
+      "recent_window_magnitude": 0.052935,
+      "confidence": 0.999507,
+      "fit_applied": false
+    },
+    {
+      "frame": 333,
+      "seconds": 11.077744,
+      "dx": 0.012156,
+      "dy": -0.000973,
+      "magnitude": 0.012195,
+      "recent_window_magnitude": 0.009118,
+      "confidence": 0.999958,
+      "fit_applied": false
+    },
+    {
+      "frame": 334,
+      "seconds": 11.111111,
+      "dx": -0.029565,
+      "dy": 0.028965,
+      "magnitude": 0.041389,
+      "recent_window_magnitude": 0.044004,
+      "confidence": 0.999801,
+      "fit_applied": false
+    },
+    {
+      "frame": 335,
+      "seconds": 11.144478,
+      "dx": 0.017566,
+      "dy": 0.006203,
+      "magnitude": 0.018629,
+      "recent_window_magnitude": 0.038319,
+      "confidence": 0.999706,
+      "fit_applied": false
+    },
+    {
+      "frame": 336,
+      "seconds": 11.177845,
+      "dx": -0.019591,
+      "dy": 0.008577,
+      "magnitude": 0.021386,
+      "recent_window_magnitude": 0.067539,
+      "confidence": 0.998677,
+      "fit_applied": false
+    },
+    {
+      "frame": 337,
+      "seconds": 11.211211,
+      "dx": 0.01514,
+      "dy": 0.016632,
+      "magnitude": 0.022491,
+      "recent_window_magnitude": 0.059558,
+      "confidence": 0.999598,
+      "fit_applied": false
+    },
+    {
+      "frame": 338,
+      "seconds": 11.244578,
+      "dx": -0.006633,
+      "dy": 0.010549,
+      "magnitude": 0.012461,
+      "recent_window_magnitude": 0.074586,
+      "confidence": 0.99908,
+      "fit_applied": false
+    },
+    {
+      "frame": 339,
+      "seconds": 11.277945,
+      "dx": -0.00399,
+      "dy": -0.002881,
+      "magnitude": 0.004921,
+      "recent_window_magnitude": 0.039159,
+      "confidence": 1.000046,
+      "fit_applied": false
+    },
+    {
+      "frame": 340,
+      "seconds": 11.311311,
+      "dx": 0.023655,
+      "dy": -0.011971,
+      "magnitude": 0.026511,
+      "recent_window_magnitude": 0.022598,
+      "confidence": 0.998931,
+      "fit_applied": false
+    },
+    {
+      "frame": 341,
+      "seconds": 11.344678,
+      "dx": 0.002012,
+      "dy": 0.007738,
+      "magnitude": 0.007995,
+      "recent_window_magnitude": 0.036246,
+      "confidence": 0.99953,
+      "fit_applied": false
+    },
+    {
+      "frame": 342,
+      "seconds": 11.378045,
+      "dx": 0.023303,
+      "dy": 0.002114,
+      "magnitude": 0.023399,
+      "recent_window_magnitude": 0.038746,
+      "confidence": 1.000054,
+      "fit_applied": false
+    },
+    {
+      "frame": 343,
+      "seconds": 11.411411,
+      "dx": -0.024291,
+      "dy": 0.00242,
+      "magnitude": 0.024411,
+      "recent_window_magnitude": 0.02085,
+      "confidence": 1.0,
+      "fit_applied": false
+    },
+    {
+      "frame": 344,
+      "seconds": 11.444778,
+      "dx": 0.025324,
+      "dy": 0.012691,
+      "magnitude": 0.028326,
+      "recent_window_magnitude": 0.051664,
+      "confidence": 0.999543,
+      "fit_applied": false
+    },
+    {
+      "frame": 345,
+      "seconds": 11.478145,
+      "dx": 0.018797,
+      "dy": -0.006014,
+      "magnitude": 0.019736,
+      "recent_window_magnitude": 0.048961,
+      "confidence": 1.000093,
+      "fit_applied": false
+    },
+    {
+      "frame": 346,
+      "seconds": 11.511512,
+      "dx": 0.008625,
+      "dy": 0.010423,
+      "magnitude": 0.013529,
+      "recent_window_magnitude": 0.056097,
+      "confidence": 0.999409,
+      "fit_applied": false
+    },
+    {
+      "frame": 347,
+      "seconds": 11.544878,
+      "dx": -0.01505,
+      "dy": 0.004189,
+      "magnitude": 0.015622,
+      "recent_window_magnitude": 0.027235,
+      "confidence": 0.999455,
+      "fit_applied": false
+    },
+    {
+      "frame": 348,
+      "seconds": 11.578245,
+      "dx": 0.033706,
+      "dy": 0.007741,
+      "magnitude": 0.034583,
+      "recent_window_magnitude": 0.077078,
+      "confidence": 0.999617,
+      "fit_applied": false
+    },
+    {
+      "frame": 349,
+      "seconds": 11.611612,
+      "dx": -0.006237,
+      "dy": -0.001013,
+      "magnitude": 0.006319,
+      "recent_window_magnitude": 0.042687,
+      "confidence": 0.999749,
+      "fit_applied": false
+    },
+    {
+      "frame": 350,
+      "seconds": 11.644978,
+      "dx": -0.00869,
+      "dy": -0.009459,
+      "magnitude": 0.012845,
+      "recent_window_magnitude": 0.01714,
+      "confidence": 0.999257,
+      "fit_applied": false
+    },
+    {
+      "frame": 351,
+      "seconds": 11.678345,
+      "dx": -0.012104,
+      "dy": -0.022799,
+      "magnitude": 0.025812,
+      "recent_window_magnitude": 0.022925,
+      "confidence": 0.99928,
+      "fit_applied": false
+    },
+    {
+      "frame": 352,
+      "seconds": 11.711712,
+      "dx": 0.005226,
+      "dy": 0.006723,
+      "magnitude": 0.008515,
+      "recent_window_magnitude": 0.022255,
+      "confidence": 0.999205,
+      "fit_applied": false
+    },
+    {
+      "frame": 353,
+      "seconds": 11.745078,
+      "dx": -0.011951,
+      "dy": 0.004779,
+      "magnitude": 0.012871,
+      "recent_window_magnitude": 0.040167,
+      "confidence": 0.998875,
+      "fit_applied": false
+    },
+    {
+      "frame": 354,
+      "seconds": 11.778445,
+      "dx": -0.021576,
+      "dy": -0.001519,
+      "magnitude": 0.02163,
+      "recent_window_magnitude": 0.053913,
+      "confidence": 0.999506,
+      "fit_applied": false
+    },
+    {
+      "frame": 355,
+      "seconds": 11.811812,
+      "dx": 0.005482,
+      "dy": -0.009026,
+      "magnitude": 0.01056,
+      "recent_window_magnitude": 0.041192,
+      "confidence": 1.000257,
+      "fit_applied": false
+    },
+    {
+      "frame": 356,
+      "seconds": 11.845179,
+      "dx": -0.010365,
+      "dy": 0.018672,
+      "magnitude": 0.021356,
+      "recent_window_magnitude": 0.038556,
+      "confidence": 0.998823,
+      "fit_applied": false
+    },
+    {
+      "frame": 357,
+      "seconds": 11.878545,
+      "dx": -0.002281,
+      "dy": 0.000674,
+      "magnitude": 0.002378,
+      "recent_window_magnitude": 0.042898,
+      "confidence": 0.999662,
+      "fit_applied": false
+    },
+    {
+      "frame": 358,
+      "seconds": 11.911912,
+      "dx": -0.00771,
+      "dy": -0.004069,
+      "magnitude": 0.008717,
+      "recent_window_magnitude": 0.036756,
+      "confidence": 0.998893,
+      "fit_applied": false
+    },
+    {
+      "frame": 359,
+      "seconds": 11.945279,
+      "dx": 0.008356,
+      "dy": 0.012337,
+      "magnitude": 0.014901,
+      "recent_window_magnitude": 0.019699,
+      "confidence": 1.000252,
+      "fit_applied": false
+    },
+    {
+      "frame": 360,
+      "seconds": 11.978645,
+      "dx": -0.056185,
+      "dy": -0.000585,
+      "magnitude": 0.056188,
+      "recent_window_magnitude": 0.073347,
+      "confidence": 0.99994,
+      "fit_applied": false
+    },
+    {
+      "frame": 361,
+      "seconds": 12.012012,
+      "dx": 0.000631,
+      "dy": 0.011709,
+      "magnitude": 0.011726,
+      "recent_window_magnitude": 0.060607,
+      "confidence": 1.000374,
+      "fit_applied": false
+    },
+    {
+      "frame": 362,
+      "seconds": 12.045379,
+      "dx": 0.028481,
+      "dy": -0.00224,
+      "magnitude": 0.028569,
+      "recent_window_magnitude": 0.031506,
+      "confidence": 0.998486,
+      "fit_applied": false
+    },
+    {
+      "frame": 363,
+      "seconds": 12.078745,
+      "dx": -0.025818,
+      "dy": 0.01365,
+      "magnitude": 0.029204,
+      "recent_window_magnitude": 0.056564,
+      "confidence": 0.99864,
+      "fit_applied": false
+    },
+    {
+      "frame": 364,
+      "seconds": 12.112112,
+      "dx": 0.008942,
+      "dy": -0.013755,
+      "magnitude": 0.016406,
+      "recent_window_magnitude": 0.044817,
+      "confidence": 0.99891,
+      "fit_applied": false
+    },
+    {
+      "frame": 365,
+      "seconds": 12.145479,
+      "dx": -0.005124,
+      "dy": -0.003301,
+      "magnitude": 0.006095,
+      "recent_window_magnitude": 0.009347,
+      "confidence": 0.999795,
+      "fit_applied": false
+    },
+    {
+      "frame": 366,
+      "seconds": 12.178846,
+      "dx": -0.01906,
+      "dy": 0.009296,
+      "magnitude": 0.021206,
+      "recent_window_magnitude": 0.013097,
+      "confidence": 1.0003,
+      "fit_applied": false
+    },
+    {
+      "frame": 367,
+      "seconds": 12.212212,
+      "dx": -0.016925,
+      "dy": 0.001276,
+      "magnitude": 0.016973,
+      "recent_window_magnitude": 0.058425,
+      "confidence": 0.999509,
+      "fit_applied": false
+    },
+    {
+      "frame": 368,
+      "seconds": 12.245579,
+      "dx": -0.015374,
+      "dy": 0.008671,
+      "magnitude": 0.017651,
+      "recent_window_magnitude": 0.047591,
+      "confidence": 0.999038,
+      "fit_applied": false
+    },
+    {
+      "frame": 369,
+      "seconds": 12.278946,
+      "dx": 0.016245,
+      "dy": -0.002351,
+      "magnitude": 0.016415,
+      "recent_window_magnitude": 0.042471,
+      "confidence": 1.000102,
+      "fit_applied": false
+    },
+    {
+      "frame": 370,
+      "seconds": 12.312312,
+      "dx": 0.055299,
+      "dy": -0.001256,
+      "magnitude": 0.055313,
+      "recent_window_magnitude": 0.025533,
+      "confidence": 0.999503,
+      "fit_applied": false
+    },
+    {
+      "frame": 371,
+      "seconds": 12.345679,
+      "dx": 0.030261,
+      "dy": 0.004264,
+      "magnitude": 0.030559,
+      "recent_window_magnitude": 0.07031,
+      "confidence": 0.999483,
+      "fit_applied": false
+    },
+    {
+      "frame": 372,
+      "seconds": 12.379046,
+      "dx": -0.052225,
+      "dy": -0.018257,
+      "magnitude": 0.055324,
+      "recent_window_magnitude": 0.035352,
+      "confidence": 0.997552,
+      "fit_applied": false
+    },
+    {
+      "frame": 373,
+      "seconds": 12.412412,
+      "dx": 0.001398,
+      "dy": -0.003427,
+      "magnitude": 0.003701,
+      "recent_window_magnitude": 0.055143,
+      "confidence": 0.999039,
+      "fit_applied": false
+    },
+    {
+      "frame": 374,
+      "seconds": 12.445779,
+      "dx": 0.011411,
+      "dy": -0.007056,
+      "magnitude": 0.013416,
+      "recent_window_magnitude": 0.052832,
+      "confidence": 0.998016,
+      "fit_applied": false
+    },
+    {
+      "frame": 375,
+      "seconds": 12.479146,
+      "dx": 0.011171,
+      "dy": 0.001863,
+      "magnitude": 0.011325,
+      "recent_window_magnitude": 0.022702,
+      "confidence": 0.999581,
+      "fit_applied": false
+    },
+    {
+      "frame": 376,
+      "seconds": 12.512513,
+      "dx": -0.019251,
+      "dy": 0.005761,
+      "magnitude": 0.020095,
+      "recent_window_magnitude": 0.051979,
+      "confidence": 0.998739,
+      "fit_applied": false
+    },
+    {
+      "frame": 377,
+      "seconds": 12.545879,
+      "dx": -0.000148,
+      "dy": -0.002583,
+      "magnitude": 0.002587,
+      "recent_window_magnitude": 0.007112,
+      "confidence": 1.000049,
+      "fit_applied": false
+    },
+    {
+      "frame": 378,
+      "seconds": 12.579246,
+      "dx": 0.001167,
+      "dy": -0.013957,
+      "magnitude": 0.014006,
+      "recent_window_magnitude": 0.016553,
+      "confidence": 0.999135,
+      "fit_applied": false
+    },
+    {
+      "frame": 379,
+      "seconds": 12.612613,
+      "dx": 0.038973,
+      "dy": -0.002705,
+      "magnitude": 0.039066,
+      "recent_window_magnitude": 0.033962,
+      "confidence": 0.999969,
+      "fit_applied": false
+    },
+    {
+      "frame": 380,
+      "seconds": 12.645979,
+      "dx": -0.006613,
+      "dy": 0.015247,
+      "magnitude": 0.016619,
+      "recent_window_magnitude": 0.014237,
+      "confidence": 0.999157,
+      "fit_applied": false
+    },
+    {
+      "frame": 381,
+      "seconds": 12.679346,
+      "dx": 0.005965,
+      "dy": -0.003866,
+      "magnitude": 0.007108,
+      "recent_window_magnitude": 0.040122,
+      "confidence": 1.000174,
+      "fit_applied": false
+    },
+    {
+      "frame": 382,
+      "seconds": 12.712713,
+      "dx": -0.033143,
+      "dy": -0.01442,
+      "magnitude": 0.036144,
+      "recent_window_magnitude": 0.020699,
+      "confidence": 0.998819,
+      "fit_applied": false
+    },
+    {
+      "frame": 383,
+      "seconds": 12.746079,
+      "dx": -0.015202,
+      "dy": -8e-05,
+      "magnitude": 0.015202,
+      "recent_window_magnitude": 0.011589,
+      "confidence": 1.000082,
+      "fit_applied": false
+    },
+    {
+      "frame": 384,
+      "seconds": 12.779446,
+      "dx": -0.012608,
+      "dy": -0.004242,
+      "magnitude": 0.013302,
+      "recent_window_magnitude": 0.062038,
+      "confidence": 1.000001,
+      "fit_applied": false
+    },
+    {
+      "frame": 385,
+      "seconds": 12.812813,
+      "dx": 0.000292,
+      "dy": 0.001828,
+      "magnitude": 0.001851,
+      "recent_window_magnitude": 0.05851,
+      "confidence": 0.999944,
+      "fit_applied": false
+    },
+    {
+      "frame": 386,
+      "seconds": 12.84618,
+      "dx": -0.001267,
+      "dy": -0.012561,
+      "magnitude": 0.012625,
+      "recent_window_magnitude": 0.068584,
+      "confidence": 0.999993,
+      "fit_applied": false
+    },
+    {
+      "frame": 387,
+      "seconds": 12.879546,
+      "dx": 0.054664,
+      "dy": 0.003619,
+      "magnitude": 0.054784,
+      "recent_window_magnitude": 0.028294,
+      "confidence": 0.999742,
+      "fit_applied": false
+    },
+    {
+      "frame": 388,
+      "seconds": 12.912913,
+      "dx": 0.050202,
+      "dy": -0.000155,
+      "magnitude": 0.050203,
+      "recent_window_magnitude": 0.092007,
+      "confidence": 0.99896,
+      "fit_applied": false
+    },
+    {
+      "frame": 389,
+      "seconds": 12.94628,
+      "dx": -0.00401,
+      "dy": -0.005613,
+      "magnitude": 0.006898,
+      "recent_window_magnitude": 0.100708,
+      "confidence": 0.999894,
+      "fit_applied": false
+    },
+    {
+      "frame": 390,
+      "seconds": 12.979646,
+      "dx": -0.037671,
+      "dy": -8.9e-05,
+      "magnitude": 0.037672,
+      "recent_window_magnitude": 0.063662,
+      "confidence": 0.997432,
+      "fit_applied": false
+    },
+    {
+      "frame": 391,
+      "seconds": 13.013013,
+      "dx": -0.013632,
+      "dy": 0.009159,
+      "magnitude": 0.016423,
+      "recent_window_magnitude": 0.050034,
+      "confidence": 0.997869,
+      "fit_applied": false
+    },
+    {
+      "frame": 392,
+      "seconds": 13.04638,
+      "dx": -0.01626,
+      "dy": -0.009952,
+      "magnitude": 0.019064,
+      "recent_window_magnitude": 0.022382,
+      "confidence": 0.999113,
+      "fit_applied": false
+    },
+    {
+      "frame": 393,
+      "seconds": 13.079746,
+      "dx": -0.010944,
+      "dy": 0.010088,
+      "magnitude": 0.014885,
+      "recent_window_magnitude": 0.082596,
+      "confidence": 0.999643,
+      "fit_applied": false
+    },
+    {
+      "frame": 394,
+      "seconds": 13.113113,
+      "dx": -0.031369,
+      "dy": -0.005191,
+      "magnitude": 0.031796,
+      "recent_window_magnitude": 0.109951,
+      "confidence": 0.998429,
+      "fit_applied": false
+    },
+    {
+      "frame": 395,
+      "seconds": 13.14648,
+      "dx": 0.022874,
+      "dy": 0.004218,
+      "magnitude": 0.02326,
+      "recent_window_magnitude": 0.050029,
+      "confidence": 0.999521,
+      "fit_applied": false
+    },
+    {
+      "frame": 396,
+      "seconds": 13.179847,
+      "dx": -0.031118,
+      "dy": -0.008834,
+      "magnitude": 0.032348,
+      "recent_window_magnitude": 0.067515,
+      "confidence": 0.997757,
+      "fit_applied": false
+    },
+    {
+      "frame": 397,
+      "seconds": 13.213213,
+      "dx": 4.8e-05,
+      "dy": -0.006797,
+      "magnitude": 0.006797,
+      "recent_window_magnitude": 0.050929,
+      "confidence": 0.999743,
+      "fit_applied": false
+    },
+    {
+      "frame": 398,
+      "seconds": 13.24658,
+      "dx": -0.024347,
+      "dy": 0.01487,
+      "magnitude": 0.028529,
+      "recent_window_magnitude": 0.063937,
+      "confidence": 0.999412,
+      "fit_applied": false
+    },
+    {
+      "frame": 399,
+      "seconds": 13.279947,
+      "dx": -0.013579,
+      "dy": 0.011186,
+      "magnitude": 0.017593,
+      "recent_window_magnitude": 0.048392,
+      "confidence": 0.998338,
+      "fit_applied": false
+    },
+    {
+      "frame": 400,
+      "seconds": 13.313313,
+      "dx": -0.017421,
+      "dy": 0.015744,
+      "magnitude": 0.023481,
+      "recent_window_magnitude": 0.090294,
+      "confidence": 0.998769,
+      "fit_applied": false
+    },
+    {
+      "frame": 401,
+      "seconds": 13.34668,
+      "dx": -0.012331,
+      "dy": 0.003884,
+      "magnitude": 0.012928,
+      "recent_window_magnitude": 0.078014,
+      "confidence": 0.999678,
+      "fit_applied": false
+    },
+    {
+      "frame": 402,
+      "seconds": 13.380047,
+      "dx": 0.007351,
+      "dy": 0.017087,
+      "magnitude": 0.018602,
+      "recent_window_magnitude": 0.087061,
+      "confidence": 0.996356,
+      "fit_applied": false
+    },
+    {
+      "frame": 403,
+      "seconds": 13.413413,
+      "dx": 0.012761,
+      "dy": 0.003883,
+      "magnitude": 0.013339,
+      "recent_window_magnitude": 0.056751,
+      "confidence": 0.998441,
+      "fit_applied": false
+    },
+    {
+      "frame": 404,
+      "seconds": 13.44678,
+      "dx": -0.009953,
+      "dy": 0.00665,
+      "magnitude": 0.01197,
+      "recent_window_magnitude": 0.051149,
+      "confidence": 0.997291,
+      "fit_applied": false
+    },
+    {
+      "frame": 405,
+      "seconds": 13.480147,
+      "dx": -0.008825,
+      "dy": 0.000469,
+      "magnitude": 0.008838,
+      "recent_window_magnitude": 0.033811,
+      "confidence": 0.99938,
+      "fit_applied": false
+    },
+    {
+      "frame": 406,
+      "seconds": 13.513514,
+      "dx": 0.011586,
+      "dy": 0.019178,
+      "magnitude": 0.022406,
+      "recent_window_magnitude": 0.049001,
+      "confidence": 0.99942,
+      "fit_applied": false
+    },
+    {
+      "frame": 407,
+      "seconds": 13.54688,
+      "dx": -0.015469,
+      "dy": -0.001131,
+      "magnitude": 0.01551,
+      "recent_window_magnitude": 0.030689,
+      "confidence": 0.999272,
+      "fit_applied": false
+    },
+    {
+      "frame": 408,
+      "seconds": 13.580247,
+      "dx": -0.016239,
+      "dy": 0.012453,
+      "magnitude": 0.020464,
+      "recent_window_magnitude": 0.054114,
+      "confidence": 0.999568,
+      "fit_applied": false
+    },
+    {
+      "frame": 409,
+      "seconds": 13.613614,
+      "dx": -0.001416,
+      "dy": 0.00431,
+      "magnitude": 0.004536,
+      "recent_window_magnitude": 0.046545,
+      "confidence": 1.000273,
+      "fit_applied": false
+    },
+    {
+      "frame": 410,
+      "seconds": 13.64698,
+      "dx": -0.03336,
+      "dy": 0.01529,
+      "magnitude": 0.036697,
+      "recent_window_magnitude": 0.074321,
+      "confidence": 0.998338,
+      "fit_applied": false
+    },
+    {
+      "frame": 411,
+      "seconds": 13.680347,
+      "dx": -0.029068,
+      "dy": 0.008283,
+      "magnitude": 0.030225,
+      "recent_window_magnitude": 0.103281,
+      "confidence": 0.998178,
+      "fit_applied": false
+    },
+    {
+      "frame": 412,
+      "seconds": 13.713714,
+      "dx": -0.024781,
+      "dy": 0.014655,
+      "magnitude": 0.02879,
+      "recent_window_magnitude": 0.118406,
+      "confidence": 0.998171,
+      "fit_applied": false
+    },
+    {
+      "frame": 413,
+      "seconds": 13.74708,
+      "dx": 0.005252,
+      "dy": -0.005201,
+      "magnitude": 0.007391,
+      "recent_window_magnitude": 0.091351,
+      "confidence": 0.999852,
+      "fit_applied": false
+    },
+    {
+      "frame": 414,
+      "seconds": 13.780447,
+      "dx": 0.001577,
+      "dy": 0.003854,
+      "magnitude": 0.004165,
+      "recent_window_magnitude": 0.088436,
+      "confidence": 0.998975,
+      "fit_applied": false
+    },
+    {
+      "frame": 415,
+      "seconds": 13.813814,
+      "dx": 0.012846,
+      "dy": -0.008278,
+      "magnitude": 0.015282,
+      "recent_window_magnitude": 0.036675,
+      "confidence": 0.999259,
+      "fit_applied": false
+    },
+    {
+      "frame": 416,
+      "seconds": 13.847181,
+      "dx": -0.018787,
+      "dy": -0.005643,
+      "magnitude": 0.019616,
+      "recent_window_magnitude": 0.023901,
+      "confidence": 0.999307,
+      "fit_applied": false
+    },
+    {
+      "frame": 417,
+      "seconds": 13.880547,
+      "dx": -0.001638,
+      "dy": 0.002221,
+      "magnitude": 0.00276,
+      "recent_window_magnitude": 0.013068,
+      "confidence": 0.998702,
+      "fit_applied": false
+    },
+    {
+      "frame": 418,
+      "seconds": 13.913914,
+      "dx": -0.036552,
+      "dy": -0.000883,
+      "magnitude": 0.036562,
+      "recent_window_magnitude": 0.04344,
+      "confidence": 0.998312,
+      "fit_applied": false
+    },
+    {
+      "frame": 419,
+      "seconds": 13.947281,
+      "dx": -0.006676,
+      "dy": -0.001895,
+      "magnitude": 0.00694,
+      "recent_window_magnitude": 0.05283,
+      "confidence": 0.999414,
+      "fit_applied": false
+    },
+    {
+      "frame": 420,
+      "seconds": 13.980647,
+      "dx": -0.02453,
+      "dy": 0.018661,
+      "magnitude": 0.030821,
+      "recent_window_magnitude": 0.089059,
+      "confidence": 0.998332,
+      "fit_applied": false
+    },
+    {
+      "frame": 421,
+      "seconds": 14.014014,
+      "dx": -0.008203,
+      "dy": 0.000824,
+      "magnitude": 0.008245,
+      "recent_window_magnitude": 0.079875,
+      "confidence": 0.997953,
+      "fit_applied": false
+    },
+    {
+      "frame": 422,
+      "seconds": 14.047381,
+      "dx": -0.000465,
+      "dy": -0.002164,
+      "magnitude": 0.002213,
+      "recent_window_magnitude": 0.077798,
+      "confidence": 0.99884,
+      "fit_applied": false
+    },
+    {
+      "frame": 423,
+      "seconds": 14.080747,
+      "dx": -0.002497,
+      "dy": -0.005671,
+      "magnitude": 0.006197,
+      "recent_window_magnitude": 0.04348,
+      "confidence": 0.999569,
+      "fit_applied": false
+    },
+    {
+      "frame": 424,
+      "seconds": 14.114114,
+      "dx": -0.005373,
+      "dy": -0.001204,
+      "magnitude": 0.005506,
+      "recent_window_magnitude": 0.042376,
+      "confidence": 0.998763,
+      "fit_applied": false
+    },
+    {
+      "frame": 425,
+      "seconds": 14.147481,
+      "dx": 0.009592,
+      "dy": -0.000614,
+      "magnitude": 0.009612,
+      "recent_window_magnitude": 0.011234,
+      "confidence": 0.999365,
+      "fit_applied": false
+    },
+    {
+      "frame": 426,
+      "seconds": 14.180848,
+      "dx": -0.041643,
+      "dy": 0.001364,
+      "magnitude": 0.041665,
+      "recent_window_magnitude": 0.041227,
+      "confidence": 0.998823,
+      "fit_applied": false
+    },
+    {
+      "frame": 427,
+      "seconds": 14.214214,
+      "dx": -0.01645,
+      "dy": -0.004511,
+      "magnitude": 0.017058,
+      "recent_window_magnitude": 0.057365,
+      "confidence": 0.999671,
+      "fit_applied": false
+    },
+    {
+      "frame": 428,
+      "seconds": 14.247581,
+      "dx": 0.001558,
+      "dy": -0.00461,
+      "magnitude": 0.004866,
+      "recent_window_magnitude": 0.053185,
+      "confidence": 0.999182,
+      "fit_applied": false
+    },
+    {
+      "frame": 429,
+      "seconds": 14.280948,
+      "dx": 0.004995,
+      "dy": -0.001775,
+      "magnitude": 0.005301,
+      "recent_window_magnitude": 0.043158,
+      "confidence": 0.999732,
+      "fit_applied": false
+    },
+    {
+      "frame": 430,
+      "seconds": 14.314314,
+      "dx": -0.035785,
+      "dy": -0.004024,
+      "magnitude": 0.036011,
+      "recent_window_magnitude": 0.088372,
+      "confidence": 0.998681,
+      "fit_applied": false
+    },
+    {
+      "frame": 431,
+      "seconds": 14.347681,
+      "dx": -0.01406,
+      "dy": 0.000666,
+      "magnitude": 0.014075,
+      "recent_window_magnitude": 0.06142,
+      "confidence": 0.999766,
+      "fit_applied": false
+    },
+    {
+      "frame": 432,
+      "seconds": 14.381048,
+      "dx": -0.012516,
+      "dy": -0.01792,
+      "magnitude": 0.021858,
+      "recent_window_magnitude": 0.062288,
+      "confidence": 0.999136,
+      "fit_applied": false
+    },
+    {
+      "frame": 433,
+      "seconds": 14.414414,
+      "dx": -0.006959,
+      "dy": 0.003974,
+      "magnitude": 0.008013,
+      "recent_window_magnitude": 0.067094,
+      "confidence": 0.999894,
+      "fit_applied": false
+    },
+    {
+      "frame": 434,
+      "seconds": 14.447781,
+      "dx": 0.031981,
+      "dy": -0.00788,
+      "magnitude": 0.032937,
+      "recent_window_magnitude": 0.045037,
+      "confidence": 0.997132,
+      "fit_applied": false
+    },
+    {
+      "frame": 435,
+      "seconds": 14.481148,
+      "dx": 0.000495,
+      "dy": 0.00346,
+      "magnitude": 0.003496,
+      "recent_window_magnitude": 0.017731,
+      "confidence": 0.999399,
+      "fit_applied": false
+    },
+    {
+      "frame": 436,
+      "seconds": 14.514515,
+      "dx": 0.03751,
+      "dy": -0.007608,
+      "magnitude": 0.038274,
+      "recent_window_magnitude": 0.056799,
+      "confidence": 0.998759,
+      "fit_applied": false
+    },
+    {
+      "frame": 437,
+      "seconds": 14.547881,
+      "dx": -0.005269,
+      "dy": -0.007722,
+      "magnitude": 0.009348,
+      "recent_window_magnitude": 0.059874,
+      "confidence": 0.999726,
+      "fit_applied": false
+    },
+    {
+      "frame": 438,
+      "seconds": 14.581248,
+      "dx": -0.007631,
+      "dy": 0.004795,
+      "magnitude": 0.009013,
+      "recent_window_magnitude": 0.059012,
+      "confidence": 0.99905,
+      "fit_applied": false
+    },
+    {
+      "frame": 439,
+      "seconds": 14.614615,
+      "dx": 0.000124,
+      "dy": -0.006984,
+      "magnitude": 0.006986,
+      "recent_window_magnitude": 0.028881,
+      "confidence": 0.999988,
+      "fit_applied": false
+    },
+    {
+      "frame": 440,
+      "seconds": 14.647981,
+      "dx": -0.018531,
+      "dy": 0.002621,
+      "magnitude": 0.018715,
+      "recent_window_magnitude": 0.016138,
+      "confidence": 1.000002,
+      "fit_applied": false
+    },
+    {
+      "frame": 441,
+      "seconds": 14.681348,
+      "dx": -0.001569,
+      "dy": 0.01139,
+      "magnitude": 0.011498,
+      "recent_window_magnitude": 0.033131,
+      "confidence": 0.999864,
+      "fit_applied": false
+    },
+    {
+      "frame": 442,
+      "seconds": 14.714715,
+      "dx": -0.02842,
+      "dy": -0.015256,
+      "magnitude": 0.032255,
+      "recent_window_magnitude": 0.056132,
+      "confidence": 0.998817,
+      "fit_applied": false
+    },
+    {
+      "frame": 443,
+      "seconds": 14.748081,
+      "dx": 0.004629,
+      "dy": 0.001585,
+      "magnitude": 0.004892,
+      "recent_window_magnitude": 0.044269,
+      "confidence": 0.999474,
+      "fit_applied": false
+    },
+    {
+      "frame": 444,
+      "seconds": 14.781448,
+      "dx": -0.025179,
+      "dy": 0.019168,
+      "magnitude": 0.031645,
+      "recent_window_magnitude": 0.071772,
+      "confidence": 1.000021,
+      "fit_applied": false
+    },
+    {
+      "frame": 445,
+      "seconds": 14.814815,
+      "dx": 0.023986,
+      "dy": -0.003438,
+      "magnitude": 0.024231,
+      "recent_window_magnitude": 0.029765,
+      "confidence": 0.999152,
+      "fit_applied": false
+    },
+    {
+      "frame": 446,
+      "seconds": 14.848182,
+      "dx": 0.008707,
+      "dy": -0.014375,
+      "magnitude": 0.016807,
+      "recent_window_magnitude": 0.020412,
+      "confidence": 0.996033,
+      "fit_applied": false
+    },
+    {
+      "frame": 447,
+      "seconds": 14.881548,
+      "dx": -0.022937,
+      "dy": -0.018135,
+      "magnitude": 0.02924,
+      "recent_window_magnitude": 0.018639,
+      "confidence": 0.997915,
+      "fit_applied": false
+    },
+    {
+      "frame": 448,
+      "seconds": 14.914915,
+      "dx": -0.005256,
+      "dy": -0.007264,
+      "magnitude": 0.008967,
+      "recent_window_magnitude": 0.031714,
+      "confidence": 0.998819,
+      "fit_applied": false
+    },
+    {
+      "frame": 449,
+      "seconds": 14.948282,
+      "dx": 0.011787,
+      "dy": 0.001271,
+      "magnitude": 0.011855,
+      "recent_window_magnitude": 0.044993,
+      "confidence": 0.999177,
+      "fit_applied": false
+    },
+    {
+      "frame": 450,
+      "seconds": 14.981648,
+      "dx": 0.022573,
+      "dy": -0.007437,
+      "magnitude": 0.023766,
+      "recent_window_magnitude": 0.048288,
+      "confidence": 0.998219,
+      "fit_applied": false
+    },
+    {
+      "frame": 451,
+      "seconds": 15.015015,
+      "dx": 0.023734,
+      "dy": -0.009016,
+      "magnitude": 0.025389,
+      "recent_window_magnitude": 0.050407,
+      "confidence": 0.999668,
+      "fit_applied": false
+    },
+    {
+      "frame": 452,
+      "seconds": 15.048382,
+      "dx": -0.016064,
+      "dy": -0.012807,
+      "magnitude": 0.020544,
+      "recent_window_magnitude": 0.050942,
+      "confidence": 0.9994,
+      "fit_applied": false
+    },
+    {
+      "frame": 453,
+      "seconds": 15.081748,
+      "dx": -0.008856,
+      "dy": -0.005022,
+      "magnitude": 0.01018,
+      "recent_window_magnitude": 0.0468,
+      "confidence": 0.999593,
+      "fit_applied": false
+    },
+    {
+      "frame": 454,
+      "seconds": 15.115115,
+      "dx": -0.012906,
+      "dy": -0.015926,
+      "magnitude": 0.020498,
+      "recent_window_magnitude": 0.050919,
+      "confidence": 0.999606,
+      "fit_applied": false
+    },
+    {
+      "frame": 455,
+      "seconds": 15.148482,
+      "dx": 5e-06,
+      "dy": -0.007971,
+      "magnitude": 0.007971,
+      "recent_window_magnitude": 0.052661,
+      "confidence": 0.99996,
+      "fit_applied": false
+    },
+    {
+      "frame": 456,
+      "seconds": 15.181849,
+      "dx": -0.027042,
+      "dy": -0.007869,
+      "magnitude": 0.028164,
+      "recent_window_magnitude": 0.08165,
+      "confidence": 0.999258,
+      "fit_applied": false
+    },
+    {
+      "frame": 457,
+      "seconds": 15.215215,
+      "dx": 0.003358,
+      "dy": 0.006489,
+      "magnitude": 0.007307,
+      "recent_window_magnitude": 0.054615,
+      "confidence": 0.999821,
+      "fit_applied": false
+    },
+    {
+      "frame": 458,
+      "seconds": 15.248582,
+      "dx": -0.028878,
+      "dy": 0.000877,
+      "magnitude": 0.028892,
+      "recent_window_magnitude": 0.069863,
+      "confidence": 0.998515,
+      "fit_applied": false
+    },
+    {
+      "frame": 459,
+      "seconds": 15.281949,
+      "dx": 0.006655,
+      "dy": -0.002588,
+      "magnitude": 0.007141,
+      "recent_window_magnitude": 0.047217,
+      "confidence": 1.000211,
+      "fit_applied": false
+    },
+    {
+      "frame": 460,
+      "seconds": 15.315315,
+      "dx": -0.009324,
+      "dy": 0.010223,
+      "magnitude": 0.013836,
+      "recent_window_magnitude": 0.05569,
+      "confidence": 0.99976,
+      "fit_applied": false
+    },
+    {
+      "frame": 461,
+      "seconds": 15.348682,
+      "dx": -0.019467,
+      "dy": 0.014843,
+      "magnitude": 0.024481,
+      "recent_window_magnitude": 0.05623,
+      "confidence": 0.999848,
+      "fit_applied": false
+    },
+    {
+      "frame": 462,
+      "seconds": 15.382049,
+      "dx": -0.007605,
+      "dy": 0.003614,
+      "magnitude": 0.008421,
+      "recent_window_magnitude": 0.064526,
+      "confidence": 0.998217,
+      "fit_applied": false
+    },
+    {
+      "frame": 463,
+      "seconds": 15.415415,
+      "dx": -0.008114,
+      "dy": 0.00141,
+      "magnitude": 0.008235,
+      "recent_window_magnitude": 0.046791,
+      "confidence": 0.999789,
+      "fit_applied": false
+    },
+    {
+      "frame": 464,
+      "seconds": 15.448782,
+      "dx": -0.015499,
+      "dy": 0.00383,
+      "magnitude": 0.015965,
+      "recent_window_magnitude": 0.068933,
+      "confidence": 0.999337,
+      "fit_applied": false
+    },
+    {
+      "frame": 465,
+      "seconds": 15.482149,
+      "dx": 0.002502,
+      "dy": 0.004106,
+      "magnitude": 0.004809,
+      "recent_window_magnitude": 0.05563,
+      "confidence": 0.999972,
+      "fit_applied": false
+    },
+    {
+      "frame": 466,
+      "seconds": 15.515516,
+      "dx": -0.013708,
+      "dy": 0.015069,
+      "magnitude": 0.020371,
+      "recent_window_magnitude": 0.050847,
+      "confidence": 0.99929,
+      "fit_applied": false
+    },
+    {
+      "frame": 467,
+      "seconds": 15.548882,
+      "dx": -0.005498,
+      "dy": 0.00221,
+      "magnitude": 0.005925,
+      "recent_window_magnitude": 0.048314,
+      "confidence": 0.999673,
+      "fit_applied": false
+    },
+    {
+      "frame": 468,
+      "seconds": 15.582249,
+      "dx": -0.016126,
+      "dy": 0.010367,
+      "magnitude": 0.019171,
+      "recent_window_magnitude": 0.060014,
+      "confidence": 0.998353,
+      "fit_applied": false
+    },
+    {
+      "frame": 469,
+      "seconds": 15.615616,
+      "dx": -0.014159,
+      "dy": -0.003274,
+      "magnitude": 0.014532,
+      "recent_window_magnitude": 0.054944,
+      "confidence": 0.999592,
+      "fit_applied": false
+    },
+    {
+      "frame": 470,
+      "seconds": 15.648982,
+      "dx": -0.000892,
+      "dy": 0.008661,
+      "magnitude": 0.008707,
+      "recent_window_magnitude": 0.060245,
+      "confidence": 0.999543,
+      "fit_applied": false
+    },
+    {
+      "frame": 471,
+      "seconds": 15.682349,
+      "dx": -0.019353,
+      "dy": -0.000994,
+      "magnitude": 0.019379,
+      "recent_window_magnitude": 0.058541,
+      "confidence": 1.000046,
+      "fit_applied": false
+    },
+    {
+      "frame": 472,
+      "seconds": 15.715716,
+      "dx": -0.001218,
+      "dy": 0.0119,
+      "magnitude": 0.011962,
+      "recent_window_magnitude": 0.058211,
+      "confidence": 0.99977,
+      "fit_applied": false
+    },
+    {
+      "frame": 473,
+      "seconds": 15.749082,
+      "dx": -0.000914,
+      "dy": 0.002056,
+      "magnitude": 0.002249,
+      "recent_window_magnitude": 0.040884,
+      "confidence": 0.999969,
+      "fit_applied": false
+    },
+    {
+      "frame": 474,
+      "seconds": 15.782449,
+      "dx": -0.014628,
+      "dy": 0.002625,
+      "magnitude": 0.014862,
+      "recent_window_magnitude": 0.044241,
+      "confidence": 0.999317,
+      "fit_applied": false
+    },
+    {
+      "frame": 475,
+      "seconds": 15.815816,
+      "dx": -0.001832,
+      "dy": 0.000355,
+      "magnitude": 0.001866,
+      "recent_window_magnitude": 0.041158,
+      "confidence": 0.999559,
+      "fit_applied": false
+    },
+    {
+      "frame": 476,
+      "seconds": 15.849183,
+      "dx": -0.003756,
+      "dy": 0.004489,
+      "magnitude": 0.005853,
+      "recent_window_magnitude": 0.030959,
+      "confidence": 0.999618,
+      "fit_applied": false
+    },
+    {
+      "frame": 477,
+      "seconds": 15.882549,
+      "dx": 0.002367,
+      "dy": -0.011261,
+      "magnitude": 0.011507,
+      "recent_window_magnitude": 0.018843,
+      "confidence": 0.999747,
+      "fit_applied": false
+    },
+    {
+      "frame": 478,
+      "seconds": 15.915916,
+      "dx": 0.001894,
+      "dy": 0.002407,
+      "magnitude": 0.003063,
+      "recent_window_magnitude": 0.016016,
+      "confidence": 0.999552,
+      "fit_applied": false
+    },
+    {
+      "frame": 479,
+      "seconds": 15.949283,
+      "dx": 0.000738,
+      "dy": 0.005201,
+      "magnitude": 0.005253,
+      "recent_window_magnitude": 0.001328,
+      "confidence": 0.999277,
+      "fit_applied": false
+    },
+    {
+      "frame": 480,
+      "seconds": 15.982649,
+      "dx": 0.006788,
+      "dy": 0.003889,
+      "magnitude": 0.007823,
+      "recent_window_magnitude": 0.009317,
+      "confidence": 0.999859,
+      "fit_applied": false
+    },
+    {
+      "frame": 481,
+      "seconds": 16.016016,
+      "dx": 0.00434,
+      "dy": 0.061246,
+      "magnitude": 0.0614,
+      "recent_window_magnitude": 0.063561,
+      "confidence": 0.994155,
+      "fit_applied": false
+    },
+    {
+      "frame": 482,
+      "seconds": 16.049383,
+      "dx": 0.006785,
+      "dy": -0.001483,
+      "magnitude": 0.006946,
+      "recent_window_magnitude": 0.074162,
+      "confidence": 0.999873,
+      "fit_applied": false
+    },
+    {
+      "frame": 483,
+      "seconds": 16.082749,
+      "dx": 0.009932,
+      "dy": -0.002571,
+      "magnitude": 0.010259,
+      "recent_window_magnitude": 0.072182,
+      "confidence": 1.000156,
+      "fit_applied": false
+    },
+    {
+      "frame": 484,
+      "seconds": 16.116116,
+      "dx": 0.004696,
+      "dy": -0.010584,
+      "magnitude": 0.011579,
+      "recent_window_magnitude": 0.060074,
+      "confidence": 0.999906,
+      "fit_applied": false
+    },
+    {
+      "frame": 485,
+      "seconds": 16.149483,
+      "dx": 0.087236,
+      "dy": 0.018528,
+      "magnitude": 0.089182,
+      "recent_window_magnitude": 0.13042,
+      "confidence": 0.999667,
+      "fit_applied": false
+    },
+    {
+      "frame": 486,
+      "seconds": 16.18285,
+      "dx": 0.003863,
+      "dy": 0.004175,
+      "magnitude": 0.005688,
+      "recent_window_magnitude": 0.1128,
+      "confidence": 1.000256,
+      "fit_applied": false
+    },
+    {
+      "frame": 487,
+      "seconds": 16.216216,
+      "dx": 0.006611,
+      "dy": 0.020671,
+      "magnitude": 0.021702,
+      "recent_window_magnitude": 0.116331,
+      "confidence": 1.000137,
+      "fit_applied": false
+    },
+    {
+      "frame": 488,
+      "seconds": 16.249583,
+      "dx": 0.029052,
+      "dy": 0.001051,
+      "magnitude": 0.029071,
+      "recent_window_magnitude": 0.135744,
+      "confidence": 1.000003,
+      "fit_applied": false
+    },
+    {
+      "frame": 489,
+      "seconds": 16.28295,
+      "dx": 0.003994,
+      "dy": -0.003577,
+      "magnitude": 0.005362,
+      "recent_window_magnitude": 0.136989,
+      "confidence": 1.000066,
+      "fit_applied": false
+    },
+    {
+      "frame": 490,
+      "seconds": 16.316316,
+      "dx": -0.007372,
+      "dy": 0.002521,
+      "magnitude": 0.007791,
+      "recent_window_magnitude": 0.043861,
+      "confidence": 1.00024,
+      "fit_applied": false
+    },
+    {
+      "frame": 491,
+      "seconds": 16.349683,
+      "dx": -0.003788,
+      "dy": -0.004388,
+      "magnitude": 0.005797,
+      "recent_window_magnitude": 0.032818,
+      "confidence": 1.000055,
+      "fit_applied": false
+    },
+    {
+      "frame": 492,
+      "seconds": 16.38305,
+      "dx": 0.038377,
+      "dy": 0.007987,
+      "magnitude": 0.0392,
+      "recent_window_magnitude": 0.060371,
+      "confidence": 0.999323,
+      "fit_applied": false
+    },
+    {
+      "frame": 493,
+      "seconds": 16.416416,
+      "dx": -0.00144,
+      "dy": -0.003719,
+      "magnitude": 0.003988,
+      "recent_window_magnitude": 0.029794,
+      "confidence": 0.999908,
+      "fit_applied": false
+    },
+    {
+      "frame": 494,
+      "seconds": 16.449783,
+      "dx": -0.008966,
+      "dy": -0.008395,
+      "magnitude": 0.012283,
+      "recent_window_magnitude": 0.017847,
+      "confidence": 0.999636,
+      "fit_applied": false
+    },
+    {
+      "frame": 495,
+      "seconds": 16.48315,
+      "dx": 0.002767,
+      "dy": 0.007557,
+      "magnitude": 0.008048,
+      "recent_window_magnitude": 0.026967,
+      "confidence": 0.999623,
+      "fit_applied": false
+    },
+    {
+      "frame": 496,
+      "seconds": 16.516517,
+      "dx": -0.018796,
+      "dy": 0.01229,
+      "magnitude": 0.022457,
+      "recent_window_magnitude": 0.019742,
+      "confidence": 0.999486,
+      "fit_applied": false
+    },
+    {
+      "frame": 497,
+      "seconds": 16.549883,
+      "dx": -0.003565,
+      "dy": 0.00116,
+      "magnitude": 0.003748,
+      "recent_window_magnitude": 0.031289,
+      "confidence": 0.999416,
+      "fit_applied": false
+    },
+    {
+      "frame": 498,
+      "seconds": 16.58325,
+      "dx": -0.004761,
+      "dy": 0.006283,
+      "magnitude": 0.007883,
+      "recent_window_magnitude": 0.038304,
+      "confidence": 0.998844,
+      "fit_applied": false
+    },
+    {
+      "frame": 499,
+      "seconds": 16.616617,
+      "dx": -0.016166,
+      "dy": -0.000661,
+      "magnitude": 0.01618,
+      "recent_window_magnitude": 0.048487,
+      "confidence": 0.999064,
+      "fit_applied": false
+    },
+    {
+      "frame": 500,
+      "seconds": 16.649983,
+      "dx": -0.026757,
+      "dy": -0.011946,
+      "magnitude": 0.029303,
+      "recent_window_magnitude": 0.070407,
+      "confidence": 0.999352,
+      "fit_applied": false
+    },
+    {
+      "frame": 501,
+      "seconds": 16.68335,
+      "dx": 0.027883,
+      "dy": 0.035536,
+      "magnitude": 0.045169,
+      "recent_window_magnitude": 0.03832,
+      "confidence": 0.99889,
+      "fit_applied": false
+    },
+    {
+      "frame": 502,
+      "seconds": 16.716717,
+      "dx": 0.003681,
+      "dy": -0.003908,
+      "magnitude": 0.005369,
+      "recent_window_magnitude": 0.030003,
+      "confidence": 0.999514,
+      "fit_applied": false
+    },
+    {
+      "frame": 503,
+      "seconds": 16.750083,
+      "dx": -0.039684,
+      "dy": 0.000357,
+      "magnitude": 0.039686,
+      "recent_window_magnitude": 0.054598,
+      "confidence": 0.997233,
+      "fit_applied": false
+    },
+    {
+      "frame": 504,
+      "seconds": 16.78345,
+      "dx": 0.00414,
+      "dy": -0.004398,
+      "magnitude": 0.00604,
+      "recent_window_magnitude": 0.034488,
+      "confidence": 1.000006,
+      "fit_applied": false
+    },
+    {
+      "frame": 505,
+      "seconds": 16.816817,
+      "dx": 0.013726,
+      "dy": 0.012613,
+      "magnitude": 0.018641,
+      "recent_window_magnitude": 0.041365,
+      "confidence": 0.996636,
+      "fit_applied": false
+    },
+    {
+      "frame": 506,
+      "seconds": 16.850184,
+      "dx": -0.015523,
+      "dy": 0.00336,
+      "magnitude": 0.015883,
+      "recent_window_magnitude": 0.034603,
+      "confidence": 0.999201,
+      "fit_applied": false
+    },
+    {
+      "frame": 507,
+      "seconds": 16.88355,
+      "dx": -0.016281,
+      "dy": -0.007152,
+      "magnitude": 0.017783,
+      "recent_window_magnitude": 0.053835,
+      "confidence": 0.999643,
+      "fit_applied": false
+    },
+    {
+      "frame": 508,
+      "seconds": 16.916917,
+      "dx": 0.011969,
+      "dy": 0.003813,
+      "magnitude": 0.012562,
+      "recent_window_magnitude": 0.008467,
+      "confidence": 0.999542,
+      "fit_applied": false
+    },
+    {
+      "frame": 509,
+      "seconds": 16.950284,
+      "dx": -0.018416,
+      "dy": 0.002369,
+      "magnitude": 0.018567,
+      "recent_window_magnitude": 0.028749,
+      "confidence": 0.999616,
+      "fit_applied": false
+    },
+    {
+      "frame": 510,
+      "seconds": 16.98365,
+      "dx": -0.008936,
+      "dy": 0.023394,
+      "magnitude": 0.025042,
+      "recent_window_magnitude": 0.053771,
+      "confidence": 0.998451,
+      "fit_applied": false
+    },
+    {
+      "frame": 511,
+      "seconds": 17.017017,
+      "dx": 0.007351,
+      "dy": 0.005335,
+      "magnitude": 0.009083,
+      "recent_window_magnitude": 0.036899,
+      "confidence": 0.999002,
+      "fit_applied": false
+    },
+    {
+      "frame": 512,
+      "seconds": 17.050384,
+      "dx": 0.017578,
+      "dy": 0.004935,
+      "magnitude": 0.018257,
+      "recent_window_magnitude": 0.040972,
+      "confidence": 1.000623,
+      "fit_applied": false
+    },
+    {
+      "frame": 513,
+      "seconds": 17.08375,
+      "dx": 0.001189,
+      "dy": 0.016349,
+      "magnitude": 0.016393,
+      "recent_window_magnitude": 0.052396,
+      "confidence": 0.999519,
+      "fit_applied": false
+    },
+    {
+      "frame": 514,
+      "seconds": 17.117117,
+      "dx": -0.02516,
+      "dy": -0.008181,
+      "magnitude": 0.026457,
+      "recent_window_magnitude": 0.042585,
+      "confidence": 0.997588,
+      "fit_applied": false
+    },
+    {
+      "frame": 515,
+      "seconds": 17.150484,
+      "dx": 0.020922,
+      "dy": 0.007735,
+      "magnitude": 0.022306,
+      "recent_window_magnitude": 0.034113,
+      "confidence": 0.998671,
+      "fit_applied": false
+    },
+    {
+      "frame": 516,
+      "seconds": 17.183851,
+      "dx": -0.042896,
+      "dy": -0.039932,
+      "magnitude": 0.058606,
+      "recent_window_magnitude": 0.034195,
+      "confidence": 0.996947,
+      "fit_applied": false
+    },
+    {
+      "frame": 517,
+      "seconds": 17.217217,
+      "dx": -0.014878,
+      "dy": 0.008136,
+      "magnitude": 0.016957,
+      "recent_window_magnitude": 0.062865,
+      "confidence": 1.000018,
+      "fit_applied": false
+    },
+    {
+      "frame": 518,
+      "seconds": 17.250584,
+      "dx": 0.032264,
+      "dy": 0.010802,
+      "magnitude": 0.034024,
+      "recent_window_magnitude": 0.03667,
+      "confidence": 0.999377,
+      "fit_applied": false
+    },
+    {
+      "frame": 519,
+      "seconds": 17.283951,
+      "dx": -0.008633,
+      "dy": -0.003214,
+      "magnitude": 0.009212,
+      "recent_window_magnitude": 0.021122,
+      "confidence": 0.999791,
+      "fit_applied": false
+    },
+    {
+      "frame": 520,
+      "seconds": 17.317317,
+      "dx": 0.010995,
+      "dy": -0.000864,
+      "magnitude": 0.011029,
+      "recent_window_magnitude": 0.034124,
+      "confidence": 0.999566,
+      "fit_applied": false
+    },
+    {
+      "frame": 521,
+      "seconds": 17.350684,
+      "dx": 0.021468,
+      "dy": 0.002292,
+      "magnitude": 0.02159,
+      "recent_window_magnitude": 0.044643,
+      "confidence": 0.9996,
+      "fit_applied": false
+    },
+    {
+      "frame": 522,
+      "seconds": 17.384051,
+      "dx": 0.013846,
+      "dy": 0.004134,
+      "magnitude": 0.01445,
+      "recent_window_magnitude": 0.071166,
+      "confidence": 0.999294,
+      "fit_applied": false
+    },
+    {
+      "frame": 523,
+      "seconds": 17.417417,
+      "dx": 0.011472,
+      "dy": -0.009169,
+      "magnitude": 0.014686,
+      "recent_window_magnitude": 0.04962,
+      "confidence": 0.999829,
+      "fit_applied": false
+    },
+    {
+      "frame": 524,
+      "seconds": 17.450784,
+      "dx": -0.001143,
+      "dy": 0.005821,
+      "magnitude": 0.005932,
+      "recent_window_magnitude": 0.056682,
+      "confidence": 0.999838,
+      "fit_applied": false
+    },
+    {
+      "frame": 525,
+      "seconds": 17.484151,
+      "dx": -0.009561,
+      "dy": -0.00838,
+      "magnitude": 0.012714,
+      "recent_window_magnitude": 0.03647,
+      "confidence": 1.0001,
+      "fit_applied": false
+    },
+    {
+      "frame": 526,
+      "seconds": 17.517518,
+      "dx": 0.015985,
+      "dy": 0.003045,
+      "magnitude": 0.016272,
+      "recent_window_magnitude": 0.030935,
+      "confidence": 0.999668,
+      "fit_applied": false
+    },
+    {
+      "frame": 527,
+      "seconds": 17.550884,
+      "dx": 0.003126,
+      "dy": -0.003653,
+      "magnitude": 0.004808,
+      "recent_window_magnitude": 0.023396,
+      "confidence": 0.999668,
+      "fit_applied": false
+    },
+    {
+      "frame": 528,
+      "seconds": 17.584251,
+      "dx": -0.007284,
+      "dy": 0.002599,
+      "magnitude": 0.007734,
+      "recent_window_magnitude": 0.001258,
+      "confidence": 0.999825,
+      "fit_applied": false
+    },
+    {
+      "frame": 529,
+      "seconds": 17.617618,
+      "dx": 0.022454,
+      "dy": -0.012883,
+      "magnitude": 0.025888,
+      "recent_window_magnitude": 0.031345,
+      "confidence": 0.999035,
+      "fit_applied": false
+    },
+    {
+      "frame": 530,
+      "seconds": 17.650984,
+      "dx": 0.002769,
+      "dy": -0.012284,
+      "magnitude": 0.012592,
+      "recent_window_magnitude": 0.043702,
+      "confidence": 0.999733,
+      "fit_applied": false
+    },
+    {
+      "frame": 531,
+      "seconds": 17.684351,
+      "dx": 0.010816,
+      "dy": 0.00148,
+      "magnitude": 0.010917,
+      "recent_window_magnitude": 0.040356,
+      "confidence": 0.999396,
+      "fit_applied": false
+    },
+    {
+      "frame": 532,
+      "seconds": 17.717718,
+      "dx": 0.010158,
+      "dy": -0.001611,
+      "magnitude": 0.010285,
+      "recent_window_magnitude": 0.04505,
+      "confidence": 0.999585,
+      "fit_applied": false
+    },
+    {
+      "frame": 533,
+      "seconds": 17.751084,
+      "dx": 0.021953,
+      "dy": 0.006073,
+      "magnitude": 0.022778,
+      "recent_window_magnitude": 0.07081,
+      "confidence": 0.999728,
+      "fit_applied": false
+    },
+    {
+      "frame": 534,
+      "seconds": 17.784451,
+      "dx": -0.000807,
+      "dy": 0.005056,
+      "magnitude": 0.00512,
+      "recent_window_magnitude": 0.044907,
+      "confidence": 0.999708,
+      "fit_applied": false
+    },
+    {
+      "frame": 535,
+      "seconds": 17.817818,
+      "dx": 0.017468,
+      "dy": 0.001496,
+      "magnitude": 0.017532,
+      "recent_window_magnitude": 0.060884,
+      "confidence": 0.999934,
+      "fit_applied": false
+    },
+    {
+      "frame": 536,
+      "seconds": 17.851185,
+      "dx": -0.00496,
+      "dy": -0.002669,
+      "magnitude": 0.005632,
+      "recent_window_magnitude": 0.0446,
+      "confidence": 0.999963,
+      "fit_applied": false
+    },
+    {
+      "frame": 537,
+      "seconds": 17.884551,
+      "dx": 0.002531,
+      "dy": -0.005024,
+      "magnitude": 0.005626,
+      "recent_window_magnitude": 0.03652,
+      "confidence": 0.999999,
+      "fit_applied": false
+    },
+    {
+      "frame": 538,
+      "seconds": 17.917918,
+      "dx": 0.004266,
+      "dy": -4.3e-05,
+      "magnitude": 0.004266,
+      "recent_window_magnitude": 0.018536,
+      "confidence": 1.000385,
+      "fit_applied": false
+    },
+    {
+      "frame": 539,
+      "seconds": 17.951285,
+      "dx": 0.003385,
+      "dy": 0.00673,
+      "magnitude": 0.007534,
+      "recent_window_magnitude": 0.022696,
+      "confidence": 1.000239,
+      "fit_applied": false
+    },
+    {
+      "frame": 540,
+      "seconds": 17.984651,
+      "dx": -0.001344,
+      "dy": -0.014128,
+      "magnitude": 0.014191,
+      "recent_window_magnitude": 0.015622,
+      "confidence": 1.000055,
+      "fit_applied": false
+    },
+    {
+      "frame": 541,
+      "seconds": 18.018018,
+      "dx": -0.008083,
+      "dy": -0.001812,
+      "magnitude": 0.008284,
+      "recent_window_magnitude": 0.014296,
+      "confidence": 1.000089,
+      "fit_applied": false
+    },
+    {
+      "frame": 542,
+      "seconds": 18.051385,
+      "dx": -0.019575,
+      "dy": -0.003034,
+      "magnitude": 0.019808,
+      "recent_window_magnitude": 0.024634,
+      "confidence": 1.00026,
+      "fit_applied": false
+    },
+    {
+      "frame": 543,
+      "seconds": 18.084751,
+      "dx": -0.021533,
+      "dy": 0.004813,
+      "magnitude": 0.022064,
+      "recent_window_magnitude": 0.047732,
+      "confidence": 0.999605,
+      "fit_applied": false
+    },
+    {
+      "frame": 544,
+      "seconds": 18.118118,
+      "dx": 0.002555,
+      "dy": 0.007786,
+      "magnitude": 0.008195,
+      "recent_window_magnitude": 0.048401,
+      "confidence": 0.998948,
+      "fit_applied": false
+    },
+    {
+      "frame": 545,
+      "seconds": 18.151485,
+      "dx": -0.014059,
+      "dy": 0.001704,
+      "magnitude": 0.014162,
+      "recent_window_magnitude": 0.061427,
+      "confidence": 0.999525,
+      "fit_applied": false
+    },
+    {
+      "frame": 546,
+      "seconds": 18.184852,
+      "dx": -0.000716,
+      "dy": 0.000131,
+      "magnitude": 0.000728,
+      "recent_window_magnitude": 0.054532,
+      "confidence": 0.999805,
+      "fit_applied": false
+    },
+    {
+      "frame": 547,
+      "seconds": 18.218218,
+      "dx": -0.017747,
+      "dy": 0.00321,
+      "magnitude": 0.018035,
+      "recent_window_magnitude": 0.054439,
+      "confidence": 0.999566,
+      "fit_applied": false
+    },
+    {
+      "frame": 548,
+      "seconds": 18.251585,
+      "dx": -0.0069,
+      "dy": -0.000148,
+      "magnitude": 0.006902,
+      "recent_window_magnitude": 0.038989,
+      "confidence": 0.999592,
+      "fit_applied": false
+    },
+    {
+      "frame": 549,
+      "seconds": 18.284952,
+      "dx": -0.01461,
+      "dy": 0.001489,
+      "magnitude": 0.014686,
+      "recent_window_magnitude": 0.054409,
+      "confidence": 0.99948,
+      "fit_applied": false
+    },
+    {
+      "frame": 550,
+      "seconds": 18.318318,
+      "dx": -0.040255,
+      "dy": -0.00457,
+      "magnitude": 0.040514,
+      "recent_window_magnitude": 0.080229,
+      "confidence": 0.999241,
+      "fit_applied": false
+    },
+    {
+      "frame": 551,
+      "seconds": 18.351685,
+      "dx": -0.028257,
+      "dy": 0.00349,
+      "magnitude": 0.028472,
+      "recent_window_magnitude": 0.107826,
+      "confidence": 0.999938,
+      "fit_applied": false
+    },
+    {
+      "frame": 552,
+      "seconds": 18.385052,
+      "dx": -0.036798,
+      "dy": -0.005429,
+      "magnitude": 0.037197,
+      "recent_window_magnitude": 0.126927,
+      "confidence": 0.999697,
+      "fit_applied": false
+    },
+    {
+      "frame": 553,
+      "seconds": 18.418418,
+      "dx": 0.003366,
+      "dy": 0.006373,
+      "magnitude": 0.007207,
+      "recent_window_magnitude": 0.116563,
+      "confidence": 0.999972,
+      "fit_applied": false
+    },
+    {
+      "frame": 554,
+      "seconds": 18.451785,
+      "dx": -0.007691,
+      "dy": -0.001626,
+      "magnitude": 0.007861,
+      "recent_window_magnitude": 0.10965,
+      "confidence": 0.999896,
+      "fit_applied": false
+    },
+    {
+      "frame": 555,
+      "seconds": 18.485152,
+      "dx": 0.014389,
+      "dy": 0.005877,
+      "magnitude": 0.015543,
+      "recent_window_magnitude": 0.055673,
+      "confidence": 0.999813,
+      "fit_applied": false
+    },
+    {
+      "frame": 556,
+      "seconds": 18.518519,
+      "dx": -0.028822,
+      "dy": 0.009359,
+      "magnitude": 0.030303,
+      "recent_window_magnitude": 0.057431,
+      "confidence": 0.999997,
+      "fit_applied": false
+    },
+    {
+      "frame": 557,
+      "seconds": 18.551885,
+      "dx": 0.00698,
+      "dy": 5e-05,
+      "magnitude": 0.00698,
+      "recent_window_magnitude": 0.023238,
+      "confidence": 0.999974,
+      "fit_applied": false
+    },
+    {
+      "frame": 558,
+      "seconds": 18.585252,
+      "dx": -0.00098,
+      "dy": 0.003539,
+      "magnitude": 0.003672,
+      "recent_window_magnitude": 0.023575,
+      "confidence": 0.999931,
+      "fit_applied": false
+    },
+    {
+      "frame": 559,
+      "seconds": 18.618619,
+      "dx": -0.019546,
+      "dy": -0.003373,
+      "magnitude": 0.019835,
+      "recent_window_magnitude": 0.031963,
+      "confidence": 0.999708,
+      "fit_applied": false
+    },
+    {
+      "frame": 560,
+      "seconds": 18.651985,
+      "dx": -0.013935,
+      "dy": 0.005693,
+      "magnitude": 0.015053,
+      "recent_window_magnitude": 0.058337,
+      "confidence": 0.999334,
+      "fit_applied": false
+    },
+    {
+      "frame": 561,
+      "seconds": 18.685352,
+      "dx": -0.016826,
+      "dy": -0.00077,
+      "magnitude": 0.016843,
+      "recent_window_magnitude": 0.044604,
+      "confidence": 0.999345,
+      "fit_applied": false
+    },
+    {
+      "frame": 562,
+      "seconds": 18.718719,
+      "dx": -0.010234,
+      "dy": -0.001579,
+      "magnitude": 0.010355,
+      "recent_window_magnitude": 0.061621,
+      "confidence": 0.999725,
+      "fit_applied": false
+    },
+    {
+      "frame": 563,
+      "seconds": 18.752085,
+      "dx": -0.012435,
+      "dy": -0.001172,
+      "magnitude": 0.01249,
+      "recent_window_magnitude": 0.072985,
+      "confidence": 0.999764,
+      "fit_applied": false
+    },
+    {
+      "frame": 564,
+      "seconds": 18.785452,
+      "dx": -0.003189,
+      "dy": -0.002501,
+      "magnitude": 0.004053,
+      "recent_window_magnitude": 0.05662,
+      "confidence": 1.000152,
+      "fit_applied": false
+    },
+    {
+      "frame": 565,
+      "seconds": 18.818819,
+      "dx": -0.000515,
+      "dy": 0.000765,
+      "magnitude": 0.000922,
+      "recent_window_magnitude": 0.043517,
+      "confidence": 0.999875,
+      "fit_applied": false
+    },
+    {
+      "frame": 566,
+      "seconds": 18.852186,
+      "dx": -0.002733,
+      "dy": -0.000185,
+      "magnitude": 0.00274,
+      "recent_window_magnitude": 0.029478,
+      "confidence": 0.999556,
+      "fit_applied": false
+    },
+    {
+      "frame": 567,
+      "seconds": 18.885552,
+      "dx": -0.008501,
+      "dy": -0.004595,
+      "magnitude": 0.009663,
+      "recent_window_magnitude": 0.028432,
+      "confidence": 0.999745,
+      "fit_applied": false
+    },
+    {
+      "frame": 568,
+      "seconds": 18.918919,
+      "dx": 0.00325,
+      "dy": 0.007956,
+      "magnitude": 0.008594,
+      "recent_window_magnitude": 0.011776,
+      "confidence": 0.999469,
+      "fit_applied": false
+    },
+    {
+      "frame": 569,
+      "seconds": 18.952286,
+      "dx": -0.015064,
+      "dy": -0.00051,
+      "magnitude": 0.015073,
+      "recent_window_magnitude": 0.023811,
+      "confidence": 0.99991,
+      "fit_applied": false
+    },
+    {
+      "frame": 570,
+      "seconds": 18.985652,
+      "dx": -0.013552,
+      "dy": -0.0008,
+      "magnitude": 0.013575,
+      "recent_window_magnitude": 0.036647,
+      "confidence": 1.000211,
+      "fit_applied": false
+    },
+    {
+      "frame": 571,
+      "seconds": 19.019019,
+      "dx": 0.008282,
+      "dy": -0.003374,
+      "magnitude": 0.008943,
+      "recent_window_magnitude": 0.025618,
+      "confidence": 0.998872,
+      "fit_applied": false
+    },
+    {
+      "frame": 572,
+      "seconds": 19.052386,
+      "dx": -0.013386,
+      "dy": 0.011537,
+      "magnitude": 0.017672,
+      "recent_window_magnitude": 0.033879,
+      "confidence": 0.999956,
+      "fit_applied": false
+    },
+    {
+      "frame": 573,
+      "seconds": 19.085752,
+      "dx": -0.010646,
+      "dy": -0.003203,
+      "magnitude": 0.011117,
+      "recent_window_magnitude": 0.044516,
+      "confidence": 1.000029,
+      "fit_applied": false
+    },
+    {
+      "frame": 574,
+      "seconds": 19.119119,
+      "dx": -0.004123,
+      "dy": 0.002998,
+      "magnitude": 0.005098,
+      "recent_window_magnitude": 0.034183,
+      "confidence": 1.000388,
+      "fit_applied": false
+    },
+    {
+      "frame": 575,
+      "seconds": 19.152486,
+      "dx": -0.001238,
+      "dy": 0.007597,
+      "magnitude": 0.007697,
+      "recent_window_magnitude": 0.026223,
+      "confidence": 1.000288,
+      "fit_applied": false
+    },
+    {
+      "frame": 576,
+      "seconds": 19.185853,
+      "dx": 0.004142,
+      "dy": 0.004463,
+      "magnitude": 0.006089,
+      "recent_window_magnitude": 0.034421,
+      "confidence": 1.000278,
+      "fit_applied": false
+    },
+    {
+      "frame": 577,
+      "seconds": 19.219219,
+      "dx": -0.020309,
+      "dy": 0.005087,
+      "magnitude": 0.020936,
+      "recent_window_magnitude": 0.036362,
+      "confidence": 1.000042,
+      "fit_applied": false
+    },
+    {
+      "frame": 578,
+      "seconds": 19.252586,
+      "dx": -0.00834,
+      "dy": -0.005738,
+      "magnitude": 0.010123,
+      "recent_window_magnitude": 0.033161,
+      "confidence": 0.999067,
+      "fit_applied": false
+    },
+    {
+      "frame": 579,
+      "seconds": 19.285953,
+      "dx": -0.022902,
+      "dy": 0.007554,
+      "magnitude": 0.024115,
+      "recent_window_magnitude": 0.052211,
+      "confidence": 0.999646,
+      "fit_applied": false
+    },
+    {
+      "frame": 580,
+      "seconds": 19.319319,
+      "dx": -2.9e-05,
+      "dy": -0.004436,
+      "magnitude": 0.004436,
+      "recent_window_magnitude": 0.04794,
+      "confidence": 0.999403,
+      "fit_applied": false
+    },
+    {
+      "frame": 581,
+      "seconds": 19.352686,
+      "dx": -0.004792,
+      "dy": 0.002309,
+      "magnitude": 0.005319,
+      "recent_window_magnitude": 0.056573,
+      "confidence": 0.996187,
+      "fit_applied": false
+    },
+    {
+      "frame": 582,
+      "seconds": 19.386053,
+      "dx": -0.006388,
+      "dy": 0.0005,
+      "magnitude": 0.006407,
+      "recent_window_magnitude": 0.04245,
+      "confidence": 0.996289,
+      "fit_applied": false
+    },
+    {
+      "frame": 583,
+      "seconds": 19.419419,
+      "dx": 0.000179,
+      "dy": 0.003376,
+      "magnitude": 0.003381,
+      "recent_window_magnitude": 0.035183,
+      "confidence": 0.99986,
+      "fit_applied": false
+    },
+    {
+      "frame": 584,
+      "seconds": 19.452786,
+      "dx": -0.019477,
+      "dy": -0.003619,
+      "magnitude": 0.01981,
+      "recent_window_magnitude": 0.030563,
+      "confidence": 1.000115,
+      "fit_applied": false
+    },
+    {
+      "frame": 585,
+      "seconds": 19.486153,
+      "dx": -0.007504,
+      "dy": 0.002412,
+      "magnitude": 0.007882,
+      "recent_window_magnitude": 0.038306,
+      "confidence": 1.000085,
+      "fit_applied": false
+    },
+    {
+      "frame": 586,
+      "seconds": 19.51952,
+      "dx": -0.012956,
+      "dy": 0.010574,
+      "magnitude": 0.016723,
+      "recent_window_magnitude": 0.048008,
+      "confidence": 0.999754,
+      "fit_applied": false
+    },
+    {
+      "frame": 587,
+      "seconds": 19.552886,
+      "dx": -0.014099,
+      "dy": 0.00746,
+      "magnitude": 0.015951,
+      "recent_window_magnitude": 0.057522,
+      "confidence": 1.000209,
+      "fit_applied": false
+    },
+    {
+      "frame": 588,
+      "seconds": 19.586253,
+      "dx": -0.02013,
+      "dy": -0.017777,
+      "magnitude": 0.026856,
+      "recent_window_magnitude": 0.074172,
+      "confidence": 1.000309,
+      "fit_applied": false
+    },
+    {
+      "frame": 589,
+      "seconds": 19.61962,
+      "dx": -0.007075,
+      "dy": 0.000474,
+      "magnitude": 0.007091,
+      "recent_window_magnitude": 0.061844,
+      "confidence": 1.000109,
+      "fit_applied": false
+    },
+    {
+      "frame": 590,
+      "seconds": 19.652986,
+      "dx": -0.021928,
+      "dy": 0.000611,
+      "magnitude": 0.021937,
+      "recent_window_magnitude": 0.0762,
+      "confidence": 1.000574,
+      "fit_applied": false
+    },
+    {
+      "frame": 591,
+      "seconds": 19.686353,
+      "dx": -0.004863,
+      "dy": -0.002571,
+      "magnitude": 0.005501,
+      "recent_window_magnitude": 0.069111,
+      "confidence": 0.999121,
+      "fit_applied": false
+    },
+    {
+      "frame": 592,
+      "seconds": 19.71972,
+      "dx": 0.003831,
+      "dy": 0.026033,
+      "magnitude": 0.026313,
+      "recent_window_magnitude": 0.05062,
+      "confidence": 1.00064,
+      "fit_applied": false
+    },
+    {
+      "frame": 593,
+      "seconds": 19.753086,
+      "dx": -0.009528,
+      "dy": -0.001804,
+      "magnitude": 0.009697,
+      "recent_window_magnitude": 0.045634,
+      "confidence": 0.99962,
+      "fit_applied": false
+    },
+    {
+      "frame": 594,
+      "seconds": 19.786453,
+      "dx": -0.006114,
+      "dy": 0.009347,
+      "magnitude": 0.011169,
+      "recent_window_magnitude": 0.049897,
+      "confidence": 0.99979,
+      "fit_applied": false
+    },
+    {
+      "frame": 595,
+      "seconds": 19.81982,
+      "dx": 0.01179,
+      "dy": 8.6e-05,
+      "magnitude": 0.01179,
+      "recent_window_magnitude": 0.031473,
+      "confidence": 1.000164,
+      "fit_applied": false
+    },
+    {
+      "frame": 596,
+      "seconds": 19.853187,
+      "dx": -0.005045,
+      "dy": 0.00612,
+      "magnitude": 0.007931,
+      "recent_window_magnitude": 0.040103,
+      "confidence": 1.000214,
+      "fit_applied": false
+    },
+    {
+      "frame": 597,
+      "seconds": 19.886553,
+      "dx": -0.018646,
+      "dy": -0.007546,
+      "magnitude": 0.020115,
+      "recent_window_magnitude": 0.028233,
+      "confidence": 1.000101,
+      "fit_applied": false
+    },
+    {
+      "frame": 598,
+      "seconds": 19.91992,
+      "dx": 0.009054,
+      "dy": 0.008021,
+      "magnitude": 0.012096,
+      "recent_window_magnitude": 0.018363,
+      "confidence": 0.999787,
+      "fit_applied": false
+    },
+    {
+      "frame": 599,
+      "seconds": 19.953287,
+      "dx": -0.007515,
+      "dy": 0.015161,
+      "magnitude": 0.016921,
+      "recent_window_magnitude": 0.024175,
+      "confidence": 1.000349,
+      "fit_applied": false
+    },
+    {
+      "frame": 600,
+      "seconds": 19.986653,
+      "dx": -0.004178,
+      "dy": -0.003521,
+      "magnitude": 0.005463,
+      "recent_window_magnitude": 0.032028,
+      "confidence": 0.999958,
+      "fit_applied": false
+    },
+    {
+      "frame": 601,
+      "seconds": 20.02002,
+      "dx": -0.002566,
+      "dy": -0.006981,
+      "magnitude": 0.007438,
+      "recent_window_magnitude": 0.024397,
+      "confidence": 0.999808,
+      "fit_applied": false
+    },
+    {
+      "frame": 602,
+      "seconds": 20.053387,
+      "dx": -0.009571,
+      "dy": -0.006905,
+      "magnitude": 0.011802,
+      "recent_window_magnitude": 0.015864,
+      "confidence": 1.000176,
+      "fit_applied": false
+    },
+    {
+      "frame": 603,
+      "seconds": 20.086753,
+      "dx": 0.004955,
+      "dy": 0.001501,
+      "magnitude": 0.005178,
+      "recent_window_magnitude": 0.018889,
+      "confidence": 1.000086,
+      "fit_applied": false
+    },
+    {
+      "frame": 604,
+      "seconds": 20.12012,
+      "dx": -0.013613,
+      "dy": 0.002711,
+      "magnitude": 0.01388,
+      "recent_window_magnitude": 0.028244,
+      "confidence": 0.999607,
+      "fit_applied": false
+    },
+    {
+      "frame": 605,
+      "seconds": 20.153487,
+      "dx": -0.009852,
+      "dy": -0.007402,
+      "magnitude": 0.012323,
+      "recent_window_magnitude": 0.035083,
+      "confidence": 1.000139,
+      "fit_applied": false
+    },
+    {
+      "frame": 606,
+      "seconds": 20.186854,
+      "dx": -0.005125,
+      "dy": 0.005156,
+      "magnitude": 0.00727,
+      "recent_window_magnitude": 0.033571,
+      "confidence": 1.000529,
+      "fit_applied": false
+    },
+    {
+      "frame": 607,
+      "seconds": 20.22022,
+      "dx": 0.000765,
+      "dy": -0.001075,
+      "magnitude": 0.001319,
+      "recent_window_magnitude": 0.022887,
+      "confidence": 1.000354,
+      "fit_applied": false
+    },
+    {
+      "frame": 608,
+      "seconds": 20.253587,
+      "dx": -0.035727,
+      "dy": -0.019536,
+      "magnitude": 0.040719,
+      "recent_window_magnitude": 0.066668,
+      "confidence": 1.00015,
+      "fit_applied": false
+    },
+    {
+      "frame": 609,
+      "seconds": 20.286954,
+      "dx": -0.001009,
+      "dy": -0.005039,
+      "magnitude": 0.005139,
+      "recent_window_magnitude": 0.058085,
+      "confidence": 1.00013,
+      "fit_applied": false
+    },
+    {
+      "frame": 610,
+      "seconds": 20.32032,
+      "dx": -0.01374,
+      "dy": -0.010378,
+      "magnitude": 0.017219,
+      "recent_window_magnitude": 0.062929,
+      "confidence": 1.000175,
+      "fit_applied": false
+    },
+    {
+      "frame": 611,
+      "seconds": 20.353687,
+      "dx": -0.000795,
+      "dy": 0.000424,
+      "magnitude": 0.000901,
+      "recent_window_magnitude": 0.061794,
+      "confidence": 0.999582,
+      "fit_applied": false
+    },
+    {
+      "frame": 612,
+      "seconds": 20.387054,
+      "dx": -0.01958,
+      "dy": -0.004603,
+      "magnitude": 0.020114,
+      "recent_window_magnitude": 0.08094,
+      "confidence": 0.999661,
+      "fit_applied": false
+    },
+    {
+      "frame": 613,
+      "seconds": 20.42042,
+      "dx": -0.003282,
+      "dy": -0.003107,
+      "magnitude": 0.00452,
+      "recent_window_magnitude": 0.044615,
+      "confidence": 1.000005,
+      "fit_applied": false
+    },
+    {
+      "frame": 614,
+      "seconds": 20.453787,
+      "dx": -0.024835,
+      "dy": 0.019001,
+      "magnitude": 0.03127,
+      "recent_window_magnitude": 0.062247,
+      "confidence": 1.000921,
+      "fit_applied": false
+    },
+    {
+      "frame": 615,
+      "seconds": 20.487154,
+      "dx": -0.001888,
+      "dy": -0.007872,
+      "magnitude": 0.008095,
+      "recent_window_magnitude": 0.050526,
+      "confidence": 1.00038,
+      "fit_applied": false
+    },
+    {
+      "frame": 616,
+      "seconds": 20.520521,
+      "dx": 0.029889,
+      "dy": 0.018762,
+      "magnitude": 0.03529,
+      "recent_window_magnitude": 0.029663,
+      "confidence": 0.999817,
+      "fit_applied": false
+    },
+    {
+      "frame": 617,
+      "seconds": 20.553887,
+      "dx": 0.001652,
+      "dy": -0.000549,
+      "magnitude": 0.001741,
+      "recent_window_magnitude": 0.02628,
+      "confidence": 1.000125,
+      "fit_applied": false
+    },
+    {
+      "frame": 618,
+      "seconds": 20.587254,
+      "dx": 0.002685,
+      "dy": -0.001045,
+      "magnitude": 0.002881,
+      "recent_window_magnitude": 0.029274,
+      "confidence": 1.000352,
+      "fit_applied": false
+    },
+    {
+      "frame": 619,
+      "seconds": 20.620621,
+      "dx": -0.018382,
+      "dy": -0.010778,
+      "magnitude": 0.021309,
+      "recent_window_magnitude": 0.014036,
+      "confidence": 0.999962,
+      "fit_applied": false
+    },
+    {
+      "frame": 620,
+      "seconds": 20.653987,
+      "dx": -0.393462,
+      "dy": 0.075627,
+      "magnitude": 0.400664,
+      "recent_window_magnitude": 0.386421,
+      "confidence": 0.999464,
+      "fit_applied": false
+    },
+    {
+      "frame": 621,
+      "seconds": 20.687354,
+      "dx": -0.016897,
+      "dy": -0.002023,
+      "magnitude": 0.017018,
+      "recent_window_magnitude": 0.428798,
+      "confidence": 1.00053,
+      "fit_applied": false
+    },
+    {
+      "frame": 622,
+      "seconds": 20.720721,
+      "dx": -0.014051,
+      "dy": -0.011031,
+      "magnitude": 0.017863,
+      "recent_window_magnitude": 0.443022,
+      "confidence": 0.999834,
+      "fit_applied": false
+    },
+    {
+      "frame": 623,
+      "seconds": 20.754087,
+      "dx": -0.010639,
+      "dy": -0.018809,
+      "magnitude": 0.02161,
+      "recent_window_magnitude": 0.454629,
+      "confidence": 1.000041,
+      "fit_applied": false
+    },
+    {
+      "frame": 624,
+      "seconds": 20.787454,
+      "dx": -0.002936,
+      "dy": 0.000375,
+      "magnitude": 0.00296,
+      "recent_window_magnitude": 0.440204,
+      "confidence": 0.999896,
+      "fit_applied": false
+    },
+    {
+      "frame": 625,
+      "seconds": 20.820821,
+      "dx": -0.001886,
+      "dy": -0.006482,
+      "magnitude": 0.006751,
+      "recent_window_magnitude": 0.059963,
+      "confidence": 0.999718,
+      "fit_applied": false
+    },
+    {
+      "frame": 626,
+      "seconds": 20.854188,
+      "dx": 0.013034,
+      "dy": -0.001637,
+      "magnitude": 0.013137,
+      "recent_window_magnitude": 0.041037,
+      "confidence": 0.999833,
+      "fit_applied": false
+    },
+    {
+      "frame": 627,
+      "seconds": 20.887554,
+      "dx": 0.01845,
+      "dy": 0.000482,
+      "magnitude": 0.018456,
+      "recent_window_magnitude": 0.030601,
+      "confidence": 1.000005,
+      "fit_applied": false
+    },
+    {
+      "frame": 628,
+      "seconds": 20.920921,
+      "dx": -0.005887,
+      "dy": -0.008594,
+      "magnitude": 0.010417,
+      "recent_window_magnitude": 0.026135,
+      "confidence": 0.999999,
+      "fit_applied": false
+    },
+    {
+      "frame": 629,
+      "seconds": 20.954288,
+      "dx": -0.004762,
+      "dy": -0.004051,
+      "magnitude": 0.006252,
+      "recent_window_magnitude": 0.027757,
+      "confidence": 1.00019,
+      "fit_applied": false
+    },
+    {
+      "frame": 630,
+      "seconds": 20.987654,
+      "dx": -0.025278,
+      "dy": 0.018936,
+      "magnitude": 0.031584,
+      "recent_window_magnitude": 0.006791,
+      "confidence": 0.999656,
+      "fit_applied": false
+    },
+    {
+      "frame": 631,
+      "seconds": 21.021021,
+      "dx": 0.017271,
+      "dy": 0.001724,
+      "magnitude": 0.017357,
+      "recent_window_magnitude": 0.008499,
+      "confidence": 1.000149,
+      "fit_applied": false
+    },
+    {
+      "frame": 632,
+      "seconds": 21.054388,
+      "dx": -0.022823,
+      "dy": -0.000729,
+      "magnitude": 0.022835,
+      "recent_window_magnitude": 0.042114,
+      "confidence": 1.000109,
+      "fit_applied": false
+    },
+    {
+      "frame": 633,
+      "seconds": 21.087754,
+      "dx": -0.010981,
+      "dy": -0.007976,
+      "magnitude": 0.013572,
+      "recent_window_magnitude": 0.047239,
+      "confidence": 0.999943,
+      "fit_applied": false
+    },
+    {
+      "frame": 634,
+      "seconds": 21.121121,
+      "dx": 0.001474,
+      "dy": -0.00247,
+      "magnitude": 0.002876,
+      "recent_window_magnitude": 0.041437,
+      "confidence": 0.99995,
+      "fit_applied": false
+    },
+    {
+      "frame": 635,
+      "seconds": 21.154488,
+      "dx": 0.009466,
+      "dy": -0.004341,
+      "magnitude": 0.010414,
+      "recent_window_magnitude": 0.014883,
+      "confidence": 0.99994,
+      "fit_applied": false
+    },
+    {
+      "frame": 636,
+      "seconds": 21.187855,
+      "dx": -0.019074,
+      "dy": -0.002032,
+      "magnitude": 0.019182,
+      "recent_window_magnitude": 0.045462,
+      "confidence": 1.000007,
+      "fit_applied": false
+    },
+    {
+      "frame": 637,
+      "seconds": 21.221221,
+      "dx": -0.002144,
+      "dy": 0.000517,
+      "magnitude": 0.002206,
+      "recent_window_magnitude": 0.02679,
+      "confidence": 0.99923,
+      "fit_applied": false
+    },
+    {
+      "frame": 638,
+      "seconds": 21.254588,
+      "dx": -0.02552,
+      "dy": -0.004074,
+      "magnitude": 0.025843,
+      "recent_window_magnitude": 0.037885,
+      "confidence": 1.000167,
+      "fit_applied": false
+    },
+    {
+      "frame": 639,
+      "seconds": 21.287955,
+      "dx": -0.003744,
+      "dy": -0.00612,
+      "magnitude": 0.007175,
+      "recent_window_magnitude": 0.044045,
+      "confidence": 1.000062,
+      "fit_applied": false
+    },
+    {
+      "frame": 640,
+      "seconds": 21.321321,
+      "dx": -0.005146,
+      "dy": -0.004856,
+      "magnitude": 0.007075,
+      "recent_window_magnitude": 0.058042,
+      "confidence": 1.000186,
+      "fit_applied": false
+    },
+    {
+      "frame": 641,
+      "seconds": 21.354688,
+      "dx": -0.041447,
+      "dy": -0.02875,
+      "magnitude": 0.050443,
+      "recent_window_magnitude": 0.089205,
+      "confidence": 0.998601,
+      "fit_applied": false
+    },
+    {
+      "frame": 642,
+      "seconds": 21.388055,
+      "dx": -0.000504,
+      "dy": -0.001071,
+      "magnitude": 0.001184,
+      "recent_window_magnitude": 0.088569,
+      "confidence": 0.999311,
+      "fit_applied": false
+    },
+    {
+      "frame": 643,
+      "seconds": 21.421421,
+      "dx": -0.00528,
+      "dy": -0.006504,
+      "magnitude": 0.008378,
+      "recent_window_magnitude": 0.073397,
+      "confidence": 0.999284,
+      "fit_applied": false
+    },
+    {
+      "frame": 644,
+      "seconds": 21.454788,
+      "dx": 0.037401,
+      "dy": -0.008001,
+      "magnitude": 0.038247,
+      "recent_window_magnitude": 0.051413,
+      "confidence": 0.999506,
+      "fit_applied": false
+    },
+    {
+      "frame": 645,
+      "seconds": 21.488155,
+      "dx": -0.003559,
+      "dy": 0.006447,
+      "magnitude": 0.007364,
+      "recent_window_magnitude": 0.040177,
+      "confidence": 0.999502,
+      "fit_applied": false
+    },
+    {
+      "frame": 646,
+      "seconds": 21.521522,
+      "dx": 0.002133,
+      "dy": -0.008931,
+      "magnitude": 0.009182,
+      "recent_window_magnitude": 0.03518,
+      "confidence": 1.000026,
+      "fit_applied": false
+    },
+    {
+      "frame": 647,
+      "seconds": 21.554888,
+      "dx": -0.013134,
+      "dy": 0.005816,
+      "magnitude": 0.014364,
+      "recent_window_magnitude": 0.020814,
+      "confidence": 1.000093,
+      "fit_applied": false
+    },
+    {
+      "frame": 648,
+      "seconds": 21.588255,
+      "dx": -0.009773,
+      "dy": -0.010138,
+      "magnitude": 0.014081,
+      "recent_window_magnitude": 0.019748,
+      "confidence": 0.99947,
+      "fit_applied": false
+    },
+    {
+      "frame": 649,
+      "seconds": 21.621622,
+      "dx": 0.006288,
+      "dy": 0.003712,
+      "magnitude": 0.007302,
+      "recent_window_magnitude": 0.018308,
+      "confidence": 0.998433,
+      "fit_applied": false
+    },
+    {
+      "frame": 650,
+      "seconds": 21.654988,
+      "dx": 0.001363,
+      "dy": -0.013074,
+      "magnitude": 0.013145,
+      "recent_window_magnitude": 0.026146,
+      "confidence": 0.999414,
+      "fit_applied": false
+    },
+    {
+      "frame": 651,
+      "seconds": 21.688355,
+      "dx": 0.005254,
+      "dy": 0.006478,
+      "magnitude": 0.008341,
+      "recent_window_magnitude": 0.012327,
+      "confidence": 0.999591,
+      "fit_applied": false
+    },
+    {
+      "frame": 652,
+      "seconds": 21.721722,
+      "dx": -0.001333,
+      "dy": -0.000829,
+      "magnitude": 0.001569,
+      "recent_window_magnitude": 0.013967,
+      "confidence": 0.999161,
+      "fit_applied": false
+    },
+    {
+      "frame": 653,
+      "seconds": 21.755088,
+      "dx": -0.016113,
+      "dy": 0.006435,
+      "magnitude": 0.01735,
+      "recent_window_magnitude": 0.005294,
+      "confidence": 1.000165,
+      "fit_applied": false
+    },
+    {
+      "frame": 654,
+      "seconds": 21.788455,
+      "dx": 0.008345,
+      "dy": -0.004941,
+      "magnitude": 0.009698,
+      "recent_window_magnitude": 0.00643,
+      "confidence": 1.000079,
+      "fit_applied": false
+    },
+    {
+      "frame": 655,
+      "seconds": 21.821822,
+      "dx": -0.013938,
+      "dy": -0.005482,
+      "magnitude": 0.014977,
+      "recent_window_magnitude": 0.017861,
+      "confidence": 0.998595,
+      "fit_applied": false
+    },
+    {
+      "frame": 656,
+      "seconds": 21.855189,
+      "dx": 0.007189,
+      "dy": -0.012456,
+      "magnitude": 0.014381,
+      "recent_window_magnitude": 0.023442,
+      "confidence": 1.000269,
+      "fit_applied": false
+    },
+    {
+      "frame": 657,
+      "seconds": 21.888555,
+      "dx": 0.014814,
+      "dy": -0.003061,
+      "magnitude": 0.015127,
+      "recent_window_magnitude": 0.019507,
+      "confidence": 0.998935,
+      "fit_applied": false
+    },
+    {
+      "frame": 658,
+      "seconds": 21.921922,
+      "dx": -0.034027,
+      "dy": 0.010501,
+      "magnitude": 0.035611,
+      "recent_window_magnitude": 0.023425,
+      "confidence": 0.999167,
+      "fit_applied": false
+    },
+    {
+      "frame": 659,
+      "seconds": 21.955289,
+      "dx": 0.008176,
+      "dy": 0.001222,
+      "magnitude": 0.008266,
+      "recent_window_magnitude": 0.02006,
+      "confidence": 1.000136,
+      "fit_applied": false
+    },
+    {
+      "frame": 660,
+      "seconds": 21.988655,
+      "dx": -0.003866,
+      "dy": -0.00055,
+      "magnitude": 0.003905,
+      "recent_window_magnitude": 0.008854,
+      "confidence": 1.000181,
+      "fit_applied": false
+    },
+    {
+      "frame": 661,
+      "seconds": 22.022022,
+      "dx": -0.003455,
+      "dy": 0.00725,
+      "magnitude": 0.008031,
+      "recent_window_magnitude": 0.023937,
+      "confidence": 0.999569,
+      "fit_applied": false
+    },
+    {
+      "frame": 662,
+      "seconds": 22.055389,
+      "dx": 0.004404,
+      "dy": 0.001757,
+      "magnitude": 0.004742,
+      "recent_window_magnitude": 0.03514,
+      "confidence": 0.999948,
+      "fit_applied": false
+    },
+    {
+      "frame": 663,
+      "seconds": 22.088755,
+      "dx": -0.003277,
+      "dy": 0.001108,
+      "magnitude": 0.003459,
+      "recent_window_magnitude": 0.010967,
+      "confidence": 0.99975,
+      "fit_applied": false
+    },
+    {
+      "frame": 664,
+      "seconds": 22.122122,
+      "dx": 0.003932,
+      "dy": -0.001535,
+      "magnitude": 0.004221,
+      "recent_window_magnitude": 0.008342,
+      "confidence": 0.999821,
+      "fit_applied": false
+    },
+    {
+      "frame": 665,
+      "seconds": 22.155489,
+      "dx": -0.005068,
+      "dy": -0.00119,
+      "magnitude": 0.005206,
+      "recent_window_magnitude": 0.008161,
+      "confidence": 0.999693,
+      "fit_applied": false
+    },
+    {
+      "frame": 666,
+      "seconds": 22.188856,
+      "dx": -0.004314,
+      "dy": -0.009816,
+      "magnitude": 0.010722,
+      "recent_window_magnitude": 0.010597,
+      "confidence": 0.999848,
+      "fit_applied": false
+    },
+    {
+      "frame": 667,
+      "seconds": 22.222222,
+      "dx": -0.003892,
+      "dy": -0.000264,
+      "magnitude": 0.003901,
+      "recent_window_magnitude": 0.017207,
+      "confidence": 0.999574,
+      "fit_applied": false
+    },
+    {
+      "frame": 668,
+      "seconds": 22.255589,
+      "dx": -0.002492,
+      "dy": 0.005197,
+      "magnitude": 0.005763,
+      "recent_window_magnitude": 0.014069,
+      "confidence": 0.999275,
+      "fit_applied": false
+    },
+    {
+      "frame": 669,
+      "seconds": 22.288956,
+      "dx": 0.008641,
+      "dy": 4.5e-05,
+      "magnitude": 0.008641,
+      "recent_window_magnitude": 0.009333,
+      "confidence": 1.000069,
+      "fit_applied": false
+    },
+    {
+      "frame": 670,
+      "seconds": 22.322322,
+      "dx": -0.001034,
+      "dy": -0.005209,
+      "magnitude": 0.00531,
+      "recent_window_magnitude": 0.010511,
+      "confidence": 0.999618,
+      "fit_applied": false
+    },
+    {
+      "frame": 671,
+      "seconds": 22.355689,
+      "dx": 0.001072,
+      "dy": 0.000683,
+      "magnitude": 0.001271,
+      "recent_window_magnitude": 0.002339,
+      "confidence": 0.999412,
+      "fit_applied": false
+    },
+    {
+      "frame": 672,
+      "seconds": 22.389056,
+      "dx": 0.004362,
+      "dy": 0.003232,
+      "magnitude": 0.005429,
+      "recent_window_magnitude": 0.011265,
+      "confidence": 0.999617,
+      "fit_applied": false
+    },
+    {
+      "frame": 673,
+      "seconds": 22.422422,
+      "dx": 0.000373,
+      "dy": 0.0038,
+      "magnitude": 0.003818,
+      "recent_window_magnitude": 0.013655,
+      "confidence": 0.99945,
+      "fit_applied": false
+    },
+    {
+      "frame": 674,
+      "seconds": 22.455789,
+      "dx": 0.00447,
+      "dy": 0.001715,
+      "magnitude": 0.004788,
+      "recent_window_magnitude": 0.010162,
+      "confidence": 0.999795,
+      "fit_applied": false
+    },
+    {
+      "frame": 675,
+      "seconds": 22.489156,
+      "dx": -0.003873,
+      "dy": 9.5e-05,
+      "magnitude": 0.003874,
+      "recent_window_magnitude": 0.011478,
+      "confidence": 1.000021,
+      "fit_applied": false
+    },
+    {
+      "frame": 676,
+      "seconds": 22.522523,
+      "dx": 0.009537,
+      "dy": 0.008659,
+      "magnitude": 0.012881,
+      "recent_window_magnitude": 0.022964,
+      "confidence": 0.997027,
+      "fit_applied": false
+    },
+    {
+      "frame": 677,
+      "seconds": 22.555889,
+      "dx": -0.000364,
+      "dy": -0.002798,
+      "magnitude": 0.002822,
+      "recent_window_magnitude": 0.015311,
+      "confidence": 0.997262,
+      "fit_applied": false
+    },
+    {
+      "frame": 678,
+      "seconds": 22.589256,
+      "dx": -0.020989,
+      "dy": 0.008995,
+      "magnitude": 0.022835,
+      "recent_window_magnitude": 0.020089,
+      "confidence": 1.000222,
+      "fit_applied": false
+    },
+    {
+      "frame": 679,
+      "seconds": 22.622623,
+      "dx": 0.001114,
+      "dy": -0.006026,
+      "magnitude": 0.006128,
+      "recent_window_magnitude": 0.017089,
+      "confidence": 1.000026,
+      "fit_applied": false
+    },
+    {
+      "frame": 680,
+      "seconds": 22.655989,
+      "dx": -0.010243,
+      "dy": 0.001932,
+      "magnitude": 0.010423,
+      "recent_window_magnitude": 0.023547,
+      "confidence": 0.999664,
+      "fit_applied": false
+    },
+    {
+      "frame": 681,
+      "seconds": 22.689356,
+      "dx": -0.004774,
+      "dy": -0.001444,
+      "magnitude": 0.004987,
+      "recent_window_magnitude": 0.035262,
+      "confidence": 0.999956,
+      "fit_applied": false
+    },
+    {
+      "frame": 682,
+      "seconds": 22.722723,
+      "dx": -0.011481,
+      "dy": -0.000544,
+      "magnitude": 0.011493,
+      "recent_window_magnitude": 0.046464,
+      "confidence": 0.999814,
+      "fit_applied": false
+    },
+    {
+      "frame": 683,
+      "seconds": 22.756089,
+      "dx": 0.00218,
+      "dy": -0.001361,
+      "magnitude": 0.00257,
+      "recent_window_magnitude": 0.024368,
+      "confidence": 0.999888,
+      "fit_applied": false
+    },
+    {
+      "frame": 684,
+      "seconds": 22.789456,
+      "dx": 0.003477,
+      "dy": 0.003224,
+      "magnitude": 0.004742,
+      "recent_window_magnitude": 0.020918,
+      "confidence": 0.999299,
+      "fit_applied": false
+    },
+    {
+      "frame": 685,
+      "seconds": 22.822823,
+      "dx": 0.004222,
+      "dy": 0.001812,
+      "magnitude": 0.004594,
+      "recent_window_magnitude": 0.006595,
+      "confidence": 0.99995,
+      "fit_applied": false
+    },
+    {
+      "frame": 686,
+      "seconds": 22.85619,
+      "dx": -0.008876,
+      "dy": 0.021117,
+      "magnitude": 0.022907,
+      "recent_window_magnitude": 0.026415,
+      "confidence": 1.000084,
+      "fit_applied": false
+    },
+    {
+      "frame": 687,
+      "seconds": 22.889556,
+      "dx": 0.016394,
+      "dy": 0.001781,
+      "magnitude": 0.01649,
+      "recent_window_magnitude": 0.031761,
+      "confidence": 0.999999,
+      "fit_applied": false
+    },
+    {
+      "frame": 688,
+      "seconds": 22.922923,
+      "dx": -0.00605,
+      "dy": 0.008458,
+      "magnitude": 0.010399,
+      "recent_window_magnitude": 0.037529,
+      "confidence": 1.000469,
+      "fit_applied": false
+    },
+    {
+      "frame": 689,
+      "seconds": 22.95629,
+      "dx": 0.021472,
+      "dy": 0.003524,
+      "magnitude": 0.021759,
+      "recent_window_magnitude": 0.045651,
+      "confidence": 1.000156,
+      "fit_applied": false
+    },
+    {
+      "frame": 690,
+      "seconds": 22.989656,
+      "dx": 0.012164,
+      "dy": -0.001866,
+      "magnitude": 0.012306,
+      "recent_window_magnitude": 0.048189,
+      "confidence": 1.000059,
+      "fit_applied": false
+    },
+    {
+      "frame": 691,
+      "seconds": 23.023023,
+      "dx": -0.007448,
+      "dy": -0.001174,
+      "magnitude": 0.00754,
+      "recent_window_magnitude": 0.038073,
+      "confidence": 1.00048,
+      "fit_applied": false
+    },
+    {
+      "frame": 692,
+      "seconds": 23.05639,
+      "dx": 0.01763,
+      "dy": -0.002003,
+      "magnitude": 0.017744,
+      "recent_window_magnitude": 0.038401,
+      "confidence": 1.000046,
+      "fit_applied": false
+    },
+    {
+      "frame": 693,
+      "seconds": 23.089756,
+      "dx": -0.009676,
+      "dy": -0.006106,
+      "magnitude": 0.011441,
+      "recent_window_magnitude": 0.034984,
+      "confidence": 1.000304,
+      "fit_applied": false
+    },
+    {
+      "frame": 694,
+      "seconds": 23.123123,
+      "dx": 0.007319,
+      "dy": -0.00311,
+      "magnitude": 0.007952,
+      "recent_window_magnitude": 0.024554,
+      "confidence": 0.999831,
+      "fit_applied": false
+    },
+    {
+      "frame": 695,
+      "seconds": 23.15649,
+      "dx": -0.001056,
+      "dy": 0.012051,
+      "magnitude": 0.012098,
+      "recent_window_magnitude": 0.006778,
+      "confidence": 0.999946,
+      "fit_applied": false
+    },
+    {
+      "frame": 696,
+      "seconds": 23.189857,
+      "dx": 0.001648,
+      "dy": -0.008202,
+      "magnitude": 0.008366,
+      "recent_window_magnitude": 0.017493,
+      "confidence": 0.999926,
+      "fit_applied": false
+    },
+    {
+      "frame": 697,
+      "seconds": 23.223223,
+      "dx": 0.001753,
+      "dy": -0.000882,
+      "magnitude": 0.001962,
+      "recent_window_magnitude": 0.006248,
+      "confidence": 0.999982,
+      "fit_applied": false
+    },
+    {
+      "frame": 698,
+      "seconds": 23.25659,
+      "dx": -0.014779,
+      "dy": 0.001908,
+      "magnitude": 0.014902,
+      "recent_window_magnitude": 0.005412,
+      "confidence": 0.999825,
+      "fit_applied": false
+    },
+    {
+      "frame": 699,
+      "seconds": 23.289957,
+      "dx": 0.008667,
+      "dy": 0.021081,
+      "magnitude": 0.022793,
+      "recent_window_magnitude": 0.026229,
+      "confidence": 1.000103,
+      "fit_applied": false
+    },
+    {
+      "frame": 700,
+      "seconds": 23.323323,
+      "dx": 0.011306,
+      "dy": -0.007071,
+      "magnitude": 0.013335,
+      "recent_window_magnitude": 0.010981,
+      "confidence": 0.9985,
+      "fit_applied": false
+    },
+    {
+      "frame": 701,
+      "seconds": 23.35669,
+      "dx": 0.001075,
+      "dy": 0.007468,
+      "magnitude": 0.007545,
+      "recent_window_magnitude": 0.023891,
+      "confidence": 0.998461,
+      "fit_applied": false
+    },
+    {
+      "frame": 702,
+      "seconds": 23.390057,
+      "dx": -0.023488,
+      "dy": -0.009481,
+      "magnitude": 0.02533,
+      "recent_window_magnitude": 0.022132,
+      "confidence": 0.999907,
+      "fit_applied": false
+    },
+    {
+      "frame": 703,
+      "seconds": 23.423423,
+      "dx": 0.00983,
+      "dy": 0.00143,
+      "magnitude": 0.009934,
+      "recent_window_magnitude": 0.015326,
+      "confidence": 0.999788,
+      "fit_applied": false
+    },
+    {
+      "frame": 704,
+      "seconds": 23.45679,
+      "dx": -0.000892,
+      "dy": -0.001714,
+      "magnitude": 0.001933,
+      "recent_window_magnitude": 0.009617,
+      "confidence": 0.999717,
+      "fit_applied": false
+    },
+    {
+      "frame": 705,
+      "seconds": 23.490157,
+      "dx": 0.013355,
+      "dy": 0.006067,
+      "magnitude": 0.014669,
+      "recent_window_magnitude": 0.003771,
+      "confidence": 0.999763,
+      "fit_applied": false
+    },
+    {
+      "frame": 706,
+      "seconds": 23.523524,
+      "dx": 0.001513,
+      "dy": 0.015499,
+      "magnitude": 0.015573,
+      "recent_window_magnitude": 0.011806,
+      "confidence": 0.999312,
+      "fit_applied": false
+    }
+  ],
+  "top_peaks": [
+    {
+      "frame": 71,
+      "seconds": 2.335669,
+      "dx": -1.485749,
+      "dy": 0.018416,
+      "magnitude": 1.485864,
+      "recent_window_magnitude": 3.112108,
+      "confidence": 0.998105,
+      "fit_applied": true
+    },
+    {
+      "frame": 42,
+      "seconds": 1.368035,
+      "dx": -1.117892,
+      "dy": -0.060445,
+      "magnitude": 1.119525,
+      "recent_window_magnitude": 0.974378,
+      "confidence": 1.001907,
+      "fit_applied": false
+    },
+    {
+      "frame": 69,
+      "seconds": 2.268936,
+      "dx": -0.837664,
+      "dy": 0.197286,
+      "magnitude": 0.860583,
+      "recent_window_magnitude": 1.605179,
+      "confidence": 0.997907,
+      "fit_applied": false
+    },
+    {
+      "frame": 20,
+      "seconds": 0.633967,
+      "dx": -0.827992,
+      "dy": -0.052072,
+      "magnitude": 0.829628,
+      "recent_window_magnitude": 0.697039,
+      "confidence": 0.989146,
+      "fit_applied": false
+    },
+    {
+      "frame": 26,
+      "seconds": 0.834168,
+      "dx": 0.744083,
+      "dy": 0.006247,
+      "magnitude": 0.744109,
+      "recent_window_magnitude": 0.926235,
+      "confidence": 0.985878,
+      "fit_applied": false
+    },
+    {
+      "frame": 67,
+      "seconds": 2.202202,
+      "dx": -0.673177,
+      "dy": -0.037607,
+      "magnitude": 0.674227,
+      "recent_window_magnitude": 0.757273,
+      "confidence": 0.992429,
+      "fit_applied": false
+    },
+    {
+      "frame": 6,
+      "seconds": 0.166834,
+      "dx": 0.651905,
+      "dy": 0.075938,
+      "magnitude": 0.656312,
+      "recent_window_magnitude": 0.404048,
+      "confidence": 0.961585,
+      "fit_applied": false
+    },
+    {
+      "frame": 2,
+      "seconds": 0.033367,
+      "dx": -0.622923,
+      "dy": -0.096796,
+      "magnitude": 0.630399,
+      "recent_window_magnitude": 0.630399,
+      "confidence": 0.65467,
+      "fit_applied": false
+    },
+    {
+      "frame": 4,
+      "seconds": 0.1001,
+      "dx": -0.387071,
+      "dy": 0.270525,
+      "magnitude": 0.472237,
+      "recent_window_magnitude": 1.106727,
+      "confidence": 0.52748,
+      "fit_applied": false
+    },
+    {
+      "frame": 32,
+      "seconds": 1.034368,
+      "dx": -0.442833,
+      "dy": -0.005976,
+      "magnitude": 0.442874,
+      "recent_window_magnitude": 0.287965,
+      "confidence": 0.995413,
+      "fit_applied": false
+    },
+    {
+      "frame": 620,
+      "seconds": 20.653987,
+      "dx": -0.393462,
+      "dy": 0.075627,
+      "magnitude": 0.400664,
+      "recent_window_magnitude": 0.386421,
+      "confidence": 0.999464,
+      "fit_applied": false
+    },
+    {
+      "frame": 21,
+      "seconds": 0.667334,
+      "dx": -0.326774,
+      "dy": 0.017869,
+      "magnitude": 0.327262,
+      "recent_window_magnitude": 1.055794,
+      "confidence": 0.998951,
+      "fit_applied": false
+    }
+  ],
+  "highlight_windows": [
+    {
+      "start": 67,
+      "end": 73,
+      "label": "camera shift cluster",
+      "seconds": "2.20-2.40 s"
+    }
+  ],
+  "time_markers": [
+    {
+      "frame": 61,
+      "label": "0:02 at 29.97 fps"
+    },
+    {
+      "frame": 310,
+      "label": "frame 310, no motion trigger"
+    }
+  ]
+}
