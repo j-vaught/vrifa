@@ -240,7 +240,7 @@
   // show std.bibliography: set block(spacing: 0.5em)
   set std.bibliography(title: text(10pt)[References], style: "american-institute-of-aeronautics-and-astronautics")
 
-  pagebreak(weak: true)
+  colbreak(weak: true)
   bibliography
 
   // if bibliography-file != none {
