@@ -89,8 +89,11 @@
   let label-pad = 0.15
   let item-w = 3.0      // 0.5 swatch + 0.15 pad + ~2.0 label + buffer
   let total-w = entries.len() * item-w
-  let layout-w = row-label-w + 4 * tile-w + 3 * gap
-  let leg-x0 = (layout-w - total-w) / 2
+  // Center the legend over the panel grid (not the full layout) so it
+  // visually aligns with where the eye reads the four column tiles.
+  let panels-x0 = row-label-w
+  let panels-w = 4 * tile-w + 3 * gap
+  let leg-x0 = panels-x0 + (panels-w - total-w) / 2
 
   for (i, (name, color)) in entries.enumerate() {
     let xa = leg-x0 + i * item-w
