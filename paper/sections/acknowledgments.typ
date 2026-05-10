@@ -18,8 +18,8 @@
 // remove the section entirely.
 // ----------------------------------------------------------------
 
-#text(fill: rgb("#73000A"), weight: 800)[
-  #underline(stroke: 1.2pt + rgb("#73000A"), offset: 2pt)[
+#text(fill: rgb("#FF0000"), weight: 800)[
+  #underline(stroke: 1.2pt + rgb("#FF0000"), offset: 2pt)[
     PENDING SPONSOR CONFIRMATION. See AUTHOR NOTE in
     `paper/sections/acknowledgments.typ` and either populate or remove
     this section before submission.
