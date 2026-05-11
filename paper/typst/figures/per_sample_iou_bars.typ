@@ -26,23 +26,23 @@
 // Resolution bucket: 1080p (input_1..3) -> atlantic, 524p (input_4..11)
 // -> warmgrey, per the dataset section's resolution tiering.
 // Per-sample integrated-config IoU from agreement_metrics_integrated.json
-// (lock_frames=3, morph_kernel=13 default). The "ci" column here is
-// the half-width of the per-sample 95% bootstrap CI over 5 frames.
+// (lock_frames=0, morph_kernel=13). The "ci" column here is the half-
+// width of the per-sample 95% bootstrap CI over 5 frames.
 #let rows = (
-  ("input_1",  0.748, 0.273, atlantic),
-  ("input_2",  0.960, 0.023, atlantic),
-  ("input_3",  0.970, 0.012, atlantic),
-  ("input_4",  0.601, 0.184, warmgrey),
-  ("input_5",  0.674, 0.180, warmgrey),
-  ("input_6",  0.646, 0.215, warmgrey),
-  ("input_7",  0.649, 0.181, warmgrey),
-  ("input_8",  0.603, 0.118, warmgrey),
-  ("input_9",  0.608, 0.104, warmgrey),
-  ("input_10", 0.948, 0.006, warmgrey),
-  ("input_11", 0.816, 0.044, warmgrey),
+  ("input_1",  0.778, 0.137, atlantic),
+  ("input_2",  0.890, 0.041, atlantic),
+  ("input_3",  0.961, 0.011, atlantic),
+  ("input_4",  0.933, 0.019, warmgrey),
+  ("input_5",  0.952, 0.018, warmgrey),
+  ("input_6",  0.937, 0.030, warmgrey),
+  ("input_7",  0.946, 0.013, warmgrey),
+  ("input_8",  0.925, 0.024, warmgrey),
+  ("input_9",  0.948, 0.013, warmgrey),
+  ("input_10", 0.946, 0.005, warmgrey),
+  ("input_11", 0.912, 0.026, warmgrey),
 )
 
-#let overall-mean = 0.748
+#let overall-mean = 0.921
 
 // Sort ascending by IoU so the worst-performing sample is at the top
 // and the strongest at the bottom.
@@ -58,7 +58,7 @@
   let chart-x0 = label-w
   let chart-x1 = chart-x0 + chart-w
 
-  let x-min = 0.30
+  let x-min = 0.60
   let x-max = 1.00
   let x-scale = chart-w / (x-max - x-min)
   let to-x(v) = chart-x0 + (v - x-min) * x-scale
@@ -70,7 +70,7 @@
   let y-bot = y-top - total-h - 0.4
 
   // X-axis tick labels.
-  let ticks = (0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.00)
+  let ticks = (0.60, 0.70, 0.80, 0.90, 1.00)
   for tv in ticks {
     let xx = to-x(tv)
     line((xx, y-bot), (xx, y-bot - 0.08), stroke: 0.4pt + black)

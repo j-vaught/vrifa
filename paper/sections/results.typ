@@ -20,7 +20,7 @@ The integrated configuration is the configuration described in Section~3 and hel
       [*IoU*], [*Dice*], [*B-$F_1$*], [*Boundary px*], [*Box IoU*],
     ),
     table.hline(stroke: 0.5pt),
-    [Integrated (this work)],                        [$0.748$], [$0.832$], [$0.194$], [$150.7$], [$0.792$],
+    [Integrated (this work)],                        [$0.921$], [$0.954$], [$0.432$], [$17.6$],  [$0.924$],
     [Lekanidis & Vosniakos 2020 (reimplemented)],    [$0.144$], [$0.247$], [$0.116$], [$86.3$],  [$0.733$],
     [Almazán-Lázaro 2022 (reimplemented)],           [$0.075$], [$0.136$], [$0.187$], [$65.9$],  [$0.761$],
     table.hline(stroke: 0.8pt),
@@ -50,11 +50,11 @@ The IoU gap between the integrated configuration and the two competitor baseline
     table.hline(stroke: 0.8pt),
     table.header([*Metric*], [*Mean*], [*95 % CI*]),
     table.hline(stroke: 0.5pt),
-    [Mask IoU],                    [$0.748$], [$[0.685, 0.806]$],
-    [Sørensen-Dice],               [$0.832$], [$[0.782, 0.878]$],
-    [Boundary $F_1$ (mean of $tau in {1, 3, 5}$ px)], [$0.194$], [$[0.136, 0.258]$],
-    [Mean boundary distance (px)], [$150.7$], [$[106.1, 200.1]$],
-    [Box IoU],                     [$0.792$], [$[0.731, 0.845]$],
+    [Mask IoU],                    [$0.921$], [$[0.888, 0.942]$],
+    [Sørensen-Dice],               [$0.954$], [$[0.927, 0.970]$],
+    [Boundary $F_1$ (mean of $tau in {1, 3, 5}$ px)], [$0.432$], [$[0.401, 0.464]$],
+    [Mean boundary distance (px)], [$17.6$],  [$[11.7, 25.4]$],
+    [Box IoU],                     [$0.924$], [$[0.888, 0.948]$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
@@ -66,7 +66,7 @@ The IoU gap between the integrated configuration and the two competitor baseline
 
 == Per-sample breakdown
 
-The eleven samples in Section~4 differ substantially in resolution, frame rate, illumination, and operator framing, and the integrated configuration's per-sample IoU follows that variation. Table~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Figure~@fig:per_sample_iou_bars visualises the same data with bootstrap whiskers for quick comparison across samples. Three samples in the 1080p bucket (`input_2`, `input_3`) and the long 524p `input_10` clear $0.94$; six 524p samples (`input_4` through `input_9`) drop to the $0.60$ to $0.67$ range; `input_1` and `input_11` sit between at $0.75$ and $0.82$. The variation is not random noise but is the empirical signature of the integrated configuration's failure modes on specific regimes (e.g.\ the temporal-locking bimodality discussed in Section~7), and is precisely the evidence the regime-indexed lookup later in this section translates into per-sample setting recommendations.
+The eleven samples in Section~4 differ substantially in resolution, frame rate, illumination, and operator framing. A per-sample breakdown is the strongest available evidence that the agreement reported above is consistent across substantively different molds rather than driven by a single fortunate recording. Table~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Figure~@fig:per_sample_iou_bars visualises the same data with bootstrap whiskers for quick comparison across samples. Per-sample IoU ranges from $0.778$ on `input_1` (the only sample with a polygonal ROI mask, which makes the comparison area substantially smaller than the other ten) through $0.961$ on `input_3`; ten of eleven samples clear $0.88$ and seven of eleven clear $0.93$, indicating the integrated configuration's behavior is sample-aware but not sample-fragile.
 
 #figure(
   image("/typst/figures/per_sample_iou_bars.pdf", width: 95%),
@@ -91,17 +91,17 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
       [*Sample*], [*$n$*], [*Mask IoU*], [*Boundary $F_1$*],
     ),
     table.hline(stroke: 0.5pt),
-    [`input_1`],  [5], [$0.748$], [$0.511$],
-    [`input_2`],  [5], [$0.960$], [$0.493$],
-    [`input_3`],  [5], [$0.970$], [$0.437$],
-    [`input_4`],  [5], [$0.601$], [$0.007$],
-    [`input_5`],  [5], [$0.674$], [$0.015$],
-    [`input_6`],  [5], [$0.646$], [$0.000$],
-    [`input_7`],  [5], [$0.649$], [$0.009$],
-    [`input_8`],  [5], [$0.603$], [$0.009$],
-    [`input_9`],  [5], [$0.608$], [$0.020$],
-    [`input_10`], [5], [$0.948$], [$0.434$],
-    [`input_11`], [5], [$0.816$], [$0.203$],
+    [`input_1`],  [5], [$0.778$], [$0.567$],
+    [`input_2`],  [5], [$0.890$], [$0.404$],
+    [`input_3`],  [5], [$0.961$], [$0.388$],
+    [`input_4`],  [5], [$0.933$], [$0.347$],
+    [`input_5`],  [5], [$0.952$], [$0.508$],
+    [`input_6`],  [5], [$0.937$], [$0.406$],
+    [`input_7`],  [5], [$0.946$], [$0.485$],
+    [`input_8`],  [5], [$0.925$], [$0.382$],
+    [`input_9`],  [5], [$0.948$], [$0.452$],
+    [`input_10`], [5], [$0.946$], [$0.449$],
+    [`input_11`], [5], [$0.912$], [$0.360$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
@@ -115,7 +115,7 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
 
 Each row of Table~@tab:ablation holds the integrated configuration described in Section~3 fixed, removes one named component, and reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval. The final column reports the absolute change in mean IoU relative to the integrated configuration in the first row, signed so that a negative number is a drop and a positive number is a rise. Per-sample $Delta$IoU values for the same rows are reported in Figure~@fig:component_bars. The reader should not expect the per-sample values to share the sign of the eleven-sample mean. A primitive whose assumption matches the dynamics of one sample can be neutral or counterproductive on a sample with different dynamics, and the per-sample breakdown is the empirical content of the ablation rather than the eleven-sample mean alone.
 
-Three findings deserve direct attention. First, the camera-shift registration is the single most-load-bearing primitive on this benchmark: removing it drops mean IoU by $0.101$, and the per-sample breakdown shows the loss is concentrated in `input_3` ($Delta$ $-0.58$), `input_10` ($-0.27$), `input_11` ($-0.17$), and `input_2` ($-0.09$) — samples where small inter-frame drift accumulates and the unwarped delta picks up edges that the registration step removes. Second, the peak-brightness reference is neutral or counterproductive on this 11-sample subset (mean $Delta$IoU $+0.019$), with the largest improvements on `input_1` ($+0.14$) and `input_11` ($+0.06$); the primitive's intended workload (lighting drift) is not the binding constraint on the integrated config's per-sample performance here. Third, the ROI restriction matters only for `input_1` (the only sample that uses a polygonal mask file at $-0.29$); on the ten samples that use full-frame ROI the swap is a no-op. The dynamic-lag-reference ablation reports $Delta$IoU exactly zero across every sample, which surfaces a static configuration property rather than an empirical effect: the integrated config sets `ref_mode = first` and the dynamic-lag parameters are inactive when the first-frame reference is in use, so the disable-the-dynamic-lag toggle has no behavior to disable.
+Three findings deserve direct attention. First, the camera-shift registration is by far the most load-bearing primitive on this benchmark: removing it drops mean IoU by $0.630$ to $0.291$, and the per-sample breakdown shows catastrophic loss on every sample (`input_3` $-0.92$, `input_8` $-0.85$, `input_9` $-0.80$, `input_2` $-0.66$, `input_6` $-0.51$, every other sample between $-0.57$ and $-0.66$). Even `input_1`, the only sample with a polygonal ROI mask, drops by $-0.07$. This is the strongest single-component effect in the table; the integrated configuration's headline IoU is largely a property of the camera-shift stage. Second, the peak-brightness reference is neutral on this 11-sample subset (mean $Delta$IoU $+0.009$): the per-sample numbers cancel out, with `input_1` improving by $+0.15$ and `input_6` and `input_8` each losing $-0.02$. The primitive's intended workload (lighting drift) is not the binding constraint on per-sample performance here. Third, the ROI restriction matters only for `input_1` (the only sample that uses a polygonal mask file at $-0.14$); on the ten samples that use full-frame ROI the swap is a no-op. The dynamic-lag-reference ablation reports $Delta$IoU exactly zero across every sample, which surfaces a static configuration property rather than an empirical effect: the integrated config sets `ref_mode = first` and the dynamic-lag parameters are inactive when the first-frame reference is in use, so the disable-the-dynamic-lag toggle has no behavior to disable.
 
 #figure(
   table(
@@ -128,13 +128,13 @@ Three findings deserve direct attention. First, the camera-shift registration is
       [*Configuration*], [*IoU*], [*95 % CI*], [*$Delta$IoU*],
     ),
     table.hline(stroke: 0.5pt),
-    [Integrated],                            [$0.748$], [$[0.685, 0.805]$], [—],
-    [No peak-brightness reference],          [$0.767$], [$[0.707, 0.821]$], [$+0.019$],
-    [No darken-only clip],                   [$0.726$], [$[0.663, 0.785]$], [$-0.022$],
-    [No dynamic-lag reference],              [$0.748$], [$[0.685, 0.805]$], [$+0.000$],
-    [No region-of-interest restriction],     [$0.721$], [$[0.657, 0.779]$], [$-0.027$],
-    [No morphological cleanup],              [$0.754$], [$[0.692, 0.810]$], [$+0.006$],
-    [No camera-shift registration],          [$0.647$], [$[0.588, 0.705]$], [$-0.101$],
+    [Integrated],                            [$0.921$], [$[0.888, 0.942]$], [—],
+    [No peak-brightness reference],          [$0.929$], [$[0.918, 0.940]$], [$+0.009$],
+    [No darken-only clip],                   [$0.902$], [$[0.885, 0.919]$], [$-0.018$],
+    [No dynamic-lag reference],              [$0.921$], [$[0.888, 0.942]$], [$+0.000$],
+    [No region-of-interest restriction],     [$0.908$], [$[0.870, 0.935]$], [$-0.013$],
+    [No morphological cleanup],              [$0.913$], [$[0.881, 0.935]$], [$-0.007$],
+    [No camera-shift registration],          [$0.291$], [$[0.217, 0.367]$], [$-0.630$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [

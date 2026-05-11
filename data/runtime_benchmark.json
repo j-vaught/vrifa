@@ -1,58 +1,103 @@
 {
-  "cpu": {},
+  "cpu": {
+    "input_1": {
+      "runtime_s": 65.51816272735596,
+      "ok": true
+    },
+    "input_2": {
+      "runtime_s": 8.66041088104248,
+      "ok": true
+    },
+    "input_3": {
+      "runtime_s": 16.70863938331604,
+      "ok": true
+    },
+    "input_4": {
+      "runtime_s": 22.129223823547363,
+      "ok": true
+    },
+    "input_5": {
+      "runtime_s": 20.68580937385559,
+      "ok": true
+    },
+    "input_6": {
+      "runtime_s": 22.911766052246094,
+      "ok": true
+    },
+    "input_7": {
+      "runtime_s": 22.255164861679077,
+      "ok": true
+    },
+    "input_8": {
+      "runtime_s": 36.41083216667175,
+      "ok": true
+    },
+    "input_9": {
+      "runtime_s": 40.97131633758545,
+      "ok": true
+    },
+    "input_10": {
+      "runtime_s": 32.31828474998474,
+      "ok": true
+    },
+    "input_11": {
+      "runtime_s": 41.065808057785034,
+      "ok": true
+    }
+  },
   "cuda": {
     "input_1": {
-      "runtime_s": 6.581059455871582,
+      "runtime_s": 6.433565616607666,
       "ok": true,
       "n_masks": 706
     },
     "input_2": {
-      "runtime_s": 1.5276048183441162,
+      "runtime_s": 1.5232226848602295,
       "ok": true,
       "n_masks": 100
     },
     "input_3": {
-      "runtime_s": 2.121657371520996,
+      "runtime_s": 2.0709142684936523,
       "ok": true,
       "n_masks": 200
     },
     "input_4": {
-      "runtime_s": 1.8194506168365479,
+      "runtime_s": 2.171424388885498,
       "ok": true,
       "n_masks": 542
     },
     "input_5": {
-      "runtime_s": 1.8206491470336914,
+      "runtime_s": 2.2719147205352783,
       "ok": true,
       "n_masks": 542
     },
     "input_6": {
-      "runtime_s": 1.8209967613220215,
+      "runtime_s": 2.2210021018981934,
       "ok": true,
       "n_masks": 542
     },
     "input_7": {
-      "runtime_s": 1.8696632385253906,
+      "runtime_s": 2.222743034362793,
       "ok": true,
       "n_masks": 542
     },
     "input_8": {
-      "runtime_s": 2.521794319152832,
+      "runtime_s": 3.32415509223938,
       "ok": true,
       "n_masks": 842
     },
     "input_9": {
-      "runtime_s": 3.021817207336426,
+      "runtime_s": 3.775038003921509,
       "ok": true,
       "n_masks": 1037
     },
     "input_10": {
-      "runtime_s": 3.0731945037841797,
+      "runtime_s": 3.073192834854126,
       "ok": true,
       "n_masks": 767
     },
     "input_11": {
-      "runtime_s": 5.37806248664856,
+      "runtime_s": 3.8253161907196045,
       "ok": true,
       "n_masks": 997
     }
@@ -67,5 +112,5 @@
     "gpu_driver": "550.144.03",
     "os_version": "22.04.5 LTS (Jammy Jellyfish)"
   },
-  "overall_elapsed_s": 3071.42015004158
+  "overall_elapsed_s": 2665.2638709545135
 }

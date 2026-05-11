@@ -8,15 +8,11 @@ All runtimes are reported on a single Linux host. The CPU is an Intel Xeon w9-34
 
 == Throughput
 
-Table~@tab:runtime reports per-sample wall-clock for the integrated configuration on the CPU implementation and on the CUDA implementation. Frames per second is reported as the ratio of input frame count to wall-clock seconds, including decode but excluding output encode and Common Objects in Context (COCO) annotation assembly. Aggregated across the eleven samples, the CUDA implementation processes $216$ frames per second on average, an $87$-fold speedup over the CPU implementation at the same parameter values.
+Table~@tab:runtime reports per-sample wall-clock for the integrated configuration on the CPU implementation and on the CUDA implementation. Each per-sample wall-clock is captured as a sequential single-process run, so the reported CPU figures reflect the throughput a research bench observes when the integrated pipeline is the only thing using the host's cores. Frames per second is reported as the ratio of input frame count to wall-clock seconds, including decode but excluding output encode and Common Objects in Context (COCO) annotation assembly. Aggregated across the eleven samples, the CUDA implementation processes $207$ frames per second on average, a $10$-fold speedup over the CPU implementation at the same parameter values.
 
-// INTERNAL: CPU numbers in tab:runtime were captured under 8-worker
-// concurrent execution (single-process wall-clock is contention-
-// inflated; the relative CUDA/CPU speedup is the correct headline,
-// not the absolute CPU fps). CUDA numbers reflect the current
-// fast-vrifa-rs state and will be refreshed before final publication
-// once the CUDA close-out lands. Regenerate by running
-//   tmux new -d -s paper "cd ~/bench_vrifa && ... python3 /tmp/run_paper_data.py --cuda-only"
+// INTERNAL: CUDA numbers will be refreshed before final publication
+// once the fast-vrifa-rs CUDA close-out lands. Regenerate by running
+//   tmux new -d -s paper "cd ~/bench_vrifa && ... python3 /tmp/run_paper_data.py --workers 1"
 // on COMECH-2422 and re-running scripts/build_paper_tables.py.
 
 #figure(
@@ -30,17 +26,17 @@ Table~@tab:runtime reports per-sample wall-clock for the integrated configuratio
       [*Sample*], [*Frames*], [*CPU s*], [*CUDA s*], [*CPU fps*], [*CUDA fps*], [*Speedup*],
     ),
     table.hline(stroke: 0.5pt),
-    [`input_2`],  [100],  [$71.3$],  [$1.5$], [$1.4$], [$65.4$],   [$46.6×$],
-    [`input_3`],  [200],  [$141.2$], [$2.1$], [$1.4$], [$94.3$],   [$66.6×$],
-    [`input_4`],  [542],  [$258.0$], [$1.8$], [$2.1$], [$297.8$],  [$141.8×$],
-    [`input_5`],  [542],  [$255.9$], [$1.8$], [$2.1$], [$297.8$],  [$140.6×$],
-    [`input_6`],  [542],  [$253.7$], [$1.8$], [$2.1$], [$297.8$],  [$139.4×$],
-    [`input_7`],  [542],  [$255.0$], [$1.9$], [$2.1$], [$289.8$],  [$136.4×$],
-    [`input_1`],  [706],  [$397.2$], [$6.6$], [$1.8$], [$107.3$],  [$60.4×$],
-    [`input_10`], [767],  [$256.4$], [$3.1$], [$3.0$], [$249.8$],  [$83.5×$],
-    [`input_8`],  [842],  [$343.9$], [$2.5$], [$2.4$], [$334.1$],  [$136.5×$],
-    [`input_11`], [997],  [$172.0$], [$5.4$], [$5.8$], [$185.3$],  [$32.0×$],
-    [`input_9`],  [1037], [$338.7$], [$3.0$], [$3.1$], [$343.4$],  [$112.2×$],
+    [`input_2`],  [100],  [$8.7$],   [$1.5$], [$11.5$], [$65.7$],   [$5.7×$],
+    [`input_3`],  [200],  [$16.7$],  [$2.1$], [$12.0$], [$96.6$],   [$8.1×$],
+    [`input_4`],  [542],  [$22.1$],  [$2.2$], [$24.5$], [$249.6$],  [$10.2×$],
+    [`input_5`],  [542],  [$20.7$],  [$2.3$], [$26.2$], [$238.6$],  [$9.1×$],
+    [`input_6`],  [542],  [$22.9$],  [$2.2$], [$23.7$], [$244.0$],  [$10.3×$],
+    [`input_7`],  [542],  [$22.3$],  [$2.2$], [$24.4$], [$243.8$],  [$10.0×$],
+    [`input_1`],  [706],  [$65.5$],  [$6.4$], [$10.8$], [$109.7$],  [$10.2×$],
+    [`input_10`], [767],  [$32.3$],  [$3.1$], [$23.7$], [$249.6$],  [$10.5×$],
+    [`input_8`],  [842],  [$36.4$],  [$3.3$], [$23.1$], [$253.3$],  [$11.0×$],
+    [`input_11`], [997],  [$41.1$],  [$3.8$], [$24.3$], [$260.6$],  [$10.7×$],
+    [`input_9`],  [1037], [$41.0$],  [$3.8$], [$25.3$], [$274.7$],  [$10.9×$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
@@ -49,8 +45,9 @@ Table~@tab:runtime reports per-sample wall-clock for the integrated configuratio
     (`fast-vrifa-rs`) on COMECH-2422. Wall-clock includes video decode
     but excludes output encode and annotation export. Speedup is the
     ratio of CPU seconds to CUDA seconds at matched parameter values.
-    Frame counts are for the trimmed labeling videos in
-    `data/ablation_data/`.
+    Each row is a sequential single-process run; no concurrent
+    workload competed for cores or GPU during measurement. Frame
+    counts are for the trimmed labeling videos in `data/ablation_data/`.
   ],
 ) <tab:runtime>
 

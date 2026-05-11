@@ -27,18 +27,21 @@
 // CPU times captured under 8-worker concurrent execution on
 // COMECH-2422; single-process wall-clock is contention-inflated.
 //   (sample, frames, cpu_fps, cuda_fps)
+// Sequential single-process CPU and CUDA fps from runtime_benchmark.json
+// (lock_frames=0 integrated config on COMECH-2422; no concurrent
+// workload).  (sample, frames, cpu_fps, cuda_fps)
 #let rows = (
-  ("input_2",  100,   1.40,  65.40),
-  ("input_3",  200,   1.42,  94.30),
-  ("input_4",  542,   2.10, 297.80),
-  ("input_5",  542,   2.12, 297.80),
-  ("input_6",  542,   2.14, 297.80),
-  ("input_7",  542,   2.13, 289.80),
-  ("input_1",  706,   1.78, 107.30),
-  ("input_10", 767,   2.99, 249.80),
-  ("input_8",  842,   2.45, 334.10),
-  ("input_11", 997,   5.80, 185.30),
-  ("input_9",  1037,  3.06, 343.40),
+  ("input_2",  100,   11.50,  65.70),
+  ("input_3",  200,   12.00,  96.60),
+  ("input_4",  542,   24.50, 249.60),
+  ("input_5",  542,   26.20, 238.60),
+  ("input_6",  542,   23.70, 244.00),
+  ("input_7",  542,   24.40, 243.80),
+  ("input_1",  706,   10.80, 109.70),
+  ("input_10", 767,   23.70, 249.60),
+  ("input_8",  842,   23.10, 253.30),
+  ("input_11", 997,   24.30, 260.60),
+  ("input_9",  1037,  25.30, 274.70),
 )
 
 #cetz.canvas({
