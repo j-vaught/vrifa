@@ -19,29 +19,16 @@ Unlike contemporary ML models, the detection algorithm introduced here treats ea
   ],
 ) <fig:pipeline>
 
-The pipeline is structured as a configurable framework rather than a fixed algorithm. The sixteen stages collectively expose four colorspaces, three region-of-interest forms, five reference-selection modes, six blur kernels, six threshold modes, three structuring-element shapes, and a handful of other binary or numeric options. The "integrated configuration" referenced throughout this paper is one specific point in that menu space, chosen on a held-out subset and held fixed across every experiment. The per-component ablation in Section~5 evaluates that point, and the regime-indexed configuration lookup in Section~7 recommends alternative settings under operating conditions where the integrated point does not transfer.
+The pipeline is structured as a configurable framework rather than a fixed algorithm. The sixteen stages collectively expose four colorspaces, three region-of-interest forms, five reference-selection modes, six blur kernels, six threshold modes, three structuring-element shapes, and a handful of other binary or numeric options. The "integrated configuration" referenced throughout this paper is one specific point in that menu space. The regime-indexed configuration lookup in Section~7 recommends alternative settings under operating conditions where the integrated point does not transfer.
 
 == Frame decode and colorspace conversion
 
 The first stage decodes each Blue-Green-Red (BGR) frame from the input video. The second projects that frame into a working colorspace. The pipeline supports four options, namely the International Commission on Illumination (CIE) 1976 $L^* a^* b^*$ colorspace (CIELAB), Red-Green-Blue (RGB), Hue-Saturation-Value (HSV), and 8-bit grayscale. The integrated configuration uses CIELAB because for the resin-and-fabric combinations in the eleven samples evaluated here, wetting primarily darkens the lightness channel $L^*$ rather than shifting chrominance, so the single-channel $L^*$ projection used in the difference computation captures most of the signal. The choice is regime-dependent rather than universal. A pigmented resin or a colored fabric could shift the balance of evidence into chrominance and make RGB or HSV preferable, which is why the alternatives remain selectable. The eleven-sample mean and per-sample breakdown of the colorspace effect are reported in Table~@tab:ablation. We denote the converted frame at index $t$ by $F_t$.
 
 #figure(
-  // image("/typst/figures/colorspace_projection.pdf", width: 95%),
-  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
-    _Colorspace projection placeholder._ Four-panel grid showing the
-    same canonical input frame projected into each of the four
-    supported colorspaces. Column 1: raw BGR. Column 2: CIELAB
-    lightness $L^*$ (used by the integrated configuration). Column
-    3: HSV value channel. Column 4: 8-bit grayscale. Each panel
-    rendered with a perceptually uniform colormap so wet-vs-dry
-    separability per projection is visible. A bottom strip shows the
-    per-projection histogram for the laminate region of interest
-    with the wet and dry modes annotated. Regenerated from the new
-    ablation runs.
-  ],
+  image("/typst/figures/colorspace_projection.pdf", width: 95%),
   caption: [
-    The four working-colorspace projections supported by the
-    pipeline.
+    The nine channel projections of the three supported colorspaces.
   ],
 ) <fig:colorspace_projection>
 
