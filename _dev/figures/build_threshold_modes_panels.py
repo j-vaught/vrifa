@@ -41,7 +41,8 @@ DELTA_TAU_OFFSET = -30       # threshold offset for Otsu / Triangle / manual / p
 TAU_MANUAL = 64              # manual mode threshold
 P_PERCENTILE = 70            # percentile mode quantile
 ADAPTIVE_B = 21              # adaptive neighborhood size
-ADAPTIVE_C = 10              # adaptive subtracted constant
+ADAPTIVE_C_MEAN = 6          # subtracted constant for adaptive-mean (tuned to match Otsu coverage)
+ADAPTIVE_C_GAUSSIAN = 4      # subtracted constant for adaptive-gaussian (tuned to match Otsu coverage)
 
 PANEL_W, PANEL_H = 960, 540
 N_HIST_BINS = 64
@@ -148,7 +149,7 @@ def main():
     am = cv2.adaptiveThreshold(d_tilde, 255,
                                cv2.ADAPTIVE_THRESH_MEAN_C,
                                cv2.THRESH_BINARY,
-                               ADAPTIVE_B, ADAPTIVE_C)
+                               ADAPTIVE_B, ADAPTIVE_C_MEAN)
     mask_adaptive_mean = (am > 0).astype(np.uint8) * 255
     mask_adaptive_mean[roi == 0] = 0
 
@@ -156,7 +157,7 @@ def main():
     ag = cv2.adaptiveThreshold(d_tilde, 255,
                                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                cv2.THRESH_BINARY,
-                               ADAPTIVE_B, ADAPTIVE_C)
+                               ADAPTIVE_B, ADAPTIVE_C_GAUSSIAN)
     mask_adaptive_gaussian = (ag > 0).astype(np.uint8) * 255
     mask_adaptive_gaussian[roi == 0] = 0
 

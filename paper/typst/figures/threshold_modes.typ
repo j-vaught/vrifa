@@ -58,8 +58,8 @@
   ),
   (
     ([percentile ($p = 70$)],                  "threshold_modes_panels/mask_percentile.png"),
-    ([adaptive-mean ($b = 21$, $C = 10$)],     "threshold_modes_panels/mask_adaptive_mean.png"),
-    ([adaptive-gaussian ($b = 21$, $C = 10$)], "threshold_modes_panels/mask_adaptive_gaussian.png"),
+    ([adaptive-mean ($b = 21$, $C = 6$)],      "threshold_modes_panels/mask_adaptive_mean.png"),
+    ([adaptive-gaussian ($b = 21$, $C = 4$)],  "threshold_modes_panels/mask_adaptive_gaussian.png"),
   ),
 )
 
@@ -122,13 +122,13 @@
   line((otsu-x, hist-y1), (otsu-x, hist-y0),
        stroke: (paint: garnet, thickness: 1.4pt, dash: "dashed"))
   content((otsu-x, hist-y0 + 0.08),
-          text(size: 7pt, fill: garnet, weight: 600)[Otsu (#calc.round(thrs.at("otsu_raw"))) ],
+          text(size: 7pt, fill: txt, weight: 600)[Otsu (#calc.round(thrs.at("otsu_raw"))) ],
           anchor: "south")
 
   line((tri-x, hist-y1), (tri-x, hist-y0),
        stroke: (paint: atlantic, thickness: 1.4pt, dash: "dashed"))
   content((tri-x, hist-y0 + 0.08),
-          text(size: 7pt, fill: atlantic, weight: 600)[Triangle (#calc.round(thrs.at("triangle_raw")))],
+          text(size: 7pt, fill: txt, weight: 600)[Triangle (#calc.round(thrs.at("triangle_raw")))],
           anchor: "south")
 
   // Y-axis label.

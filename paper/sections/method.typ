@@ -128,26 +128,6 @@ The smoothed field is rescaled to the byte range using a min-max linear rescalin
   ],
 ) <fig:threshold_modes>
 
-#figure(
-  table(
-    columns: (auto, 1fr),
-    align: (left, left),
-    stroke: none,
-    inset: 5pt,
-    table.hline(stroke: 0.8pt),
-    table.header([*Option*], [*Description*]),
-    table.hline(stroke: 0.5pt),
-    [otsu],              [Between-class variance threshold over the histogram of $tilde(D)_t$ @Otsu1979Threshold, plus offset $delta_tau$.],
-    [triangle],          [Geometric construction of Zack and co-workers on the histogram @Zack1977Triangle, plus offset; appropriate when one class dominates the histogram.],
-    [manual],            [User-supplied absolute byte value $tau_"man"$, plus offset.],
-    [percentile],        [$p$-th percentile of ROI pixels of $tilde(D)_t$ by linear interpolation, plus offset.],
-    [adaptive-mean],     [Per-pixel threshold from a $b times b$ neighborhood mean minus constant $C$. Bypasses $delta_tau$.],
-    [adaptive-gaussian], [Per-pixel threshold from a $b times b$ Gaussian-weighted neighborhood mean minus constant $C$. Bypasses $delta_tau$.],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [Threshold modes selectable via the `KIND[:ARGS]` specification of `--threshold`.],
-) <tab:threshold_modes>
-
 == Morphological close
 
 Stage ten passes the binary mask through morphological closing with an elliptical structuring element of size $k_m$ (default thirteen pixels). Closing welds neighbouring wet patches into a single front and fills small gaps where transient bag wrinkles muted the local response. The kernel size is the parameter that sets the spatial scale at which gaps are considered noise rather than real disconnections in the front; on the resolutions in the eleven labeled samples a $13 times 13$ ellipse is large enough to bridge bag-wrinkle gaps and small enough to leave genuinely separate wet regions separate.
