@@ -152,19 +152,20 @@
   content((-0.92, plot-h / 2), y-axis-label, anchor: "south")
 
   // Legend (top-right corner of plot area, inside box).
-  let leg-x = plot-w - 3.6
-  let leg-y = plot-h - 0.3
-  let leg-row-h = 0.30
-  rect((leg-x - 0.15, leg-y + 0.18),
-       (plot-w - 0.15, leg-y - 4 * leg-row-h - 0.05),
+  let leg-row-h = 0.26
+  let leg-w = 2.0
+  let leg-x = plot-w - leg-w - 0.05
+  let leg-y = plot-h - 0.25
+  rect((leg-x - 0.10, leg-y + 0.16),
+       (plot-w - 0.05, leg-y - 4 * leg-row-h),
        fill: white, stroke: 0.4pt + b70)
   for (i, p) in pixels.enumerate() {
     let color = pixel-colors.at(i)
     let y = leg-y - i * leg-row-h
     // Color swatch
-    line((leg-x, y), (leg-x + 0.5, y), stroke: 1.2pt + color)
-    content((leg-x + 0.62, y),
-            text(size: 6.5pt, fill: txt)[pixel at (#p.x, #p.y)],
+    line((leg-x, y), (leg-x + 0.4, y), stroke: 1.2pt + color)
+    content((leg-x + 0.5, y),
+            text(size: 6.5pt, fill: txt)[(#p.x, #p.y)],
             anchor: "west")
   }
 })
