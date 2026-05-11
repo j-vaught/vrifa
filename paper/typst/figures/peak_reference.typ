@@ -104,7 +104,7 @@
     line((x, 0), (x, plot-h), stroke: 0.3pt + b10)
   }
 
-  // Per-pixel arrival markers: a dotted vertical line in each pixel's
+  // Per-pixel arrival markers: a dashed vertical line in each pixel's
   // own color, at the frame where that pixel first drops more than 30
   // L* units below its running peak. Tells the reader exactly when the
   // pipeline considers each pixel to have wetted.
@@ -112,9 +112,9 @@
     let color = pixel-colors.at(i)
     let x = to-x(p.arrival)
     line((x, 0), (x, plot-h),
-         stroke: (paint: color, thickness: 0.5pt, dash: "dotted"))
+         stroke: (paint: color, thickness: 1.2pt, dash: "dashed"))
     content((x, plot-h + 0.14),
-            text(size: 6pt, fill: color)[#p.arrival],
+            text(size: 6.5pt, fill: color, weight: 600)[#p.arrival],
             anchor: "south")
   }
 
