@@ -149,7 +149,7 @@
     line((0, y), (-0.08, y), stroke: 0.5pt + b70)
     content((-0.18, y), text(size: 7pt, fill: b70)[#v], anchor: "east")
   }
-  content((-0.92, plot-h / 2), y-axis-label, anchor: "south")
+  content((-0.92, plot-h / 2), y-axis-label, anchor: "center")
 
   // Legend (top-right corner of plot area, inside box).
   let leg-row-h = 0.26
