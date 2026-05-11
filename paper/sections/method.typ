@@ -109,36 +109,10 @@ The delta field is smoothed by the post-delta blur stage, which is a single func
 #figure(
   image("/typst/figures/pre_post_blur.pdf", width: 95%),
   caption: [
-    Pre- and post-delta blur on the input_1 bump event (frame 10
-    reference, frame 75 current, camera-shift stabilization disabled
-    so the ~3.7 px residual is present). Top row, working channel
-    $L^*$ after pre-delta blur. Bottom row, resulting $D_t$ after the
-    same pre-blur followed by the integrated $k_b = 9$ post-blur.
-    The integrated configuration uses $k_p = 0$ (no pre-blur) and
-    $k_b = 9$ post-blur; the alternative columns show the effect of
-    enabling pre-blur at $k_p = 5$ and $k_p = 9$.
+    Pre- and post-delta blur on the input_1 bump event.  
+    Top row, working channel $L^*$ after pre-delta blur.
   ],
 ) <fig:pre_post_blur>
-
-#figure(
-  table(
-    columns: (auto, 1fr),
-    align: (left, left),
-    stroke: none,
-    inset: 5pt,
-    table.hline(stroke: 0.8pt),
-    table.header([*Option*], [*Description*]),
-    table.hline(stroke: 0.5pt),
-    [gaussian],   [Separable Gaussian kernel; appropriate when speckle is approximately white noise around the underlying response.],
-    [flat],       [Box (uniform-mean) filter; cheapest, biases edges more than gaussian.],
-    [triangle],   [Tent kernel; intermediate between flat and gaussian on edge handling.],
-    [median],     [Median filter; appropriate for salt-and-pepper noise.],
-    [bilateral],  [Edge-preserving cross-bilateral filter; preserves boundaries between wet and dry while smoothing inside each region.],
-    [none],       [No blur applied. Equivalent to specification `none` or kernel size zero.],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [Blur kernels exposed by `blur.rs` and selected via the `KIND[:SIZE]` specification of `--pre-delta-blur` and `--blur`.],
-) <tab:blur_modes>
 
 == Normalization and threshold
 
