@@ -15,16 +15,9 @@ The third failure mode is the inherent ceiling of any tuned classical-CV pipelin
 #figure(
   image("/typst/figures/failure_offdistribution.pdf", width: 95%),
   caption: [
-    Three regimes that stress the integrated configuration in
-    different ways. Left: bright-bag with auto-exposure rebound,
-    common on samples whose first-frame mean $L^*$ exceeds $70$.
-    Center: dark-fabric, low-contrast regime where the dry weave
-    sits near $L^* = 55$ and wet-dry separation is compressed.
-    Right: heavily-compressed bag with weave texture nearly erased,
-    where the Sobel gradient mean drops below $10$ and local
-    edge cues no longer help.
-    Each regime calls for a different sample-aware setting from
-    Table~@tab:lookup rather than for a structural fix.
+    Three off-distribution regimes that stress the integrated
+    configuration. Each calls for a different sample-aware setting
+    from Table~@tab:lookup rather than a structural fix.
   ],
 ) <fig:failure_offdistribution>
 
