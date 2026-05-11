@@ -118,8 +118,15 @@
             anchor: "south")
   }
 
-  // Draw running peak (dashed) and raw L* (solid) for each pixel.
-  // Peak goes first so the solid L* line is drawn on top.
+  // Per-pixel L* line styles. Each pixel gets a unique combination of
+  // color and dash pattern so the lines stay distinguishable in
+  // grayscale prints, on colorblind readers, and at small reproduction
+  // size. Running peaks all share a faint dotted style and color-match
+  // their L* line.
+  let l-dashes = ("solid", "dashed", "loosely-dashed", "loosely-dotted")
+
+  // Draw running peak (faint dotted) and raw L* (color + pattern) for
+  // each pixel. Peak goes first so the L* line is drawn on top.
   for i in range(4) {
     let color = pixel-colors.at(i)
     let pts-P = ()
@@ -129,8 +136,10 @@
       pts-P.push((to-x(f), to-y(data.P.at(i).at(j))))
       pts-L.push((to-x(f), to-y(data.L.at(i).at(j))))
     }
-    line(..pts-P, stroke: (paint: color, thickness: 0.7pt, dash: "dashed"))
-    line(..pts-L, stroke: 1.0pt + color)
+    line(..pts-P,
+         stroke: (paint: color, thickness: 0.5pt, dash: "densely-dotted"))
+    line(..pts-L,
+         stroke: (paint: color, thickness: 1.3pt, dash: l-dashes.at(i)))
   }
 
   // X-axis tick labels.
@@ -162,8 +171,10 @@
   for (i, p) in pixels.enumerate() {
     let color = pixel-colors.at(i)
     let y = leg-y - i * leg-row-h
-    // Color swatch
-    line((leg-x, y), (leg-x + 0.4, y), stroke: 1.2pt + color)
+    // Color + dash swatch (matches the L* line style for that pixel).
+    line((leg-x, y), (leg-x + 0.4, y),
+         stroke: (paint: color, thickness: 1.3pt,
+                  dash: l-dashes.at(i)))
     content((leg-x + 0.5, y),
             text(size: 6.5pt, fill: txt)[(#p.x, #p.y)],
             anchor: "west")
