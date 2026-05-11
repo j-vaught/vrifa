@@ -128,15 +128,9 @@ Three findings deserve direct attention. First, the camera-shift registration ro
     table.hline(stroke: 0.8pt),
   ),
   caption: [
-    Component-removal ablation on the fifty-five-frame labeling
-    subset. Each row holds the integrated configuration of Section~3
-    fixed and disables one named component. $Delta$IoU is the signed change in mean IoU
-    relative to the integrated configuration; negative values are
-    drops, positive values are rises. Rows are listed in the order
-    in which each corresponding primitive is introduced in
-    Section~3, not sorted by $Delta$IoU, so that the order is
-    independent of the data. Confidence intervals are bootstrap
-    quantiles over $10,!000$ resamples of the per-frame mean.
+    Component-removal ablation on the 55-frame labeling subset.
+    Each row disables one component of the integrated configuration;
+    $Delta$IoU is the signed change in mean IoU.
   ],
 ) <tab:ablation>
 
