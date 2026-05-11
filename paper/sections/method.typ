@@ -46,10 +46,11 @@ A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera i
   image("/typst/figures/camera_shift_pair.pdf", width: 100%),
   caption: [
     Pipeline delta field across the bumped-tripod event in input_1
-    (frame 63 reference, frame 75 current, 3.7 px shift). Without the
-    registration warp, every laminate edge produces false-positive
-    wetting signal. With the warp, the field collapses to near-empty
-    residuals.
+    (frame 10 reference, frame 75 current, 4.7 px shift). The
+    uncorrected panel mixes the legitimate wetting signal with
+    false-positive signal along every laminate edge produced by the
+    camera shift. The corrected panel preserves the real wetting while
+    the registration warp removes the edge artifacts.
   ],
 ) <fig:camera_shift_pair>
 

@@ -34,7 +34,7 @@ ROI_MASK_PATH = REPO / "data" / "roi_masks" / "input_1.png"
 OUT_DIR = REPO / "paper" / "typst" / "figures" / "camera_shift_panels"
 OUT_DIR.mkdir(exist_ok=True, parents=True)
 
-PRE_IDX = 63        # well before the bump (frames 65-70)
+PRE_IDX = 10        # early reference, dry preform but past camera warm-up
 POST_IDX = 75       # after the bump has settled
 
 # Output dimensions for each rendered panel (16:9 to match other figures).
