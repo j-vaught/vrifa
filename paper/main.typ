@@ -55,8 +55,8 @@
     restriction, dynamic-lag reference selection, morphological
     cleanup, persistence-based temporal locking, and run-time
     camera-shift registration, reaching mean mask
-    Intersection-over-Union of $0.921$ (95 % CI $[0.889, 0.943]$) and mean boundary $F_1$ of $0.433$
-    (CI $[0.396, 0.473]$) on the benchmark introduced below. On the
+    Intersection-over-Union of $0.921$ (95 % CI $[0.888, 0.942]$) and mean boundary $F_1$ of $0.432$
+    (CI $[0.401, 0.464]$) on the benchmark introduced below. On the
     same benchmark, the two prior published classical-CV pipelines
     for VARTM flow-front segmentation, reimplemented from their
     source papers, reach mean boundary $F_1$ of $0.116$
@@ -73,8 +73,8 @@
     region-of-interest masks and a documented labeling protocol,
     against which the two prior pipelines above are evaluated as
     reference points and any future flow-front segmentation method
-    can be evaluated identically. The pipeline runs at 30 frames per second on a single
-    CPU and at 67 frames per second on a CUDA implementation for a
+    can be evaluated identically. The pipeline runs at 10.8 frames per second on a single
+    CPU and at 109.7 frames per second on a CUDA implementation for a
     $1920 times 1080$ input.
   ],
 )

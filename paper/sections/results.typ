@@ -23,8 +23,8 @@ The integrated configuration is the configuration described in Section~3 and hel
     ),
     table.hline(stroke: 0.5pt),
     [Integrated (this work)],                     [$0.921$], [$0.954$], [$0.256$], [$0.453$], [$0.586$], [$17.6$], [$0.924$],
-    [Lekanidis & Vosniakos 2020 (reimplemented)], [$0.144$], [$0.247$], [$0.061$], [$0.116$], [$0.172$], [$86.3$], [$0.733$],
-    [Almazán-Lázaro 2022 (reimplemented)],        [$0.075$], [$0.136$], [$0.103$], [$0.193$], [$0.266$], [$65.9$], [$0.761$],
+    [Lekanidis & Vosniakos 2020], [$0.144$], [$0.247$], [$0.061$], [$0.116$], [$0.172$], [$86.3$], [$0.733$],
+    [Almazán-Lázaro 2022],        [$0.075$], [$0.136$], [$0.103$], [$0.193$], [$0.266$], [$65.9$], [$0.761$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
