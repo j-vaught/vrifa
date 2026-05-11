@@ -58,8 +58,8 @@
   ),
   (
     ([percentile ($p = 70$)],                  "threshold_modes_panels/mask_percentile.png"),
-    ([adaptive-mean ($b = 21$, $C = 6$)],      "threshold_modes_panels/mask_adaptive_mean.png"),
-    ([adaptive-gaussian ($b = 21$, $C = 4$)],  "threshold_modes_panels/mask_adaptive_gaussian.png"),
+    ([adaptive-mean ($b = 1001$, $C = 15$)],     "threshold_modes_panels/mask_adaptive_mean.png"),
+    ([adaptive-gaussian ($b = 1001$, $C = 20$)], "threshold_modes_panels/mask_adaptive_gaussian.png"),
   ),
 )
 
@@ -120,13 +120,13 @@
   let tri-x   = hist-x0 + thrs.at("triangle_raw") / 255 * (hist-x1 - hist-x0)
 
   line((otsu-x, hist-y1), (otsu-x, hist-y0),
-       stroke: (paint: garnet, thickness: 1.4pt, dash: "dashed"))
+       stroke: (paint: txt, thickness: 1.4pt, dash: "dashed"))
   content((otsu-x, hist-y0 + 0.08),
           text(size: 7pt, fill: txt, weight: 600)[Otsu (#calc.round(thrs.at("otsu_raw"))) ],
           anchor: "south")
 
   line((tri-x, hist-y1), (tri-x, hist-y0),
-       stroke: (paint: atlantic, thickness: 1.4pt, dash: "dashed"))
+       stroke: (paint: txt, thickness: 1.4pt, dash: "dashed"))
   content((tri-x, hist-y0 + 0.08),
           text(size: 7pt, fill: txt, weight: 600)[Triangle (#calc.round(thrs.at("triangle_raw")))],
           anchor: "south")

@@ -40,9 +40,9 @@ DELTA_TAU_OFFSET = -30       # threshold offset for Otsu / Triangle / manual / p
 # Threshold-mode parameters.
 TAU_MANUAL = 64              # manual mode threshold
 P_PERCENTILE = 70            # percentile mode quantile
-ADAPTIVE_B = 21              # adaptive neighborhood size
-ADAPTIVE_C_MEAN = 6          # subtracted constant for adaptive-mean (tuned to match Otsu coverage)
-ADAPTIVE_C_GAUSSIAN = 4      # subtracted constant for adaptive-gaussian (tuned to match Otsu coverage)
+ADAPTIVE_B = 1001            # adaptive neighborhood size; large b makes adaptive approach global behavior
+ADAPTIVE_C_MEAN = 15         # subtracted constant for adaptive-mean (tuned to match Otsu coverage)
+ADAPTIVE_C_GAUSSIAN = 20     # subtracted constant for adaptive-gaussian (tuned to match Otsu coverage)
 
 PANEL_W, PANEL_H = 960, 540
 N_HIST_BINS = 64
