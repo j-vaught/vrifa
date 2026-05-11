@@ -111,7 +111,7 @@
     rect(
       (ref-x-center - ref-w / 2, tile-y + ref-h / 2),
       (ref-x-center + ref-w / 2, tile-y - ref-h / 2),
-      stroke: 1pt + txt,
+      stroke: 0.6pt + txt,
       fill: none,
     )
     // Label below tile.
@@ -137,7 +137,7 @@
       rect(
         (ch-x-center(c) - ch-w / 2, tile-y + ch-h / 2),
         (ch-x-center(c) + ch-w / 2, tile-y - ch-h / 2),
-        stroke: 1pt + txt,
+        stroke: 0.6pt + txt,
         fill: none,
       )
       // Per-cell label band below tile.
