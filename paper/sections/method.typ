@@ -123,8 +123,8 @@ The smoothed field is rescaled to the byte range using a min-max linear rescalin
   image("/typst/figures/threshold_modes.pdf", width: 95%),
   caption: [
     The six threshold modes applied to the same normalized response
-    field $tilde(D)_t$ from input_1 frame 352. Top strip is the
-    histogram of $tilde(D)_t$ inside the ROI with the Otsu and
+    field from input_1 frame 352. Top strip is the
+    histogram of response inside the ROI with the Otsu and
     Triangle threshold values marked.
   ],
 ) <fig:threshold_modes>
@@ -134,41 +134,26 @@ The smoothed field is rescaled to the byte range using a min-max linear rescalin
 Stages ten and eleven clean the thresholded mask. Stage ten passes the binary mask through morphological closing with an elliptical structuring element of size $k_m$ (default thirteen pixels). Closing welds neighbouring wet patches into a single front and fills small gaps where transient bag wrinkles muted the local response. The kernel size sets the spatial scale at which gaps are considered noise rather than real disconnections in the front; on the resolutions in the eleven labeled samples a $13 times 13$ ellipse is large enough to bridge bag-wrinkle gaps and small enough to leave genuinely separate wet regions separate. Stage eleven passes the closed mask through morphological opening with the same kernel and shape, removing specks below the kernel size that survived the closing pass. A connected-components labelling pass then discards any region whose pixel area is below $a_"min"$ pixels (default $400$), which removes the small islands that the morphology kernels are too small to suppress. Figure~@fig:cleanup shows the same frame at every step of stages nine through eleven.
 
 #figure(
-  // image("/typst/figures/mask_cleanup.pdf", width: 100%),
-  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
-    _Mask-cleanup montage placeholder._ Five panels for one frame:
-    the normalized response, the threshold output, after closing,
-    after opening, and after the connected-components area filter.
-    Regenerated from the new ablation runs.
-  ],
+  image("/typst/figures/mask_cleanup.pdf", width: 100%),
   caption: [
-    Mask cleanup on the first canonical input clip at frame 200.
-    The normalized response field (1) is thresholded into a noisy
-    binary mask (2). Closing welds neighbouring wet patches and
-    fills small gaps (3). Opening removes specks the closing
-    kernel could not fill (4). Connected-components labelling
-    removes the few residual islands below the four-hundred-pixel
-    area floor, leaving the final mask on which the temporal lock
-    operates (5).
+    Mask cleanup on input_1 frame 200. The normalized response field
+    (1) is thresholded into a noisy binary mask (2). Closing welds
+    neighbouring wet patches and fills small gaps (3). Opening
+    removes specks the closing kernel could not fill (4).
+    Connected-components labelling removes the few residual islands
+    below the four-hundred-pixel area floor, leaving the final mask
+    on which the temporal lock operates (5).
   ],
 ) <fig:cleanup>
 
 The kernel parities are forced odd at runtime so that anchor handling is symmetric. The structuring-element shape is elliptical by default with optional rectangular and cross-shaped alternatives, exposed because the front shape changes with infusion geometry.
 
 #figure(
-  // image("/typst/figures/morph_kernels.pdf", width: 95%),
-  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
-    _Morphological-kernel comparison placeholder._ Three panels of
-    the cleaned mask under each structuring-element shape with
-    $k_m = 13$. Left: ellipse (used by the integrated configuration),
-    isotropic, appropriate for round fronts. Center: rectangle,
-    asymmetric, appropriate for stripe-shaped wet regions. Right:
-    cross, minimal, preserves corners. The integrated panel is
-    bordered in garnet.
-  ],
+  image("/typst/figures/morph_kernels.pdf", width: 95%),
   caption: [
-    Morphological structuring-element shape applied to the same
-    threshold output. The integrated configuration uses ellipse.
+    Cleaned mask under each structuring-element shape at $k_m = 13$,
+    applied to the same thresholded mask from input_1 frame 200. The
+    integrated configuration uses ellipse.
   ],
 ) <fig:morph_kernels>
 
