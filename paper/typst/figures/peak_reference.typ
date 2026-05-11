@@ -71,7 +71,7 @@
 // Pre-rotate the y-axis label outside the cetz.canvas so the
 // Typst built-in rotate() is in scope (cetz.draw.rotate shadows it).
 #let y-axis-label = rotate(-90deg, reflow: true,
-  text(size: 8pt, fill: rgb("#000000"))[CIELAB $L^*$ (8-bit)])
+  text(size: 8pt, fill: rgb("#000000"))[delta magnitude])
 
 #cetz.canvas({
   import cetz.draw: *
@@ -117,9 +117,6 @@
             text(size: 6pt, fill: color)[#p.arrival],
             anchor: "south")
   }
-  content((plot-w / 2, plot-h + 0.40),
-          text(size: 6.5pt, fill: b70, style: "italic")[per-pixel arrival frames],
-          anchor: "south")
 
   // Draw running peak (dashed) and raw L* (solid) for each pixel.
   // Peak goes first so the solid L* line is drawn on top.
@@ -167,7 +164,7 @@
     // Color swatch
     line((leg-x, y), (leg-x + 0.5, y), stroke: 1.2pt + color)
     content((leg-x + 0.62, y),
-            text(size: 6.5pt, fill: txt)[pixel at (#p.x, #p.y), arrival frame #p.arrival],
+            text(size: 6.5pt, fill: txt)[pixel at (#p.x, #p.y)],
             anchor: "west")
   }
 })
