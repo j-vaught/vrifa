@@ -1,36 +1,51 @@
 = Datasets and Labeling Protocol
 
-The evaluation rests on eleven Vacuum-Assisted Resin Transfer Molding (VARTM) infusion videos collected at the University of South Carolina Mechanical Engineering composites laboratory. Three of the eleven samples are committed at the full sensor resolution of $1920 times 1080$ or $1920 times 1088$ pixels and are intended as the canonical reference set for the runtime benchmark and for figure regeneration. The remaining eight samples are operator-view recordings cropped to $1048 times 524$ pixels and span thirty-second-resolution captures of full infusion runs from February 2026. Sample durations range from twenty-three seconds for the shortest standard-rate clip to roughly nine minutes for the longest cropped run, and frame counts range from one hundred to over fifteen thousand. Two of the high-resolution clips are recorded at a time-lapse rate of $3.33$ frames per second, while the remaining nine record at $30$ frames per second. The sample inventory is summarized in Table~@tab:samples.
+The evaluation rests on eleven Vacuum-Assisted Resin Transfer Molding (VARTM) infusion videos. Three of the eleven samples are committed at the full sensor resolution of $1920 times 1080$ or $1920 times 1088$ pixels and are intended as the canonical reference set for the runtime benchmark and for figure regeneration. The remaining eight samples are operator-view recordings cropped to $1048 times 524$ pixels and span thirty-second-resolution captures of full infusion runs. Sample durations range from twenty-three seconds for the shortest standard-rate clip to roughly nine minutes for the longest cropped run, and frame counts range from one hundred to over fifteen thousand. The sample inventory is summarized in Table~@tab:samples.
 
 #figure(
-  table(
-    columns: (auto, auto, auto, auto, auto, auto),
-    align: (left, right, right, right, right, left),
-    stroke: none,
-    inset: 6pt,
-    table.hline(stroke: 0.8pt),
-    table.header(
-      [*Sample*], [*Frames*], [*FPS*], [*Width*], [*Height*], [*Class*],
+  grid(
+    columns: 2,
+    column-gutter: 1em,
+    align: top,
+    table(
+      columns: (auto, auto, auto, auto),
+      align: (left, right, right, right),
+      stroke: none,
+      inset: 6pt,
+      table.hline(stroke: 0.8pt),
+      table.header(
+        [*Sample*], [*Frames*], [*Width*], [*Height*],
+      ),
+      table.hline(stroke: 0.5pt),
+      [`input_1`], [706],   [1920], [1080],
+      [`input_2`], [100],   [1920], [1088],
+      [`input_3`], [200],   [1920], [1088],
+      [`input_4`], [8 100], [1048], [524],
+      [`input_5`], [8 100], [1048], [524],
+      [`input_6`], [8 100], [1048], [524],
+      table.hline(stroke: 0.8pt),
     ),
-    table.hline(stroke: 0.5pt),
-    [`input_1`],  [706],  [29.97], [1920], [1080], [high-res standard],
-    [`input_2`],  [100],  [3.33],  [1920], [1088], [high-res time-lapse],
-    [`input_3`],  [200],  [3.33],  [1920], [1088], [high-res time-lapse],
-    [`input_4`],  [8 100],  [30.00], [1048], [524], [cropped operator],
-    [`input_5`],  [8 100],  [30.00], [1048], [524], [cropped operator],
-    [`input_6`],  [8 100],  [30.00], [1048], [524], [cropped operator],
-    [`input_7`],  [8 100],  [30.00], [1048], [524], [cropped operator],
-    [`input_8`],  [12 600], [30.00], [1048], [524], [cropped operator],
-    [`input_9`],  [15 469], [30.00], [1048], [524], [cropped operator],
-    [`input_10`], [11 426], [30.00], [1048], [524], [cropped operator],
-    [`input_11`], [14 876], [30.00], [1048], [524], [cropped operator],
-    table.hline(stroke: 0.8pt),
+    table(
+      columns: (auto, auto, auto, auto),
+      align: (left, right, right, right),
+      stroke: none,
+      inset: 6pt,
+      table.hline(stroke: 0.8pt),
+      table.header(
+        [*Sample*], [*Frames*], [*Width*], [*Height*],
+      ),
+      table.hline(stroke: 0.5pt),
+      [`input_7`],  [8 100],  [1048], [524],
+      [`input_8`],  [12 600], [1048], [524],
+      [`input_9`],  [15 469], [1048], [524],
+      [`input_10`], [11 426], [1048], [524],
+      [`input_11`], [14 876], [1048], [524],
+      table.hline(stroke: 0.8pt),
+    ),
   ),
   caption: [
     Sample inventory. Eleven VARTM infusion clips committed under
-    `data/`. The high-resolution clips serve as the canonical
-    benchmark targets; the cropped operator-view recordings
-    contribute the long-form generalization evidence.
+    `data/`, split into two side-by-side tables for compactness.
   ],
 ) <tab:samples>
 
