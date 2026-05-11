@@ -1,3 +1,4 @@
+#import "../lib.typ": td
 
 = Related Work
 
@@ -5,7 +6,25 @@ This work builds upon four research pillars of the composite-manufacturing and c
 
 == Modeling, sensing, and control of the flow front
 
-The modeling literature treats the flow front as a given input. Forward simulators predict where resin will reach across the laminate given material permeability and inlet conditions, and have been validated against experiments on flat and stiffened plates @Adhikari2021HPMLevelSet @Govignon2008FullField. Inverse methods work backward from the observed front. One combines overhead camera measurements of fabric distribution with a center-injection experiment to recover a 2D permeability map @ComasCardona2014OpticalInverse. Another compares live pressure-sensor traces against an analytic front model to adjust injection parameters on the fly @DiFratta2016PressureInversion. Learning-based variants extend the same thread, using piezoelectric sensors and a hybrid learned model to identify and forecast the front @Park2025FlowFrontGAN, or physics-informed neural networks to recover permeability fields from simulated Darcy data @Mao2026PINNInversion. A parallel surrogate-modeling thread learns a 2D front map from sparse pressure sensors on simulated runs @Stieber2020FlowFrontNet, and extends to material-property inference under simulation-to-real transfer @Stieber2023SimToReal. Every method above depends on a front map, which is currently obtained from finite-element simulation or manual annotation of plate experiments. The integrated pipeline produces that map directly from production video, which is the input these methods need to leave simulation and fine-tune on real runs.
+The modeling literature treats the flow front as a given input. #td[modelling litereature for what?]
+
+Forward simulators predict where resin will reach across the laminate given material permeability and inlet conditions, and have been validated against experiments on flat and stiffened plates @Adhikari2021HPMLevelSet @Govignon2008FullField. 
+
+Inverse methods work backward from the observed front. 
+
+One combines overhead camera measurements of fabric distribution with a center-injection experiment to recover a 2D permeability map @ComasCardona2014OpticalInverse. 
+
+Another compares live pressure-sensor traces against an analytic front model to adjust injection parameters on the fly @DiFratta2016PressureInversion. 
+
+Learning-based variants extend the same thread, using piezoelectric sensors and a hybrid learned model to identify and forecast the front @Park2025FlowFrontGAN, or physics-informed neural networks to recover permeability fields from simulated Darcy data @Mao2026PINNInversion. 
+
+A parallel surrogate-modeling thread learns a 2D front map from sparse pressure sensors on simulated runs @Stieber2020FlowFrontNet, and extends to material-property inference under simulation-to-real transfer @Stieber2023SimToReal. 
+
+Every method above depends on a front map, which is currently obtained from finite-element simulation or manual annotation of plate experiments. 
+
+The integrated pipeline produces that map directly from production video, which is the input these methods need to leave simulation and fine-tune on real runs.
+
+ ----- ---------------------------------------NEW LINE
 
 The observation literature measures the front directly but does so through instrumentation that discretizes it. A recent in-line-sensing survey groups the field around dielectric, thermal, ultrasonic, fiber-optic, and electrical-resistance modalities @Konstantopoulos2014InlineSensing. Dielectric tracking gives unsaturated and saturated front positions at each electrode pair at an installation cost that is hard to beat, but the spatial resolution of the resulting front is bounded by the electrode pitch @Tifkitsis2014Dielectric. Area-sensor arrays dramatically improve coverage by tiling a polyimide film into a dense capacitive matrix and recovering the impregnated-area ratio per cell, which is the closest sensor-side analogue to a full-field flow-front mask @Matsuzaki2011AreaSensor. The resulting front is, however, still a quantized grid that is destructive to instrument inside production tooling and that adds permeability to the stack-up. Fiber-optic strategies use Fiber Bragg Grating arrays or Optical Frequency Domain Reflectometry to time-stamp resin arrival at every grating along an embedded fiber, with recent distributed-sensing implementations pushing toward life-cycle structural-health monitoring of large Carbon-Fiber-Reinforced-Polymer (CFRP) parts @Matsuzaki2022FiberOptic. These methods deliver excellent temporal precision and can survive infusion and cure, but the same coupling between sensor density and front fidelity reappears, since arbitrary front shapes between gratings are interpolated rather than measured. Distributed carbon-nanotube textile sensors push the spatial-coverage axis further by integrating the sensing layer into the lay-up itself @DaiThostenson2020CNTTextile. The limitation common to this paragraph is that front fidelity is bounded by sensor pitch, and the methods that approach pixel-level coverage do so by adding instrumentation to the part they measure.
 
