@@ -1,6 +1,6 @@
 = Datasets and Labeling Protocol
 
-The evaluation rests on eleven VARTM infusion videos. Three of the eleven samples are committed at the full sensor resolution of $1920 times 1080$ or $1920 times 1088$ pixels and are intended as the canonical reference set for the runtime benchmark and for figure regeneration. The remaining eight samples are operator-view recordings cropped to $1048 times 524$ pixels and span thirty-second-resolution captures of full infusion runs. 
+The evaluation rests on eleven VARTM infusion videos. Three of the eleven samples are committed at the full sensor resolution of $1920 times 1080$ or $1920 times 1088$ pixels and are intended as the canonical reference set for the runtime benchmark and for figure regeneration. The remaining eight samples are operator-view recordings cropped to $1048 times 524$ pixels, captured at approximately thirty frames per second across full infusion runs.
 
 #figure(
   table(

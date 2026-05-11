@@ -76,7 +76,7 @@ The dynamic mode warrants a closer look because the integrated configuration doe
 
 $ Delta tau_t = lambda dot.c [ ( (rho |R|) / kappa + sqrt(tau_t) )^2 - tau_t ], $ <eq:dynlag>
 
-This is clipped to be non-negative and scaled by a user lag factor $lambda$. The reference frame is then read from a small cache at the integer index whose elapsed time is closest to $tau_t - Delta tau_t$, falling back to the first frame whenever the calibration has not yet produced a finite $kappa$. A linear-mode override replaces the sqrt-area growth fit with a parameterized linear lag schedule, which steps the reference frame back at a constant rate independent of the calibration estimate. The override is intended for diagnostic comparisons where the sqrt-area assumption is suspect, and a per-frame log of the chosen lag is written to a log for post-hoc inspection.
+This is clipped to be non-negative and scaled by a user lag factor $lambda$. The reference frame is then read from a small cache at the integer index whose elapsed time is closest to $tau_t - Delta tau_t$, falling back to the first frame whenever the calibration has not yet produced a finite $kappa$. A linear-mode override replaces the sqrt-area growth fit with a parameterized linear lag schedule, which steps the reference frame back at a constant rate independent of the calibration estimate. The override is intended for diagnostic comparisons where the sqrt-area assumption is suspect, and the chosen lag is logged per frame for post-hoc inspection.
 
 #figure(
   image("/typst/figures/reference_modes.pdf", width: 100%),

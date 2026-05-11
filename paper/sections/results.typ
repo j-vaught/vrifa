@@ -4,7 +4,7 @@ The agreement between the predicted mask and the human-labeled ground truth is m
 
 == Published classical-CV baselines
 
-The two competitor baselines reimplement the per-frame pipelines of the only two prior camera-based VARTM/LCM systems whose method sections describe enough operations to reproduce. The Lekanidis-Vosniakos 2020 baseline @LekanidisVosniakos2020IJMMS is a chain of ROI crop, Gaussian blur ($sigma = 2$), grayscale conversion, contrast stretch, Otsu binarization, foreground-background swap, closing on a disk-13 structuring element, Sobel edge detection, opening with a 120-pixel area threshold, and dilation. The Almazán-Lázaro 2022 baseline @AlmazanLazaro2022JMP is a per-frame chain of ROI crop, Scaramuzza-style lens-distortion correction @Scaramuzza2006Toolbox, histogram equalization, first-frame absolute differencing, grayscale conversion, a $5 times 5$ mean filter, Sobel-gradient segmentation, paired erosion and dilation, and small-area removal. Neither prior pipeline released source, so both rows are reimplementations from the publication text and any minor specification gap was filled by the most natural classical-CV interpretation. ~@tab:headline_vs_baselines reports the agreement of all three rows on the fifty-five-frame labeling subset.
+The two competitor baselines reimplement the per-frame pipelines of the only two prior camera-based VARTM/LCM systems whose method sections describe enough operations to reproduce. The Lekanidis and Vosniakos 2020 baseline @LekanidisVosniakos2020IJMMS is a chain of ROI crop, Gaussian blur ($sigma = 2$), grayscale conversion, contrast stretch, Otsu binarization, foreground-background swap, closing on a disk-13 structuring element, Sobel edge detection, opening with a 120-pixel area threshold, and dilation. The Almazán-Lázaro 2022 baseline @AlmazanLazaro2022JMP is a per-frame chain of ROI crop, Scaramuzza-style lens-distortion correction @Scaramuzza2006Toolbox, histogram equalization, first-frame absolute differencing, grayscale conversion, a $5 times 5$ mean filter, Sobel-gradient segmentation, paired erosion and dilation, and small-area removal. Neither prior pipeline released source, so both rows are reimplementations from the publication text and any minor specification gap was filled by the most natural classical-CV interpretation. ~@tab:headline_vs_baselines reports the agreement of all three rows on the fifty-five-frame labeling subset.
 
 #figure(
   table(
@@ -21,7 +21,7 @@ The two competitor baselines reimplement the per-frame pipelines of the only two
     ),
     table.hline(stroke: 0.5pt),
     [Integrated (this work)],     [$0.921$], [$0.954$], [$0.256$], [$0.453$], [$0.586$], [$17.6$], [$0.924$],
-    [Lekanidis & Vosniakos 2020], [---], [---], [$0.061$], [$0.116$], [$0.172$], [$86.3$], [$0.733$],
+    [Lekanidis and Vosniakos 2020], [---], [---], [$0.061$], [$0.116$], [$0.172$], [$86.3$], [$0.733$],
     [Almazán-Lázaro 2022],        [---], [---], [$0.103$], [$0.193$], [$0.266$], [$65.9$], [$0.761$],
     table.hline(stroke: 0.8pt),
   ),
@@ -32,7 +32,7 @@ The two competitor baselines reimplement the per-frame pipelines of the only two
   ],
 ) <tab:headline_vs_baselines>
 
-The gap between the integrated configuration and the two competitor baselines is attributable to specific components the prior pipelines do not include. Lekanidis-Vosniakos 2020 has Otsu and morphology but no peak-brightness reference, no darken-only clip, no temporal lock, no dynamic-lag reference, and no run-time camera-shift registration; Almazán-Lázaro 2022 adds Scaramuzza-style lens-distortion calibration but does not use an explicit threshold (relying on Sobel-gradient segmentation), has no peak reference, no darken-only clip, no temporal lock, and no dynamic-lag reference.
+The gap between the integrated configuration and the two competitor baselines is attributable to specific components the prior pipelines do not include. Lekanidis and Vosniakos 2020 has Otsu and morphology but no peak-brightness reference, no darken-only clip, no temporal lock, no dynamic-lag reference, and no run-time camera-shift registration; Almazán-Lázaro 2022 adds Scaramuzza-style lens-distortion calibration but does not use an explicit threshold (relying on Sobel-gradient segmentation), has no peak reference, no darken-only clip, no temporal lock, and no dynamic-lag reference.
 
 #figure(
   table(
@@ -59,7 +59,7 @@ The gap between the integrated configuration and the two competitor baselines is
 
 == Per-sample breakdown
 
-The eleven labeled samples differ in resolution, frame rate, illumination, and operator framing. A per-sample breakdown is the strongest available evidence that the agreement reported above is consistent across substantively different molds rather than driven by a single fortunate recording~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Per-sample IoU ranges from $0.778$ on `input_1` (the only sample with a polygonal ROI mask, which makes the comparison area substantially smaller than the other ten) through $0.961$ on `input_3`; ten of eleven samples clear $0.88$ and seven of eleven clear $0.93$, indicating the integrated configuration's behavior is sample-aware but not sample-fragile.
+The eleven labeled samples differ in resolution, frame rate, illumination, and operator framing. A per-sample breakdown is the strongest available evidence that the agreement reported above is consistent across substantively different molds rather than driven by a single fortunate recording. ~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Per-sample IoU ranges from $0.778$ on `input_1` (the only sample with a polygonal ROI mask, which makes the comparison area substantially smaller than the other ten) through $0.961$ on `input_3`; ten of eleven samples clear $0.88$ and seven of eleven clear $0.93$, indicating the integrated configuration's behavior is sample-aware but not sample-fragile.
 
 
 #figure(
