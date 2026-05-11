@@ -13,12 +13,18 @@
 // BAMDONE!
 //***************************************************************
 
-// Drafting margin-notes. Use `#td[...]` inline to drop a margin
-// note in bright red. Grep the project for `#td[` before submission
-// to find and clear any outstanding notes.
-#import "@preview/drafting:0.2.2": margin-note, set-margin-note-defaults
-#set-margin-note-defaults(stroke: rgb("#FF0000"), side: right)
-#let td = margin-note
+// Drafting TODO marker. Use `#td[...]` inline to drop a bright-red
+// bracketed note next to any sentence. Grep the project for `#td[`
+// before submission to find and clear any outstanding notes.
+// (Earlier versions of this helper used drafting::margin-note, but
+// the AIAA template's narrow margins make true margin notes overflow
+// into the text column. Inline marker is more robust.)
+#let td(body) = box(
+  fill: rgb("#FFE5E5"),
+  stroke: 0.6pt + rgb("#FF0000"),
+  inset: (x: 3pt, y: 1pt),
+  outset: (y: 1pt),
+)[#text(fill: rgb("#FF0000"), weight: 700, size: 8pt)[TODO: #body]]
 
 // This function gets your whole document as its `body` and formats
 // it as an article in the style of the AIAA.
