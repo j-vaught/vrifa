@@ -2,6 +2,6 @@ name,value
 otsu_raw,50.00
 otsu_with_offset,20.00
 triangle_raw,4.00
-triangle_with_offset,0.00
+triangle_with_offset,20.00
 manual_with_offset,34.00
 percentile,90.00

@@ -53,7 +53,7 @@
 #let masks = (
   (
     ([Otsu + offset (integrated)],            "threshold_modes_panels/mask_otsu.png"),
-    ([Triangle + offset],                     "threshold_modes_panels/mask_triangle.png"),
+    ([Triangle + offset (+16)],               "threshold_modes_panels/mask_triangle.png"),
     ([manual ($tau_("man") = 64$)],            "threshold_modes_panels/mask_manual.png"),
   ),
   (

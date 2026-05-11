@@ -35,7 +35,8 @@ OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 CURRENT_IDX = 352
 KB_POST = 9                  # post-delta blur kernel size
-DELTA_TAU_OFFSET = -30       # threshold offset for Otsu / Triangle / manual / percentile
+DELTA_TAU_OFFSET = -30       # threshold offset for Otsu / manual / percentile (matches integrated)
+TRIANGLE_OFFSET = 16         # Triangle-specific offset tuned to match Otsu coverage on this frame
 
 # Threshold-mode parameters.
 TAU_MANUAL = 64              # manual mode threshold
@@ -130,10 +131,12 @@ def main():
     otsu_thr_with_offset = max(otsu_thr + DELTA_TAU_OFFSET, 0)
     mask_otsu = ((d_tilde > otsu_thr_with_offset) & (roi > 0)).astype(np.uint8) * 255
 
-    # Triangle + offset.
+    # Triangle + Triangle-specific offset (positive: Triangle finds the
+    # threshold near the dominant-class shoulder, which sits well below
+    # Otsu's bimodal split on this histogram).
     tri_thr, _ = cv2.threshold(d_tilde[roi > 0], 0, 255,
                                cv2.THRESH_BINARY | cv2.THRESH_TRIANGLE)
-    tri_thr_with_offset = max(tri_thr + DELTA_TAU_OFFSET, 0)
+    tri_thr_with_offset = max(tri_thr + TRIANGLE_OFFSET, 0)
     mask_triangle = ((d_tilde > tri_thr_with_offset) & (roi > 0)).astype(np.uint8) * 255
 
     # Manual at TAU_MANUAL + offset.
