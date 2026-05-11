@@ -13,12 +13,12 @@
 // BAMDONE!
 //***************************************************************
 
-// Drafting margin-notes. Use `#mn[...]` inline to drop a margin
-// note in garnet. Grep the project for `#mn[` before submission to
+// Drafting margin-notes. Use `#td[...]` inline to drop a margin
+// note in garnet. Grep the project for `#td[` before submission to
 // find and clear any outstanding notes.
 #import "@preview/drafting:0.2.2": margin-note, set-margin-note-defaults
 #set-margin-note-defaults(stroke: rgb("#73000A"), side: right)
-#let mn = margin-note
+#let td = margin-note
 
 // This function gets your whole document as its `body` and formats
 // it as an article in the style of the AIAA.
