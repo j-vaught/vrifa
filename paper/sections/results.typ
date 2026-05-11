@@ -66,19 +66,8 @@ The IoU gap between the integrated configuration and the two competitor baseline
 
 == Per-sample breakdown
 
-The eleven samples in Section~4 differ substantially in resolution, frame rate, illumination, and operator framing. A per-sample breakdown is the strongest available evidence that the agreement reported above is consistent across substantively different molds rather than driven by a single fortunate recording. Table~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Figure~@fig:per_sample_iou_bars visualises the same data with bootstrap whiskers for quick comparison across samples. Per-sample IoU ranges from $0.778$ on `input_1` (the only sample with a polygonal ROI mask, which makes the comparison area substantially smaller than the other ten) through $0.961$ on `input_3`; ten of eleven samples clear $0.88$ and seven of eleven clear $0.93$, indicating the integrated configuration's behavior is sample-aware but not sample-fragile.
+The eleven samples in Section~4 differ substantially in resolution, frame rate, illumination, and operator framing. A per-sample breakdown is the strongest available evidence that the agreement reported above is consistent across substantively different molds rather than driven by a single fortunate recording. Table~@tab:agreement_per_sample reports mask IoU and boundary $F_1$ for each sample alongside the count of labeled frames contributing to the mean. Per-sample IoU ranges from $0.778$ on `input_1` (the only sample with a polygonal ROI mask, which makes the comparison area substantially smaller than the other ten) through $0.961$ on `input_3`; ten of eleven samples clear $0.88$ and seven of eleven clear $0.93$, indicating the integrated configuration's behavior is sample-aware but not sample-fragile.
 
-#figure(
-  image("/typst/figures/per_sample_iou_bars.pdf", width: 95%),
-  caption: [
-    Per-sample mask IoU sorted ascending. Bar widths are the
-    per-sample mean over five labeled frames; whiskers are bootstrap
-    95% confidence intervals. The vertical garnet rule marks the
-    overall eleven-sample mean. Atlantic fill marks the 1080p
-    clips (`input_1`, `input_2`, `input_3`); warm grey marks the
-    524p cropped operator-view clips (`input_4` through `input_11`).
-  ],
-) <fig:per_sample_iou_bars>
 
 #figure(
   table(
