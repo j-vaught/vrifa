@@ -194,20 +194,7 @@ The kernel parities are forced odd at runtime so that anchor handling is symmetr
 
 == Temporal locking
 
-Stage twelve imposes hysteresis along the time axis. Each pixel keeps a small per-pixel counter that increments while the cleaned mask reports the pixel as wet and resets to zero on any frame where the cleaned mask says dry. Once the counter reaches the threshold $n_"lock"$ frames, a sticky locked-pixel map is set true at that location and never resets. The output of the stage is the elementwise OR of the cleaned mask with the sticky locked map, so a pixel that has ever been wet for $n_"lock"$ consecutive frames stays wet for the remainder of the run. Figure~@fig:lock illustrates the bookkeeping with a twelve-frame example for $n_"lock" = 3$.
-
-#figure(
-  image("/typst/figures/lock_timeline.pdf", width: 95%),
-  caption: [
-    Lock state for one pixel across twelve frames with
-    $n_"lock" = 3$. The detection row records what the cleaned mask
-    said this frame. The counter row tracks consecutive wet frames
-    and resets on dry. The locked row latches at the first frame
-    where the counter reaches three (frame eight in this example)
-    and never returns to false. A flicker that survives for fewer
-    than three frames is treated as a transient and not committed.
-  ],
-) <fig:lock>
+Stage twelve imposes hysteresis along the time axis. Each pixel keeps a small per-pixel counter that increments while the cleaned mask reports the pixel as wet and resets to zero on any frame where the cleaned mask says dry. Once the counter reaches the threshold $n_"lock"$ frames, a sticky locked-pixel map is set true at that location and never resets. The output of the stage is the elementwise OR of the cleaned mask with the sticky locked map, so a pixel that has ever been wet for $n_"lock"$ consecutive frames stays wet for the remainder of the run.
 
 The integrated configuration uses $n_"lock" = 3$, which holds a positive detection in the mask for three subsequent frames. The latched-after-three-frames behavior is appropriate for infusions whose true pauses are shorter than the lock window and inappropriate for infusions whose pauses are longer, where the latch produces phantom regions that look like artifacts as discussed in Section~7. Setting the lock window to zero disables the stage altogether. The "no temporal lock" row of Table~@tab:ablation reports the per-sample effect, which depends on whether the live infusion contains pauses on the order of three frames or longer.
 
