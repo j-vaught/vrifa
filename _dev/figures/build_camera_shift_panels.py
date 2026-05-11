@@ -143,19 +143,24 @@ def main():
     print(f"  corrected:   max={delta_corr.max()}, "
           f"mean (in ROI)={delta_corr[roi > 0].mean():.2f}")
 
-    # Panel 0: reference frame (raw BGR), for context.
+    # Panel 0: reference frame (raw BGR), full extent, for context.
     cv2.imwrite(str(OUT_DIR / "panel0_context.png"), fit(pre))
 
-    # Panel 1: uncorrected delta heatmap.
+    # Panels 1 and 2: zoom in on the central 50% (crop outer 25% on
+    # every edge) of the delta heatmap so the laminate-edge structure
+    # reads clearly at print size.
+    x0, y0 = w // 4, h // 4
+    x1, y1 = x0 + w // 2, y0 + h // 2
+    def crop_center(img):
+        return img[y0:y1, x0:x1]
+
     cv2.imwrite(
         str(OUT_DIR / "panel1_uncorrected.png"),
-        fit(heatmap(delta_uncorr, roi, vmax)),
+        fit(crop_center(heatmap(delta_uncorr, roi, vmax))),
     )
-
-    # Panel 2: corrected delta heatmap.
     cv2.imwrite(
         str(OUT_DIR / "panel2_corrected.png"),
-        fit(heatmap(delta_corr, roi, vmax)),
+        fit(crop_center(heatmap(delta_corr, roi, vmax))),
     )
 
     print(f"Wrote 3 camera-shift panels to {OUT_DIR}")
