@@ -56,22 +56,17 @@
         (x-center, tile-y),
         image(path, width: ch-w * 1cm, height: ch-h * 1cm),
       )
-      // Outline: garnet 1.2pt for the integrated config, neutral 0.6pt
-      // black for the others.
+      // Outline: same 0.6pt black for every panel.
       rect(
         (x-center - ch-w / 2, tile-y + ch-h / 2),
         (x-center + ch-w / 2, tile-y - ch-h / 2),
-        stroke: if is-integrated { 1.2pt + garnet } else { 0.6pt + txt },
+        stroke: 0.6pt + txt,
         fill: none,
       )
       // Label.
       content(
         (x-center, label-y),
-        text(
-          size: label-size,
-          fill: if is-integrated { garnet } else { txt },
-          weight: if is-integrated { 600 } else { 400 },
-        )[#label],
+        text(size: label-size, fill: txt)[#label],
       )
     }
   }
