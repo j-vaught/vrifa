@@ -6,23 +6,7 @@ This work builds upon four research pillars of the composite-manufacturing and c
 
 == Modeling, sensing, and control of the flow front
 
-The modeling literature treats the flow front as a given input. #td[modelling litereature for what?]
-
-Forward simulators predict where resin will reach across the laminate given material permeability and inlet conditions, and have been validated against experiments on flat and stiffened plates @Adhikari2021HPMLevelSet @Govignon2008FullField. 
-
-Inverse methods work backward from the observed front. 
-
-One combines overhead camera measurements of fabric distribution with a center-injection experiment to recover a 2D permeability map @ComasCardona2014OpticalInverse. 
-
-Another compares live pressure-sensor traces against an analytic front model to adjust injection parameters on the fly @DiFratta2016PressureInversion. 
-
-Learning-based variants extend the same thread, using piezoelectric sensors and a hybrid learned model to identify and forecast the front @Park2025FlowFrontGAN, or physics-informed neural networks to recover permeability fields from simulated Darcy data @Mao2026PINNInversion. 
-
-A parallel surrogate-modeling thread learns a 2D front map from sparse pressure sensors on simulated runs @Stieber2020FlowFrontNet, and extends to material-property inference under simulation-to-real transfer @Stieber2023SimToReal. 
-
-Every method above depends on a front map, which is currently obtained from finite-element simulation or manual annotation of plate experiments. 
-
-The integrated pipeline produces that map directly from production video, which is the input these methods need to leave simulation and fine-tune on real runs.
+The VARTM flow-modeling literature treats the flow front as a given input. Forward simulators predict where resin will flow across the laminate given material permeability and inlet conditions, and have been validated against experiments on flat and stiffened plates @Adhikari2021HPMLevelSet @Govignon2008FullField. These geometries are simpler than the multi-section preforms used in production parts, which limits how directly the simulator results transfer to operational benches. Conversely, inverse methods work backward from the observed front. One approach combines overhead camera measurements of how fabric thickness varies across the laminate with a center-injection experiment to recover a 2D permeability map @ComasCardona2014OpticalInverse. Another compares live pressure-sensor data against a closed-form Darcy-flow model of the moving front to adjust injection parameters on the fly @DiFratta2016PressureInversion. Learning-based variants extend the same thread, using piezoelectric sensors and a hybrid learned model to identify and forecast the front @Park2025FlowFrontGAN, or physics-informed neural networks to recover permeability fields from simulated Darcy data @Mao2026PINNInversion. A related line of work trains surrogate models to predict the 2D front map from sparse pressure sensors on simulated runs @Stieber2020FlowFrontNet, with a follow-up that extends the same approach to material-property inference under simulation-to-real transfer @Stieber2023SimToReal. Every method discussed above depends on a front map, which is currently obtained from finite-element simulation or manual annotation of plate experiments. However, simulation and hand-labeling are slow and bench-specific, which prevents real-time front estimation during an active infusion. The integrated pipeline we introduce produces that map directly from production video, removing both bottlenecks.
 
  ----- ---------------------------------------NEW LINE
 
