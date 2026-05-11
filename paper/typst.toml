@@ -1,7 +1,0 @@
-[package]
-name = "vrifa-paper"
-version = "0.1.0"
-entrypoint = "main.typ"
-authors = ["J.C. Vaught"]
-license = "MIT"
-description = "VRIFA SciTech paper"
