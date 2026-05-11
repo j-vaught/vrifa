@@ -70,8 +70,8 @@
   let ref-h = ch-h
 
   // Text sizes scale to the figure size. Labels below each tile.
-  let ch-label-size  = 7.5pt
-  let ref-label-size = 7.5pt
+  let ch-label-size  = 6pt
+  let ref-label-size = 6pt
 
   // Layout: each row "block" is tile-on-top + label-below.
   // y goes downward (more negative = further down). Start with row 1
@@ -90,10 +90,11 @@
   // the label band beneath the reference itself.
   let ref-tile-y(i) = gap-center(i) + label-h / 2
 
-  // X layout: refs on the left, channel grid on the right.
+  // X layout: refs on the left, channel grid on the right. All horizontal
+  // gaps between adjacent tiles share the same value so spacing is uniform.
   let ref-x0 = 0
   let ref-x-center = ref-x0 + ref-w / 2
-  let grid-x0 = ref-x0 + ref-w + 0.5    // gap between refs and grid
+  let grid-x0 = ref-x0 + ref-w + ch-gap-x
   let ch-x-center(c) = grid-x0 + c * (ch-w + ch-gap-x) + ch-w / 2
 
   // Draw reference panels: tile centered on the inter-row line, label
