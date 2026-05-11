@@ -71,32 +71,33 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto),
-    align: (left, right, right, right),
+    columns: (auto, auto, auto, auto, auto, auto),
+    align: (left, right, right, right, right, right),
     stroke: none,
     inset: 5pt,
     table.hline(stroke: 0.8pt),
     table.header(
-      [*Sample*], [*$n$*], [*Mask IoU*], [*Boundary $F_1$*],
+      [*Sample*], [*$n$*], [*Mask IoU*],
+      [*$F_1$ at $1$ px*], [*$F_1$ at $3$ px*], [*$F_1$ at $5$ px*],
     ),
     table.hline(stroke: 0.5pt),
-    [`input_1`],  [5], [$0.778$], [$0.567$],
-    [`input_2`],  [5], [$0.890$], [$0.404$],
-    [`input_3`],  [5], [$0.961$], [$0.388$],
-    [`input_4`],  [5], [$0.933$], [$0.347$],
-    [`input_5`],  [5], [$0.952$], [$0.508$],
-    [`input_6`],  [5], [$0.937$], [$0.406$],
-    [`input_7`],  [5], [$0.946$], [$0.485$],
-    [`input_8`],  [5], [$0.925$], [$0.382$],
-    [`input_9`],  [5], [$0.948$], [$0.452$],
-    [`input_10`], [5], [$0.946$], [$0.449$],
-    [`input_11`], [5], [$0.912$], [$0.360$],
+    [`input_1`],  [5], [$0.778$], [$0.393$], [$0.633$], [$0.674$],
+    [`input_2`],  [5], [$0.890$], [$0.254$], [$0.426$], [$0.531$],
+    [`input_3`],  [5], [$0.961$], [$0.219$], [$0.398$], [$0.548$],
+    [`input_4`],  [5], [$0.933$], [$0.223$], [$0.368$], [$0.450$],
+    [`input_5`],  [5], [$0.952$], [$0.293$], [$0.542$], [$0.688$],
+    [`input_6`],  [5], [$0.937$], [$0.202$], [$0.422$], [$0.594$],
+    [`input_7`],  [5], [$0.946$], [$0.274$], [$0.513$], [$0.667$],
+    [`input_8`],  [5], [$0.925$], [$0.246$], [$0.401$], [$0.497$],
+    [`input_9`],  [5], [$0.948$], [$0.253$], [$0.453$], [$0.649$],
+    [`input_10`], [5], [$0.946$], [$0.266$], [$0.463$], [$0.619$],
+    [`input_11`], [5], [$0.912$], [$0.195$], [$0.361$], [$0.524$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
-    Per-sample agreement for mask IoU and boundary $F_1$. Each row
-    aggregates the five anchor frames sampled at the $5/25/50/75/95 %$
-    fill positions described in Section~4.
+    Per-sample agreement, with boundary $F_1$ broken out at three
+    pixel tolerances. Each row aggregates the five anchor frames
+    sampled at the $5/25/50/75/95 %$ fill positions.
   ],
 ) <tab:agreement_per_sample>
 
