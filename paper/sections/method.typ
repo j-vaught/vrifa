@@ -136,20 +136,15 @@ Stages ten and eleven clean the thresholded mask. Stage ten passes the binary ma
 #figure(
   image("/typst/figures/mask_cleanup.pdf", width: 100%),
   caption: [
-    Mask cleanup on input_1 frame 200. The normalized response field
-    (1) is thresholded into a noisy binary mask (2). Closing welds
-    neighbouring wet patches and fills small gaps (3). Opening
-    removes specks the closing kernel could not fill (4).
-    Connected-components labelling removes the few residual islands
-    below the four-hundred-pixel area floor, leaving the final mask
-    on which the temporal lock operates (5).
+    Mask cleanup on input_1 frame 200. Normalized response (1),
+    threshold (2), closing (3), opening (4), and area filter (5).
   ],
 ) <fig:cleanup>
 
 The kernel parities are forced odd at runtime so that anchor handling is symmetric. The structuring-element shape is elliptical by default with optional rectangular and cross-shaped alternatives, exposed because the front shape changes with infusion geometry.
 
 #figure(
-  image("/typst/figures/morph_kernels.pdf", width: 95%),
+  image("/typst/figures/morph_kernels.pdf", width: 100%),
   caption: [
     Cleaned mask under each structuring-element shape at $k_m = 13$,
     applied to the same thresholded mask from input_1 frame 200. The
