@@ -140,64 +140,38 @@ Three findings deserve direct attention. First, the camera-shift registration ro
 ) <tab:ablation>
 
 
-== Qualitative montage
-
-#figure(
-  // image("/typst/figures/montage.pdf"),
-  rect(width: 100%, height: 2.4in, stroke: 0.5pt, inset: 8pt)[
-    _Frame montage placeholder._ Three columns per labeled frame
-    (raw input, predicted overlay, human polygon) drawn from four
-    representative samples spanning the resolution and frame-rate
-    regimes documented in Section~4. Replaced once the predicted
-    overlays are regenerated from the integrated configuration.
-  ],
-  caption: [
-    Qualitative montage of labeled frames. Each row shows one frame
-    from a different sample (high-resolution standard-rate, high-
-    resolution time-lapse, and two cropped operator-view samples),
-    with raw input, predicted overlay, and human polygon side by
-    side. The figure exists to let the reader judge the IoU number
-    against an actual frame rather than against summary statistics.
-  ],
-) <fig:montage>
-
 == Configuration lookup
 
 The per-sample ablation in the previous subsection is the empirical content of the paper, but a practitioner with their own VARTM rig is unlikely to read the per-sample $Delta$IoU table directly. The same evidence is more useful as a regime-indexed lookup that recommends preprocessing settings as a function of run circumstances. Table~@tab:lookup is that lookup. Each row pairs a circumstance (illumination drift, fabric type, fill rate, frame rate, camera stability, fabric conductivity) with the recommended setting on the corresponding mode menu of Section~3, and points at the row of Table~@tab:ablation or the per-sample breakdown of Table~@tab:agreement_per_sample that supports it. Rows whose recommendation is supported only by the eleven evaluated regimes are marked tentative (`†`); a deployed system on a circumstance the labeling subset does not cover should treat the row as a starting point for its own per-mold tuning rather than as a guarantee.
 
 #figure(
   table(
-    columns: (auto, auto, auto),
-    align: (left, left, left),
+    columns: (auto, auto),
+    align: (left, left),
     stroke: none,
     inset: 5pt,
     table.hline(stroke: 0.8pt),
-    table.header([*Run circumstance*], [*Recommended setting*], [*Source*]),
+    table.header([*Run circumstance*], [*Recommended setting*]),
     table.hline(stroke: 0.5pt),
-    [Dry-frame mean $L^*$ $>= 70$ (bright bag, possible auto-exposure rebound)], [Set $n_"lock" = 0$], [`input_4`, `input_6`, `input_10` in Table~@tab:agreement_per_sample],
-    [Dry-frame mean $L^*$ in $[54, 60]$ (darker bag)],     [Set $n_"lock"$ in $[10, 11]$],         [`input_5`, `input_7`, `input_8`, `input_9` in Table~@tab:agreement_per_sample],
-    [Mid-fill wet-dry contrast (p95-p5) $>= 65$ $L^*$],    [Set `threshold-offset` in $[-50, -40]$], [`input_2`, `input_3`, `input_6`, `input_10` in Table~@tab:agreement_per_sample],
-    [Mid-fill wet-dry contrast $<= 50$ $L^*$],             [Set `threshold-offset` near $0$ or positive; consider `threshold=triangle`†], [`input_1`, `input_7` in Table~@tab:agreement_per_sample],
-    [`lock_frames` $in {1, 2, 3, 4}$ for any sample],      [Never. Use $0$ or $>= 5$ — the intermediate range is the worst region of the parameter space on every sample], [no-temporal-lock row of Table~@tab:ablation, per-sample bimodality],
-    [Illumination drifts $> N$ $L^*$ units across the run],[Enable peak-brightness reference],     [no-peak row of Table~@tab:ablation],
-    [Time-lapse acquisition ($<= 5$ fps)],                 [Reduce $n_"lock"$ to $0$ or $1$],       [`input_2` and `input_3` in Table~@tab:agreement_per_sample],
-    [Pigmented resin or colored fabric],                   [Switch CIELAB → RGB or HSV†],          [Grayscale and HSV rows of Table~@tab:ablation],
-    [Specular silicone bag in field of view],              [Keep darken-only enabled],            [no-darken-only row of Table~@tab:ablation],
-    [Tripod with occasional bumps or thermal creep],       [Enable camera-shift registration],    [no-camera-shift row of Table~@tab:ablation],
-    [Fill rate varies across regimes],                     [Use dynamic-lag reference],           [no-dynamic-lag row of Table~@tab:ablation],
-    [Race-tracking dominates early fill],                  [First-frame reference; avoid dynamic calibration anomaly], [Section~7 failure mode 2],
-    [Heavily textured silicone bag],                       [Percentile or adaptive threshold†],    [Section~7 failure mode 3],
-    [Side-lit laminate with intensity gradient],           [adaptive-mean or adaptive-gaussian threshold†], [Section~7 failure mode 3],
+    [Dry-frame mean $L^*$ $>= 70$ (bright bag, possible auto-exposure rebound)], [Set $n_"lock" = 0$],
+    [Dry-frame mean $L^*$ in $[54, 60]$ (darker bag)],     [Set $n_"lock"$ in $[10, 11]$],
+    [Mid-fill wet-dry contrast (p95-p5) $>= 65$ $L^*$],    [Set `threshold-offset` in $[-50, -40]$],
+    [Mid-fill wet-dry contrast $<= 50$ $L^*$],             [Set `threshold-offset` near $0$ or positive; consider `threshold=triangle`†],
+    [`lock_frames` $in {1, 2, 3, 4}$ for any sample],      [Never. Use $0$ or $>= 5$ — the intermediate range is the worst region of the parameter space on every sample],
+    [Illumination drifts $> N$ $L^*$ units across the run],[Enable peak-brightness reference],
+    [Time-lapse acquisition ($<= 5$ fps)],                 [Reduce $n_"lock"$ to $0$ or $1$],
+    [Pigmented resin or colored fabric],                   [Switch CIELAB → RGB or HSV†],
+    [Specular silicone bag in field of view],              [Keep darken-only enabled],
+    [Tripod with occasional bumps or thermal creep],       [Enable camera-shift registration],
+    [Fill rate varies across regimes],                     [Use dynamic-lag reference],
+    [Race-tracking dominates early fill],                  [First-frame reference; avoid dynamic calibration anomaly],
+    [Heavily textured silicone bag],                       [Percentile or adaptive threshold†],
+    [Side-lit laminate with intensity gradient],           [adaptive-mean or adaptive-gaussian threshold†],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
-    Configuration lookup indexed by run circumstance. The
-    recommended setting names the option on the corresponding mode
-    menu of Section~3; the Source column points at the row of
-    Table~@tab:ablation or per-sample breakdown that supplies the
-    empirical evidence. Rows marked `†` extrapolate from the
-    eleven-sample subset to a regime the subset does not directly
-    cover and should be treated as a tuning starting point rather
-    than as an evaluated recommendation.
+    Configuration lookup indexed by run circumstance. Rows marked
+    `†` extrapolate beyond the eleven-sample subset and are
+    starting points rather than evaluated recommendations.
   ],
 ) <tab:lookup>
