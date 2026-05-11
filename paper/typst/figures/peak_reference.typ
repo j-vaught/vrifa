@@ -27,7 +27,7 @@
 #let garnet    = rgb("#73000A")
 #let atlantic  = rgb("#466A9F")
 #let horseshoe = rgb("#65780B")
-#let rose      = rgb("#CC2E40")
+#let congaree  = rgb("#1F414D")
 #let b70       = rgb("#5C5C5C")
 #let b50       = rgb("#A2A2A2")
 #let b10       = rgb("#ECECEC")
@@ -37,7 +37,7 @@
 #let trace-rows = csv("peak_data/traces.csv")
 #let pixel-rows = csv("peak_data/pixels.csv")
 
-#let pixel-colors = (garnet, atlantic, horseshoe, rose)
+#let pixel-colors = (garnet, atlantic, horseshoe, congaree)
 
 // Parse: traces.csv columns are (frame, L1, P1, L2, P2, L3, P3, L4, P4).
 #let parse-traces() = {
@@ -123,7 +123,7 @@
   // grayscale prints, on colorblind readers, and at small reproduction
   // size. Running peaks all share a faint dotted style and color-match
   // their L* line.
-  let l-dashes = ("solid", "dashed", "loosely-dashed", "loosely-dotted")
+  let l-dashes = ("solid", "dashed", "loosely-dashed", "densely-dotted")
 
   // Draw running peak (faint dotted) and raw L* (color + pattern) for
   // each pixel. Peak goes first so the L* line is drawn on top.
