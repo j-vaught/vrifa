@@ -51,15 +51,6 @@ Table~@tab:runtime reports per-sample wall-clock for the integrated configuratio
   ],
 ) <tab:runtime>
 
-#figure(
-  image("/typst/figures/runtime_bars.pdf", width: 90%),
-  caption: [
-    Frames-per-second per sample on the two implementations. CPU
-    in atlantic, CUDA in garnet. Samples are ordered ascending by
-    frame count.
-  ],
-) <fig:runtime_bars>
-
 == Validation
 
 The CPU implementation was validated against the Python reference by dumping eight intermediate tensors per frame, namely the converted frame, the raw delta, the blurred delta, the normalized delta, the binary mask, the cleaned mask, the overlay, and the heatmap, on six diagnostic frames spanning two distinct samples. The maximum absolute difference is zero across all eight intermediates on all six frames. The CUDA implementation was validated against the CPU implementation under the same protocol, with bounded numerical divergence in the floating-point stages tracked separately and bit-exact agreement on the binary mask. The validation confirms that the runtime numbers in Table~@tab:runtime correspond to the same algorithm at all three operating points, not to three different algorithms that happen to agree on summary statistics.
