@@ -46,31 +46,10 @@ A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera i
   image("/typst/figures/camera_shift_pair.pdf", width: 100%),
   caption: [
     Pipeline delta field across the bumped-tripod event in input_1
-    (frame 10 reference, frame 75 current, 4.7 px shift). The
-    uncorrected panel mixes the legitimate wetting signal with
-    false-positive signal along every laminate edge produced by the
-    camera shift. The corrected panel preserves the real wetting while
+    (frame 10 reference, frame 75 current, 4.7 px shift). The corrected panel preserves the real wetting while
     the registration warp removes the edge artifacts.
   ],
 ) <fig:camera_shift_pair>
-
-#figure(
-  table(
-    columns: (auto, auto, 1fr),
-    align: (left, left, left),
-    stroke: none,
-    inset: 5pt,
-    table.hline(stroke: 0.8pt),
-    table.header([*Parameter*], [*Option*], [*Description*]),
-    table.hline(stroke: 0.5pt),
-    [`motion-model`], [translation], [Two-degree-of-freedom translation warp; cheaper to fit, recovers pure tripod nudges.],
-    [`motion-model`], [affine],      [Six-degree-of-freedom affine warp; tolerates small rotations and shears in addition to translation.],
-    [`peak-on-shift`], [reset],      [Discard the peak map at registration and restart accumulation from the warped frame.],
-    [`peak-on-shift`], [warp],       [Warp the peak map itself through $W_t$ into the new coordinate system; preserves the running maximum at the cost of carrying residual registration error.],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [Camera-shift handling options. The integrated configuration uses `motion-model = affine` and `peak-on-shift = reset`.],
-) <tab:motion_modes>
 
 == Peak-brightness reference
 
