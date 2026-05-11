@@ -165,21 +165,11 @@ The last two display stages exist for inspection and label export. The heatmap r
 For machine-readable export, the contour-extraction stage emits Common Objects in Context (COCO) and YOLO-format polygons for every connected component of the locked mask. Polygon segmentation is computed with the Suzuki-Abe topological border-following algorithm @Suzuki1985Border, optionally simplified by the Douglas-Peucker algorithm @DouglasPeucker1973 with tolerance $epsilon$, and optionally densified to a maximum edge length so that downstream rasterization preserves curvature. The annotation-sampling utility selects which frames receive labels using one of three modes, namely all-frame, evenly-spaced count, or fixed-stride, with deduplication of consecutive ties so that the integer-truncated linear-spacing exactly reproduces the standard reference behaviour.
 
 #figure(
-  // image("/typst/figures/heatmap_overlay_contour.pdf", width: 100%),
-  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
-    _Render-output placeholder._ Four panels for one frame of the
-    canonical reference video. Panel 1: raw BGR input. Panel 2:
-    heatmap render of the normalized response field $tilde(D)_t$
-    through the Turbo colormap. Panel 3: overlay of the locked-mask
-    boundary in red on the original BGR frame. Panel 4: COCO-format
-    polygon export drawn over the input with the polygon vertices
-    marked. Together the four panels show what the pipeline emits
-    for human review and machine-readable export.
-  ],
+  image("/typst/figures/heatmap_overlay_contour.pdf", width: 100%),
   caption: [
-    The three render outputs for one frame: heatmap (panel 2),
-    overlay (panel 3), COCO contour export (panel 4). The raw
-    input (panel 1) is shown for reference.
+    The render outputs of the pipeline on input_1 frame 352: raw
+    input, $tilde(D)_t$ heatmap, locked-mask overlay, and COCO
+    contour export.
   ],
 ) <fig:heatmap_overlay_contour>
 
