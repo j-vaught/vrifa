@@ -81,30 +81,9 @@ clipped to be non-negative and scaled by a user lag factor $lambda$. The referen
   caption: [
     The five reference-selection modes plus the linear-lag dynamic
     override, all evaluated on input_1 frame 352 with the same Turbo
-    scale. The integrated configuration (garnet border) uses the
-    first-frame mode combined with the peak map.
+    scale. 
   ],
 ) <fig:reference_modes>
-
-#figure(
-  table(
-    columns: (auto, 1fr),
-    align: (left, left),
-    stroke: none,
-    inset: 5pt,
-    table.hline(stroke: 0.8pt),
-    table.header([*Option*], [*Description*]),
-    table.hline(stroke: 0.5pt),
-    [first],                 [Pin $G_t = F_0$ for every $t$. Combined with the peak map, used by the integrated configuration.],
-    [running],               [Exponential moving average $G_t = (1 - alpha) G_(t-1) + alpha F_t$.],
-    [previous],              [Fixed-offset history $G_t = F_(t - k)$.],
-    [absolute],              [Pin $G_t$ to a user-specified absolute frame index.],
-    [dynamic (sqrt-area)],   [Adapt the lag online from a square-root-area Darcy growth fit on a calibration window of frames per Eq.~@eq:dynlag.],
-    [dynamic (linear)],      [Constant-rate lag schedule, independent of the growth fit; intended for diagnostic comparisons.],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [Reference-selection options selectable via `--ref-mode`.],
-) <tab:reference_modes>
 
 == Delta computation
 
