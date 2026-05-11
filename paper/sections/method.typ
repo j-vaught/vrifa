@@ -56,22 +56,16 @@ A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera i
 The pipeline accumulates a running maximum of the working channel across all frames seen so far. When the pre-delta blur is enabled the maximum is updated from the blurred working channel rather than the raw channel so the peak map and the delta input share the same bandwidth, which prevents a one-pixel halo of speckle from shifting the peak above the eventual delta input and creating a phantom darkening signal. The motivation for the running maximum is that, on infusions where the dry preform is the brightest state the fabric reaches in the working channel, a per-pixel maximum tracks lighting drift caused by lamp warm-up and bag deformation rather than treating that drift as wetting evidence. Figure~@fig:peak illustrates the regime on one tracked pixel of the canonical input clip. The raw $L^*$ value drifts upward as the lamps stabilize, the running peak $P$ tracks that drift, and the front arrival separates as a sharp drop of more than thirty units below the peak. A fixed reference at frame zero would have included the post-warm-up lift in its difference. The assumption that wetting is the only event that lowers the peak does not hold universally. A specular flash that drives the peak above its long-term value, or a fabric whose wet state is brighter than its dry state for some channel, can produce a peak map that misrepresents subsequent wetting evidence. The IoU effect of disabling the primitive on the eleven-sample subset is reported in Table~@tab:ablation.
 
 #figure(
-  // image("/typst/figures/peak_reference.pdf", width: 95%),
-  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
-    _Peak-reference trace placeholder._ One pixel of the canonical
-    reference video tracked across all frames; raw $L^*$ in garnet,
-    running peak $P$ in atlantic, with the front-arrival drop
-    annotated. Regenerated from the new ablation runs.
-  ],
+  image("/typst/figures/peak_reference.pdf", width: 95%),
   caption: [
-    One pixel of the first canonical input clip tracked across all
-    706 frames. The raw CIELAB lightness $L^*$ drifts up by roughly
-    twenty units before the front arrives, and the running peak $P$
-    absorbs that drift. When the resin reaches the pixel, $L^*$
-    collapses by more than thirty units below the peak, which is
-    the signal the difference stage detects. A single fixed
-    reference at frame zero would have treated the warm-up
-    brightening as a (negative) wetting event.
+    Four pixels of input_1 tracked across all 706 frames, chosen to
+    span the run with arrival frames near 80, 230, 400, and 590.
+    Solid lines are raw $L^*$ and dashed lines are the per-pixel
+    running peak $P$. Each pixel drifts upward during lamp warm-up,
+    the running peak absorbs that drift, and the front arrival
+    collapses $L^*$ sharply below $P$. The four traces wet at
+    different times, which is why a single fixed reference frame
+    cannot serve every pixel.
   ],
 ) <fig:peak>
 
@@ -215,6 +209,8 @@ The smoothed field is rescaled to the byte range using a min-max linear rescalin
     $C = 10$. Above the grid, the histogram of the response is
     plotted with the Otsu and Triangle thresholds annotated. The
     integrated mode is bordered in garnet.
+
+    TRhis would be input 2 btw
   ],
   caption: [
     The six threshold modes the pipeline supports applied to the
