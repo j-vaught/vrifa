@@ -35,27 +35,8 @@ The region of interest is a binary mask $R$ that is one inside the laminate and 
 #figure(
   image("/typst/figures/roi_crop.pdf", width: 100%),
   caption: [
-    Three forms of the ROI mask $R$ on the canonical input frame, with
-    pixels outside the ROI marked by red diagonals.
-  ],
+    Three forms of the ROI mask $R$ on the input frame.  ],
 ) <fig:roi_crop>
-
-#figure(
-  table(
-    columns: (auto, 1fr),
-    align: (left, left),
-    stroke: none,
-    inset: 5pt,
-    table.hline(stroke: 0.8pt),
-    table.header([*Option*], [*Description*]),
-    table.hline(stroke: 0.5pt),
-    [rectangular],   [Bounding rectangle parameterised by four fractional margins (`roi-margin`, optionally overridden per edge by `roi-margin-top`, `-bottom`, `-left`, `-right`), each clamped to $[0, 0.49]$.],
-    [imported PNG],  [Single-channel grayscale image read from `--roi-mask` at the source video's resolution, thresholded at 127 to produce $R$. Used when the laminate is non-rectangular or when interior fixtures must be excluded.],
-    [imported COCO], [Polygon annotations read from a `--roi-mask` JSON file in COCO format, image entry matched by `file_name` against the input video, polygons rasterized into $R$. Used when the laminate boundary is already labeled as polygons in an existing project.],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [The two forms of the region-of-interest mask $R$. The integrated configuration uses the rectangular form.],
-) <tab:roi_modes>
 
 == Camera-shift detection and registration
 
