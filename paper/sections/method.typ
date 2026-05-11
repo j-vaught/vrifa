@@ -95,11 +95,10 @@ where the reference $G_t$ is the running peak map (per-pixel maximum of the work
 #figure(
   image("/typst/figures/darken_only_compare.pdf", width: 100%),
   caption: [
-    Same input frame from input_2 (frame 15 against frame 0 reference)
+    Input frame from input_2 (frame 15 against frame 0 reference)
     under two delta computations. The naive Euclidean delta lights up
-    the left side, which is bag-side brightening rather than wetting.
-    The darken-only delta clips that brightening to zero and keeps
-    only the true wet region on the right.
+    the left side.
+    The darken-only delta clips that brightening to zero.
   ],
 ) <fig:darken_only>
 
@@ -108,22 +107,16 @@ where the reference $G_t$ is the running peak map (per-pixel maximum of the work
 The delta field is smoothed by the post-delta blur stage, which is a single function exposed by the `blur.rs` module and shared with the optional pre-delta blur of stage four. The user selects a kernel kind from {flat, gaussian, triangle, median, bilateral, none} together with a kernel size, written as a single specification of the form KIND[:SIZE]. The integrated configuration uses `gaussian:9`, a separable Gaussian of size $k_b = 9$ pixels (forced odd at runtime). Gaussian is appropriate when speckle is approximately white noise around the underlying response field; flat and triangle are exposed because some camera-and-bag combinations produce structured noise that the corresponding box or tent filter handles with less bias. Routing both the pre- and post-delta blurs through the same module keeps their behavior identical at matched specifications and ensures that the bandwidth-limited input the peak map sees in stage four is the same kind of bandwidth-limited input the threshold sees in stage nine.
 
 #figure(
-  // image("/typst/figures/pre_post_blur.pdf", width: 95%),
-  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
-    _Pre- versus post-delta blur placeholder._ Two-row panel. Top
-    row: working frame with no pre-delta blur (left), with $k_p = 5$
-    pre-delta blur (center), with $k_p = 9$ pre-delta blur (right).
-    Bottom row: resulting $D_t$ after each, all then post-delta-
-    blurred with $k_b = 9$. The figure shows that pre-delta blur
-    reduces speckle that would otherwise enter the peak map, while
-    post-delta blur smooths the response field before thresholding.
-    The integrated configuration disables pre-delta ($k_p = 0$) and
-    applies post-delta with $k_b = 9$; both panels for that
-    configuration are bordered in garnet.
-  ],
+  image("/typst/figures/pre_post_blur.pdf", width: 95%),
   caption: [
-    Effect of pre-delta blur (top) and post-delta blur (bottom) on
-    the response field $D_t$.
+    Pre- and post-delta blur on the input_1 bump event (frame 10
+    reference, frame 75 current, camera-shift stabilization disabled
+    so the ~3.7 px residual is present). Top row, working channel
+    $L^*$ after pre-delta blur. Bottom row, resulting $D_t$ after the
+    same pre-blur followed by the integrated $k_b = 9$ post-blur.
+    The integrated configuration uses $k_p = 0$ (no pre-blur) and
+    $k_b = 9$ post-blur; the alternative columns show the effect of
+    enabling pre-blur at $k_p = 5$ and $k_p = 9$.
   ],
 ) <fig:pre_post_blur>
 
