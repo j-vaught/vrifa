@@ -43,27 +43,15 @@ The region of interest is a binary mask $R$ that is one inside the laminate and 
 A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera in mid-run shifts the projected position of every laminate pixel by some vector that has nothing to do with wetting. The reference frame stops aligning with the live frame, the difference field lights up along high-contrast laminate edges, and the threshold catches that as wet. The pipeline detects the shift and corrects it before the difference is computed. For each frame, a single phase-correlation step @KuglinHines1975PhaseCorrelation on a fixed-resolution downsample of the working channel of the previous and current frames returns a translation $(d_x, d_y)$ and a confidence score. When either the per-frame magnitude $sqrt(d_x^2 + d_y^2)$ or the cumulative drift across a five-frame rolling window exceeds the configured threshold, an iterative Enhanced Correlation Coefficient refinement @EvangelidisPsarakis2008ECC fits a translation or affine warp $W_t$ on a static-edge mask of the current ROI, and the live frame is warped through $W_t$ into the reference coordinate system before all downstream stages. The static-edge mask is recomputed at each shift event so the registration is driven by mold and frame edges that do not move with the wet front rather than by the wet region itself. The peak map is either discarded (`peak-on-shift = reset`, used by the integrated configuration), so the post-warp pixels do not accumulate against pre-warp brightness, or warped through $W_t$ into the new coordinate system (`peak-on-shift = warp`), so the running maximum is preserved at the cost of carrying any residual registration error into the peak.
 
 #figure(
-  // image("/typst/figures/camera_shift_pair.pdf", width: 95%),
-  rect(width: 100%, height: 1.8in, stroke: 0.5pt, inset: 8pt)[
-    _Camera-shift event placeholder._ Three panels of the
-    bumped-tripod event near frame 71 of the canonical reference
-    video. Left: pre-event frame (frame 70). Center: post-event
-    frame (frame 72) overlaid translucently on the pre-event frame
-    with the phase-correlation translation vector drawn as an arrow.
-    Right: the post-event frame after the iterative-coplanar-
-    correlation refinement warps it through $W_t$ back into
-    reference coordinates, with the static-edge mask overlaid
-    showing which mold-and-frame edges drive the warp. A sub-panel
-    below plots the rolling five-frame cumulative motion magnitude
-    across the run with a marker on frame 71. Regenerated from the
-    new ablation runs.
-  ],
+  image("/typst/figures/camera_shift_pair.pdf", width: 100%),
   caption: [
-    A bumped-tripod event in the canonical reference video. The
-    phase-correlation step detects the shift, the
-    iterative-coplanar-correlation refinement warps the live frame
-    back into reference coordinates, and the rest of the recording
-    shows only sub-pixel residual motion.
+    The bumped-tripod event in input_1, frames 63 (pre) and 75 (post),
+    with a measured shift of 3.7 px. Sobel edges of the pre-event frame
+    fill the red channel and edges of the post-event frame fill the
+    green channel. Aligned edges show yellow. In the uncorrected
+    overlay the laminate edge breaks into parallel red and green curves
+    whose separation is the shift; after the registration warp the
+    curves collapse into a single yellow edge.
   ],
 ) <fig:camera_shift_pair>
 
