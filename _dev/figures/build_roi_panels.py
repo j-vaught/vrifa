@@ -36,9 +36,10 @@ ROI_MARGIN = 0.15
 # Garnet in OpenCV's BGR order. Hex #73000A = (R=115, G=0, B=10).
 GARNET_BGR = (10, 0, 115)
 
-# Hatch parameters at native (1920x1080) resolution.
-HATCH_SPACING = 28      # pixels between adjacent diagonals
+# Diagonal-overlay parameters at native (1920x1080) resolution.
+HATCH_SPACING = 45      # pixels between adjacent diagonals
 HATCH_THICKNESS = 3     # line thickness in pixels
+ROI_OUTLINE_THICKNESS = 5  # ROI boundary stroke in pixels
 
 
 def read_frame(path, idx):
@@ -72,22 +73,20 @@ def imported_mask(path, h, w):
 
 
 def build_hatch(h, w, spacing=HATCH_SPACING, thickness=HATCH_THICKNESS):
-    """Render a binary cross-hatch over an HxW canvas. Pixels under either
-    of the two diagonal line families are 255.
+    """Render a binary one-direction diagonal pattern over an HxW canvas.
+    Forward-slash slope only (no cross-hatch).
     """
     hatch = np.zeros((h, w), dtype=np.uint8)
-    # Slope +1 (forward slashes): y = x - off, swept over off.
     for off in range(-h, w + 1, spacing):
         cv2.line(hatch, (off, 0), (off + h, h), 255, thickness, cv2.LINE_AA)
-    # Slope -1 (back slashes): y = -x + off.
-    for off in range(0, w + h + 1, spacing):
-        cv2.line(hatch, (off, 0), (off - h, h), 255, thickness, cv2.LINE_AA)
     return hatch
 
 
 def overlay_outside_hatch(frame, roi_mask, hatch=None):
-    """Return a copy of `frame` with the cross-hatch painted in garnet over
-    every pixel where roi_mask == 0. Pixels inside the ROI are untouched.
+    """Return a copy of `frame` with the diagonal pattern painted in
+    garnet over every pixel where roi_mask == 0, then a garnet outline
+    drawn around the ROI boundary itself. Pixels inside the ROI are
+    untouched except for the boundary stroke.
     """
     h, w = frame.shape[:2]
     if hatch is None:
@@ -96,6 +95,14 @@ def overlay_outside_hatch(frame, roi_mask, hatch=None):
     paint = (hatch > 0) & outside
     out = frame.copy()
     out[paint] = GARNET_BGR
+
+    # ROI outline. cv2.findContours over the mask returns the polygon(s)
+    # that bound the ROI; drawContours strokes them in garnet.
+    contours, _ = cv2.findContours(
+        roi_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE,
+    )
+    cv2.drawContours(out, contours, -1, GARNET_BGR, ROI_OUTLINE_THICKNESS,
+                     cv2.LINE_AA)
     return out
 
 
