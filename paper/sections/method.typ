@@ -119,22 +119,12 @@ The delta field is smoothed by the post-delta blur stage, which is a single func
 The smoothed field is rescaled to the byte range using a min-max linear rescaling, producing a $tilde(D)_t$ that fits in eight bits and feeds both the threshold-selection stage and the heatmap renderer. Six thresholding modes are exposed through a single specification of the form KIND[:ARGS]. The four global modes share a single offset $delta_tau$ that is added before binarization. Otsu's between-class variance method @Otsu1979Threshold recovers an automatic threshold $tau_"otsu"$ over the full $tilde(D)_t$ histogram and adds the offset, which is the integrated configuration's choice and works on infusions whose histograms are roughly bimodal. The Triangle method recovers $tau_"tri"$ by the geometric construction of Zack and co-workers on the histogram @Zack1977Triangle, which is appropriate when one class dominates the histogram (typically early fill, where most pixels are dry). Manual mode uses a user-supplied absolute byte value $tau_"man"$ plus $delta_tau$; percentile mode sorts the ROI pixels and recovers the $p$-th percentile by linear interpolation. The two adaptive modes, adaptive-mean and adaptive-gaussian, compute a per-pixel threshold from a $b times b$ neighborhood mean (or Gaussian-weighted mean) minus a constant $C$, and bypass $delta_tau$ because $C$ already serves the same role. Adaptive thresholding is appropriate when the delta retains a low-frequency intensity gradient that the reference stage did not fully cancel, for instance under uneven side-lighting or vignette artifacts. The integrated configuration uses Otsu with $delta_tau = -30$, which biases the global threshold toward the wet class on infusions where the partially-wetted halo around the front sits below the bimodal split that Otsu finds. The bias is appropriate for the early-fill regime of the eleven labeled samples and not appropriate for every infusion. The Triangle, manual, percentile, and adaptive variants remain selectable for infusions whose histograms or intensity gradients fit those modes better; the integrated configuration does not exercise them, and the headline numbers of Section~5 are reported under Otsu plus offset.
 
 #figure(
-  // image("/typst/figures/threshold_modes.pdf", width: 95%),
-  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
-    _Threshold-mode comparison placeholder._ Six-panel grid of
-    binary masks produced by each threshold mode on the same
-    normalized response field $tilde(D)_t$. Panels: Otsu plus offset
-    (used by the integrated configuration), Triangle, manual at
-    $tau_"man" = 64$, percentile at $p = 70$, adaptive-mean with
-    $b = 21$ and $C = 10$, adaptive-gaussian with $b = 21$ and
-    $C = 10$. Above the grid, the histogram of the response is
-    plotted with the Otsu and Triangle thresholds annotated. The
-    integrated mode is bordered in garnet.
-
-  ],
+  image("/typst/figures/threshold_modes.pdf", width: 95%),
   caption: [
-    The six threshold modes the pipeline supports applied to the
-    same normalized response field.
+    The six threshold modes applied to the same normalized response
+    field $tilde(D)_t$ from input_1 frame 352. Top strip is the
+    histogram of $tilde(D)_t$ inside the ROI with the Otsu and
+    Triangle threshold values marked.
   ],
 ) <fig:threshold_modes>
 
