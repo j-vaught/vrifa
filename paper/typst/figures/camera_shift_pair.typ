@@ -27,11 +27,11 @@
 #let txt = rgb("#000000")
 
 #let panels = (
-  ([Reference frame, zoom region in red],
+  ([Reference frame (frame 63)],
    "camera_shift_panels/panel0_context.png"),
-  ([Uncorrected overlay (pre red, post green)],
+  ([Uncorrected delta field],
    "camera_shift_panels/panel1_uncorrected.png"),
-  ([Corrected overlay after warp],
+  ([Corrected delta field after warp],
    "camera_shift_panels/panel2_corrected.png"),
 )
 

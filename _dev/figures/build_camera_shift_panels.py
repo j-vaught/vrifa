@@ -2,25 +2,23 @@
 
 Demonstrates the camera-shift registration stage on the real bump event
 in input_1.mp4 between frames ~65 and ~70 (gradual ~3.7 px drift that
-settles by frame 75).
+settles by frame 75). The figure tells the story through the pipeline's
+own delta field, the per-pixel scalar that drives the threshold. Without
+the registration warp every laminate edge produces a false-positive
+wetting signal; with the warp, the field collapses to near-empty
+residuals.
 
 Three panels:
-  panel0_context.png   Full frame at pre-event (frame 63) with a red
-                       rectangle marking the zoom region examined below.
-  panel1_uncorrected.png  Zoomed red/green overlay of pre vs post-event
-                       (post = frame 75). Red shows the pre-event frame,
-                       green shows the post-event frame. Where they
-                       align: yellow. Where they don't: red and green
-                       fringes show the shift directly.
-  panel2_corrected.png Same zoomed overlay after applying the
-                       registration warp to the post-event frame. The
-                       red/green fringes collapse back into yellow,
-                       showing that the pipeline brings the live frame
-                       back into the reference coordinate system.
-
-The registration warp uses cv2.phaseCorrelate (the same primitive the
-Rust pipeline invokes) to estimate the integer-plus-subpixel translation
-between the two frames, then cv2.warpAffine to apply the inverse.
+  panel0_context.png   Reference frame (input_1, frame 63), for context.
+  panel1_uncorrected.png  Pipeline delta field, max(0, ref - cur) on the
+                          working channel ($L^*$), with the post-event
+                          frame (frame 75) as cur. ROI mask applied.
+                          Rendered as Turbo heatmap with a shared
+                          intensity scale.
+  panel2_corrected.png Same delta field after the registration warp is
+                          applied to the post-event frame. Same Turbo
+                          scale so the magnitudes are directly
+                          comparable.
 """
 
 from __future__ import annotations
@@ -32,26 +30,21 @@ import numpy as np
 
 REPO = Path("/Users/user/Downloads/vrifa")
 VIDEO = REPO / "data" / "input_1.mp4"
+ROI_MASK_PATH = REPO / "data" / "roi_masks" / "input_1.png"
 OUT_DIR = REPO / "paper" / "typst" / "figures" / "camera_shift_panels"
 OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 PRE_IDX = 63        # well before the bump (frames 65-70)
 POST_IDX = 75       # after the bump has settled
 
-# Crop region for the zoom panels — a small, tightly framed window over
-# a high-contrast static edge (laminate corner) so the 3-4 pixel shift
-# is large relative to the crop and the red/green edge fringes are
-# obvious. 16:9 aspect to match the context-panel display.
-CROP_X0, CROP_Y0 = 410, 720
-CROP_W,  CROP_H  = 320, 180
+# Output dimensions for each rendered panel (16:9 to match other figures).
+PANEL_W, PANEL_H = 960, 540
 
-# Output dimensions for each rendered panel.
-CONTEXT_W, CONTEXT_H = 960, 540
-ZOOM_W,    ZOOM_H    = 960, 540
-
-# Zoom-region marker drawn on the context panel.
-MARKER_BGR  = (0, 0, 255)        # bright red
-MARKER_THICK = 6
+# Heatmap background colors: dim gray for "inside ROI but no signal",
+# pure black for "outside ROI". Matches the visual language of the
+# rendered overlay/heatmap stages in the Method figures.
+BG_INSIDE_ROI = (40, 40, 40)
+BG_OUTSIDE_ROI = (0, 0, 0)
 
 
 def read_frame(idx):
@@ -64,22 +57,25 @@ def read_frame(idx):
     return frame
 
 
-def phase_translation(pre_gray, post_gray):
-    """Return the (dx, dy) translation that brings post into pre, via
-    cv2.phaseCorrelate. dx is x-shift, dy is y-shift.
-    """
-    return cv2.phaseCorrelate(
-        pre_gray.astype(np.float32),
-        post_gray.astype(np.float32),
-    )[0]
+def lstar(bgr):
+    """Extract CIELAB L* channel, 8-bit."""
+    return cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)[..., 0]
+
+
+def load_roi(h, w):
+    raw = cv2.imread(str(ROI_MASK_PATH), cv2.IMREAD_GRAYSCALE)
+    if raw.shape != (h, w):
+        raw = cv2.resize(raw, (w, h), interpolation=cv2.INTER_NEAREST)
+    return (raw > 127).astype(np.uint8) * 255
+
+
+def phase_translation(pre_l, post_l):
+    """cv2.phaseCorrelate on L* gives (dx, dy) translation pre to post."""
+    return cv2.phaseCorrelate(pre_l.astype(np.float32),
+                              post_l.astype(np.float32))[0]
 
 
 def warp_translation(img, dx, dy):
-    """Translate img by (dx, dy) via affine warp. Positive dx moves the
-    image content rightward. To correct a post-event frame whose
-    content has shifted by (dx, dy) relative to pre, we apply the
-    inverse translation (-dx, -dy).
-    """
     h, w = img.shape[:2]
     M = np.array([[1.0, 0.0, dx],
                   [0.0, 1.0, dy]], dtype=np.float32)
@@ -88,73 +84,79 @@ def warp_translation(img, dx, dy):
                           borderMode=cv2.BORDER_REFLECT)
 
 
-def edge_magnitude(bgr):
-    """Sobel gradient magnitude on a BGR frame, returned as uint8."""
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
-    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
-    mag = cv2.magnitude(gx, gy)
-    mag = np.clip(mag * 0.8, 0, 255).astype(np.uint8)
-    return mag
+def delta_field(reference_l, current_l, roi):
+    """Pipeline delta on the L* working channel: max(0, ref - cur),
+    restricted to the ROI. Output uint8 in [0, 255]."""
+    d = np.maximum(
+        reference_l.astype(np.int16) - current_l.astype(np.int16),
+        0,
+    )
+    d = np.clip(d, 0, 255).astype(np.uint8)
+    d[roi == 0] = 0
+    return d
 
 
-def red_green_overlay(pre_bgr, post_bgr, dark_bg_value=24):
-    """Build a single image where the pre-frame Sobel edges fill the red
-    channel and the post-frame Sobel edges fill the green channel,
-    layered over a dark gray background. Aligned edges show as bright
-    yellow; misaligned edges break out into pure red and pure green
-    parallel lines, making a 3-4 pixel translation visible at a glance.
+def heatmap(delta, roi, vmax):
+    """Render a delta field as a Turbo heatmap with a shared vmax scale.
+    Zero-delta pixels show as a dim gray "no signal" background; outside
+    the ROI is painted black.
     """
-    pre_edges  = edge_magnitude(pre_bgr)
-    post_edges = edge_magnitude(post_bgr)
-    h, w = pre_edges.shape
-    overlay = np.full((h, w, 3), dark_bg_value, dtype=np.uint8)
-    overlay[..., 2] = np.maximum(overlay[..., 2], pre_edges)   # R
-    overlay[..., 1] = np.maximum(overlay[..., 1], post_edges)  # G
-    return overlay
+    scaled = np.clip(
+        delta.astype(np.float32) * 255.0 / max(vmax, 1),
+        0, 255,
+    ).astype(np.uint8)
+    hm = cv2.applyColorMap(scaled, cv2.COLORMAP_TURBO)
+    hm[delta == 0] = BG_INSIDE_ROI
+    hm[roi == 0] = BG_OUTSIDE_ROI
+    return hm
 
 
-def fit(img, target_w, target_h):
-    return cv2.resize(img, (target_w, target_h), interpolation=cv2.INTER_AREA)
+def fit(img):
+    return cv2.resize(img, (PANEL_W, PANEL_H), interpolation=cv2.INTER_AREA)
 
 
 def main():
-    pre  = read_frame(PRE_IDX)
+    pre = read_frame(PRE_IDX)
     post = read_frame(POST_IDX)
+    h, w = pre.shape[:2]
 
-    # Estimate the shift on the full frame, in grayscale.
-    pre_gray  = cv2.cvtColor(pre,  cv2.COLOR_BGR2GRAY)
-    post_gray = cv2.cvtColor(post, cv2.COLOR_BGR2GRAY)
-    dx, dy = phase_translation(pre_gray, post_gray)
+    roi = load_roi(h, w)
+    L_pre = lstar(pre)
+    L_post = lstar(post)
+
+    # Detect shift and apply correction.
+    dx, dy = phase_translation(L_pre, L_post)
     print(f"detected shift post relative to pre: dx={dx:.2f} px, dy={dy:.2f} px")
 
-    # Apply the inverse shift to post to bring it back into pre coords.
     post_corrected = warp_translation(post, -dx, -dy)
+    L_post_c = lstar(post_corrected)
 
-    # --- Panel 0: full pre frame with the zoom rectangle marked. ---
-    context = pre.copy()
-    cv2.rectangle(
-        context,
-        (CROP_X0, CROP_Y0),
-        (CROP_X0 + CROP_W, CROP_Y0 + CROP_H),
-        MARKER_BGR, MARKER_THICK, cv2.LINE_AA,
+    # Compute both delta fields.
+    delta_uncorr = delta_field(L_pre, L_post, roi)
+    delta_corr   = delta_field(L_pre, L_post_c, roi)
+
+    # Shared display scale so the two heatmaps are honestly comparable.
+    vmax = int(max(delta_uncorr.max(), 1))
+    print(f"shared vmax: {vmax}")
+    print(f"  uncorrected: max={delta_uncorr.max()}, "
+          f"mean (in ROI)={delta_uncorr[roi > 0].mean():.2f}")
+    print(f"  corrected:   max={delta_corr.max()}, "
+          f"mean (in ROI)={delta_corr[roi > 0].mean():.2f}")
+
+    # Panel 0: reference frame (raw BGR), for context.
+    cv2.imwrite(str(OUT_DIR / "panel0_context.png"), fit(pre))
+
+    # Panel 1: uncorrected delta heatmap.
+    cv2.imwrite(
+        str(OUT_DIR / "panel1_uncorrected.png"),
+        fit(heatmap(delta_uncorr, roi, vmax)),
     )
-    cv2.imwrite(str(OUT_DIR / "panel0_context.png"),
-                fit(context, CONTEXT_W, CONTEXT_H))
 
-    # --- Panel 1: zoomed uncorrected overlay (pre red, post green). ---
-    crop_pre  = pre [CROP_Y0:CROP_Y0+CROP_H, CROP_X0:CROP_X0+CROP_W]
-    crop_post = post[CROP_Y0:CROP_Y0+CROP_H, CROP_X0:CROP_X0+CROP_W]
-    overlay_uncorr = red_green_overlay(crop_pre, crop_post)
-    cv2.imwrite(str(OUT_DIR / "panel1_uncorrected.png"),
-                fit(overlay_uncorr, ZOOM_W, ZOOM_H))
-
-    # --- Panel 2: zoomed corrected overlay (same crop, post is warped). ---
-    crop_post_c = post_corrected[CROP_Y0:CROP_Y0+CROP_H,
-                                 CROP_X0:CROP_X0+CROP_W]
-    overlay_corr = red_green_overlay(crop_pre, crop_post_c)
-    cv2.imwrite(str(OUT_DIR / "panel2_corrected.png"),
-                fit(overlay_corr, ZOOM_W, ZOOM_H))
+    # Panel 2: corrected delta heatmap.
+    cv2.imwrite(
+        str(OUT_DIR / "panel2_corrected.png"),
+        fit(heatmap(delta_corr, roi, vmax)),
+    )
 
     print(f"Wrote 3 camera-shift panels to {OUT_DIR}")
 

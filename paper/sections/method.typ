@@ -45,13 +45,11 @@ A bumped tripod, a thermal expansion of the rig, or a hand brushing the camera i
 #figure(
   image("/typst/figures/camera_shift_pair.pdf", width: 100%),
   caption: [
-    The bumped-tripod event in input_1, frames 63 (pre) and 75 (post),
-    with a measured shift of 3.7 px. Sobel edges of the pre-event frame
-    fill the red channel and edges of the post-event frame fill the
-    green channel. Aligned edges show yellow. In the uncorrected
-    overlay the laminate edge breaks into parallel red and green curves
-    whose separation is the shift; after the registration warp the
-    curves collapse into a single yellow edge.
+    Pipeline delta field across the bumped-tripod event in input_1
+    (frame 63 reference, frame 75 current, 3.7 px shift). Without the
+    registration warp, every laminate edge produces false-positive
+    wetting signal. With the warp, the field collapses to near-empty
+    residuals.
   ],
 ) <fig:camera_shift_pair>
 
