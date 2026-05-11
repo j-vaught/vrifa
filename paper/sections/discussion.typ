@@ -8,38 +8,7 @@ The per-sample ablation surfaces an additional, mechanism-level temporal-locking
 
 The temporal-locking window is also the primary diagnostic when results appear noisy on long pauses. The integrated configuration sets the window to three frames, which holds a positive detection in the mask for three subsequent frames so transient single-frame dropouts do not flicker the boundary. On infusions whose true wet-front pauses exceed three frames, transient detections from earlier in the run persist past the moment the front recedes and the mask grows phantom regions that look like artifacts. The mechanism is not a defect. It is the locking semantics applied to a sequence whose pauses violate the assumption baked into a fixed three-frame window. The operational consequence is that the window is a per-mold parameter, not a constant suitable for every infusion, and the failure is visible only on long-pause sequences.
 
-#figure(
-  image("/typst/figures/failure_lock_phantom.pdf", width: 95%),
-  caption: [
-    Three frames from `input_6` spanning the run's fill regime,
-    where the integrated configuration's `lock_frames = 3` setting
-    interacts poorly with the true-front dynamics. The per-sample
-    ablation reveals a sharp bimodality: this sample achieves
-    IoU 0.94 with `lock_frames = 0` and IoU 0.94 with
-    `lock_frames = 30`, but every intermediate value collapses to
-    IoU 0.69. The pattern indicates a startup-transient artifact
-    in the locking heuristic that holds spurious detections during
-    the first few frames of a partial reference.
-  ],
-) <fig:failure_lock_phantom>
-
 The dynamic-reference calibration window is the second sensitive surface. The integrated configuration uses ten calibration frames to fit a square-root-of-area growth model that subsequently lags the reference frame behind the live frame. The assumption baked into that fit is that early fill is representative of the growth law. If the first ten processed frames contain race-tracking, an air pocket, or some other anomaly, the fit picks up a poor reference factor and every downstream frame inherits that error. The remedy is to choose a calibration window that excludes the anomaly or to fall back to one of the static reference modes, both of which are configuration choices rather than numerical defects.
-
-#figure(
-  image("/typst/figures/failure_calibration.pdf", width: 95%),
-  caption: [
-    Dry-frame and wet-frame comparison for two samples that differ
-    by an order of magnitude in run duration. Top row: `input_5`
-    (270 s, the clean-darkening 524p regime). Bottom row:
-    `input_9` (516 s, the longest run in the cohort).
-    The dynamic-reference fit is sensitive to the calibration
-    window's representativeness of the early-fill regime. Longer
-    runs accumulate more deviation from the sqrt-area growth law
-    if race-tracking or other anomalies sit in the calibration
-    window, propagating an offset reference frame through the rest
-    of the run.
-  ],
-) <fig:failure_calibration>
 
 The third failure mode is the inherent ceiling of any tuned classical-CV pipeline. The integrated configuration does not generalize across substantially different fabric types, lighting setups, or vacuum-bag textures without re-tuning. The mode menus and scalar values held fixed in Section~3 assume a transparent vacuum bag, top-down LED lighting, and a dark mold background, because those are the conditions of the eleven samples in the labeling subset. Off-distribution conditions, such as a heavily textured bag, side lighting, or a bright mold surface, can break the Otsu threshold or push the response distribution outside the range the threshold offset was tuned for. The pipeline exposes a percentile-threshold mode, a manual contrast threshold, and an RGB colorspace switch precisely because no single configuration covers every regime, and a per-mold reconfiguration is the appropriate response. The component-removal ablation in Section~5 reports on conditions where the integrated configuration as evaluated holds.
 

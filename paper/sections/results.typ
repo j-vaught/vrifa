@@ -113,7 +113,7 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
 
 == Component-removal ablation
 
-Each row of Table~@tab:ablation holds the integrated configuration described in Section~3 fixed, removes one named component, and reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval. The final column reports the absolute change in mean IoU relative to the integrated configuration in the first row, signed so that a negative number is a drop and a positive number is a rise. Per-sample $Delta$IoU values for the same rows are reported in Figure~@fig:component_bars. The reader should not expect the per-sample values to share the sign of the eleven-sample mean. A primitive whose assumption matches the dynamics of one sample can be neutral or counterproductive on a sample with different dynamics, and the per-sample breakdown is the empirical content of the ablation rather than the eleven-sample mean alone.
+Each row of Table~@tab:ablation holds the integrated configuration described in Section~3 fixed, removes one named component, and reports the resulting mean IoU on the fifty-five-frame subset with a bootstrap 95 % confidence interval. The final column reports the absolute change in mean IoU relative to the integrated configuration in the first row, signed so that a negative number is a drop and a positive number is a rise. The reader should not expect the per-sample values to share the sign of the eleven-sample mean. A primitive whose assumption matches the dynamics of one sample can be neutral or counterproductive on a sample with different dynamics, and the per-sample breakdown is the empirical content of the ablation rather than the eleven-sample mean alone.
 
 Three findings deserve direct attention. First, the camera-shift registration row reports the effect of *enabling* registration on the integrated configuration, which does not use it by default. The drop of $0.630$ to $0.291$ is large and consistent across every sample because the per-sample dataset is mechanically stable (first-to-last pixel displacement below $4$ px on the noisiest sample and below $1$ px on every 524p clip per the dataset's image-side characterization), and on a stationary camera the registration's phase-correlation stage misfires onto small intra-laminate features (resin wetting boundaries, fabric weave alignment) that look like apparent motion. The implication is operational rather than theoretical: a research bench that uses a tripod-mounted camera should leave camera-shift registration off, and only enable it when there is documented camera motion exceeding the per-frame and cumulative thresholds in the configuration. Second, the peak-brightness reference is neutral on this 11-sample subset (mean $Delta$IoU $+0.009$): the per-sample numbers cancel out, with `input_1` improving by $+0.15$ and `input_6` and `input_8` each losing $-0.02$. The primitive's intended workload (lighting drift) is not the binding constraint on per-sample performance here. Third, the ROI restriction matters only for `input_1` (the only sample that uses a polygonal mask file at $-0.14$); on the ten samples that use full-frame ROI the swap is a no-op. The dynamic-lag-reference ablation reports $Delta$IoU exactly zero across every sample, which surfaces a static configuration property rather than an empirical effect: the integrated config sets `ref_mode = first` and the dynamic-lag parameters are inactive when the first-frame reference is in use, so the disable-the-dynamic-lag toggle has no behavior to disable.
 
@@ -150,17 +150,6 @@ Three findings deserve direct attention. First, the camera-shift registration ro
   ],
 ) <tab:ablation>
 
-#figure(
-  image("/typst/figures/component_ablation.pdf", width: 95%),
-  caption: [
-    Effect-size companion to Table~@tab:ablation. For each row in the
-    table, the left bar is the eleven-sample mean $Delta$IoU and the
-    right strip is the eleven per-sample $Delta$IoU values. Strips
-    that cross zero identify primitives that are neutral or
-    counterproductive on at least one sample, which is information
-    the eleven-sample mean alone hides.
-  ],
-) <fig:component_bars>
 
 == Qualitative montage
 
