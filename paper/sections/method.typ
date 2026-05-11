@@ -9,21 +9,11 @@ Unlike contemporary ML models, the detection algorithm introduced here treats ea
 #figure(
   image("/typst/figures/pipeline.pdf", width: 95%),
   caption: [
-    Sixteen-stage integrated pipeline. Each frame flows from decode
-    through an optional camera-shift registration and pre-delta
-    blur, then through an appearance-difference comparison against
-    a chosen reference, a post-delta blur, a threshold, paired
-    morphological closing and opening passes, and finally a
-    temporal lock that stabilizes the boundary across frames. The
-    same mask drives the binary, heatmap, and overlay renderers.
+    Sixteen-stage integrated pipeline.
   ],
 ) <fig:pipeline>
 
 The pipeline is structured as a configurable framework rather than a fixed algorithm. The sixteen stages collectively expose four colorspaces, three region-of-interest forms, five reference-selection modes, six blur kernels, six threshold modes, three structuring-element shapes, and a handful of other binary or numeric options. The "integrated configuration" referenced throughout this paper is one specific point in that menu space. The regime-indexed configuration lookup in Section~7 recommends alternative settings under operating conditions where the integrated point does not transfer.
-
-== Frame decode and colorspace conversion
-
-The first stage decodes each Blue-Green-Red (BGR) frame from the input video. The second projects that frame into a working colorspace. The pipeline supports four options, namely the International Commission on Illumination (CIE) 1976 $L^* a^* b^*$ colorspace (CIELAB), Red-Green-Blue (RGB), Hue-Saturation-Value (HSV), and 8-bit grayscale. The integrated configuration uses CIELAB because for the resin-and-fabric combinations in the eleven samples evaluated here, wetting primarily darkens the lightness channel $L^*$ rather than shifting chrominance, so the single-channel $L^*$ projection used in the difference computation captures most of the signal. The choice is regime-dependent rather than universal. A pigmented resin or a colored fabric could shift the balance of evidence into chrominance and make RGB or HSV preferable, which is why the alternatives remain selectable. The eleven-sample mean and per-sample breakdown of the colorspace effect are reported in Table~@tab:ablation. We denote the converted frame at index $t$ by $F_t$.
 
 #figure(
   image("/typst/figures/colorspace_projection.pdf", width: 95%),
@@ -32,49 +22,21 @@ The first stage decodes each Blue-Green-Red (BGR) frame from the input video. Th
   ],
 ) <fig:colorspace_projection>
 
-#figure(
-  table(
-    columns: (auto, 1fr),
-    align: (left, left),
-    stroke: none,
-    inset: 5pt,
-    table.hline(stroke: 0.8pt),
-    table.header([*Option*], [*Description*]),
-    table.hline(stroke: 0.5pt),
-    [CIELAB], [CIE 1976 $L^* a^* b^*$. Wetting primarily darkens $L^*$ for the resin-and-fabric combinations evaluated in this paper.],
-    [RGB], [Red-Green-Blue. Useful when chrominance shifts under wetting are visible per channel, e.g.\ pigmented resin.],
-    [HSV], [Hue-Saturation-Value. Saturation tracks wet-out separately from luminance, useful under variable lighting.],
-    [Grayscale], [8-bit luminance projection. Cheapest but loses chrominance evidence entirely.],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [Working-colorspace options selectable via `--colorspace`.],
-) <tab:colorspace_modes>
+== Frame decode and colorspace conversion
+
+The first stage decodes each Blue-Green-Red (BGR) frame from the input video. The second projects that frame into a working colorspace. The pipeline supports four options, namely the International Commission on Illumination (CIE) 1976 $L^* a^* b^*$ colorspace (CIELAB), Red-Green-Blue (RGB), Hue-Saturation-Value (HSV), and 8-bit grayscale. The integrated configuration uses CIELAB because for the resin-and-fabric combinations in the eleven samples evaluated here, wetting primarily darkens the lightness channel $L^*$ rather than shifting chrominance, so the single-channel $L^*$ projection used in the difference computation captures most of the signal. The choice is regime-dependent rather than universal. A pigmented resin or a colored fabric could shift the balance of evidence into chrominance and make RGB or HSV preferable, which is why the alternatives remain selectable. The eleven-sample mean and per-sample breakdown of the colorspace effect are reported in Table~@tab:ablation. We denote the converted frame at index $t$ by $F_t$.
+
+
 
 == Region of interest
 
 The region of interest is a binary mask $R$ that is one inside the laminate and zero elsewhere; all subsequent stages operate only on pixels where $R = 1$. The pipeline supports three forms for constructing $R$, mutually exclusive, selected by which configuration parameter is supplied. The rectangular form takes four fractional margins, one per edge, each clamped to the closed interval from zero to forty-nine hundredths of the corresponding side, and builds the rectangle bounded by those margins. A single configuration parameter sets all four margins symmetrically, with per-edge overrides available. The rectangular form is appropriate for laminates that fit a rectangular bounding box with no internal fixtures, which describes every sample in the labeling subset of Section~4. The imported-PNG form reads a single-channel grayscale image at the source video's resolution from a path supplied via `--roi-mask`, thresholds it at 127, and uses the resulting binary image directly as $R$. The imported-PNG form is appropriate when the laminate is non-rectangular (for instance a curved part boundary) or when fixtures, sensors, or labels inside the bag must be excluded from the difference computation but lie inside any axis-aligned rectangle that contains the laminate. The imported-COCO form reads a Common Objects in Context (COCO) JSON file from the same `--roi-mask` flag, locates the image entry whose `file_name` matches the input video, and rasterizes every polygon annotation on that image into $R$. The imported-COCO form is appropriate when the laminate boundary is already available as a polygon in an existing labeling project. The integrated configuration uses the rectangular form with `roi-margin = 0.15`; the imported forms are exercised in the per-mold tuning regimes described in Section~7.
 
 #figure(
-  // image("/typst/figures/roi_crop.pdf", width: 95%),
-  rect(width: 100%, height: 1.6in, stroke: 0.5pt, inset: 8pt)[
-    _ROI placeholder._ Two-panel comparison of the two ROI forms on
-    the same frame. Left: rectangular form. Single canonical input
-    frame with the rectangular ROI mask $R$ drawn as a translucent
-    garnet overlay; the manifold flange and bag wrinkles outside
-    the rectangle are visibly excluded, and a small inset shows the
-    four fractional margins used in the integrated configuration.
-    Right: imported-mask form. Same frame with a non-rectangular
-    laminate boundary drawn as a translucent garnet overlay, with
-    an internal fixture (bagging-tape patch, embedded thermocouple,
-    or operator hand) drawn as a hatched exclusion region inside
-    what would have been the rectangular bounding box. The imported
-    form covers regimes the rectangular form cannot.
-  ],
+  image("/typst/figures/roi_crop.pdf", width: 95%),
   caption: [
-    The two equivalent forms for constructing the ROI mask $R$: a
-    rectangle parameterised by four fractional margins (left), or
-    an externally-supplied binary image at the source resolution
-    (right).
+    Three forms of the ROI mask $R$ on the canonical input frame, with
+    pixels outside the ROI cross-hatched in garnet.
   ],
 ) <fig:roi_crop>
 
