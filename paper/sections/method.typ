@@ -90,8 +90,6 @@ Stage seven produces the per-pixel scalar field $D_t$ that drives all downstream
 
 $ D_t (y, x) = R(y, x) dot.c max(0, w_0 dot.c (G_t (y, x) - F_t (y, x, 0))), $ <eq:delta_darken>
 
-where the reference $G_t$ is the running peak map (per-pixel maximum of the working channel across all prior frames) when peak-reference is enabled, and the working-channel slice of the frame chosen by the reference-selection mode otherwise. The clip to non-negative values discards every pixel that becomes brighter than the reference, which removes specular flashes from the silicone vacuum bag and from condensation, neither of which are wetting events. A full-color mode replaces the difference with the channel-weighted Euclidean distance across all channels and is intended for HSV and RGB workflows where chrominance shifts are diagnostic. The per-channel weights $w_0, w_1, w_2$ are exposed via `channel-weights` and equal $1, 1, 1$ in the integrated configuration; non-uniform weights are appropriate when one channel of the working colorspace carries the wetting signal more strongly than the others. Figure~@fig:darken_only shows the effect of the clip on a single frame; Table~@tab:ablation reports the IoU cost of removing it across the eleven-sample subset.
-
 #figure(
   image("/typst/figures/darken_only_compare.pdf", width: 100%),
   caption: [
@@ -102,9 +100,9 @@ where the reference $G_t$ is the running peak map (per-pixel maximum of the work
   ],
 ) <fig:darken_only>
 
-== Post-delta blur
+where the reference $G_t$ is the running peak map (per-pixel maximum of the working channel across all prior frames) when peak-reference is enabled, and the working-channel slice of the frame chosen by the reference-selection mode otherwise. The clip to non-negative values discards every pixel that becomes brighter than the reference, which removes specular flashes from the silicone vacuum bag and from condensation, neither of which are wetting events. A full-color mode replaces the difference with the channel-weighted Euclidean distance across all channels and is intended for HSV and RGB workflows where chrominance shifts are diagnostic. The per-channel weights $w_0, w_1, w_2$ are exposed via `channel-weights` and equal $1, 1, 1$ in the integrated configuration; non-uniform weights are appropriate when one channel of the working colorspace carries the wetting signal more strongly than the others. Figure~@fig:darken_only shows the effect of the clip on a single frame; Table~@tab:ablation reports the IoU cost of removing it across the eleven-sample subset.
 
-The delta field is smoothed by the post-delta blur stage, which is a single function exposed by the `blur.rs` module and shared with the optional pre-delta blur of stage four. The user selects a kernel kind from {flat, gaussian, triangle, median, bilateral, none} together with a kernel size, written as a single specification of the form KIND[:SIZE]. The integrated configuration uses `gaussian:9`, a separable Gaussian of size $k_b = 9$ pixels (forced odd at runtime). Gaussian is appropriate when speckle is approximately white noise around the underlying response field; flat and triangle are exposed because some camera-and-bag combinations produce structured noise that the corresponding box or tent filter handles with less bias. Routing both the pre- and post-delta blurs through the same module keeps their behavior identical at matched specifications and ensures that the bandwidth-limited input the peak map sees in stage four is the same kind of bandwidth-limited input the threshold sees in stage nine.
+== Post-delta blur
 
 #figure(
   image("/typst/figures/pre_post_blur.pdf", width: 95%),
@@ -113,6 +111,9 @@ The delta field is smoothed by the post-delta blur stage, which is a single func
     Top row, working channel $L^*$ after pre-delta blur.
   ],
 ) <fig:pre_post_blur>
+The delta field is smoothed by the post-delta blur stage, which is a single function exposed by the `blur.rs` module and shared with the optional pre-delta blur of stage four. The user selects a kernel kind from {flat, gaussian, triangle, median, bilateral, none} together with a kernel size, written as a single specification of the form KIND[:SIZE]. The integrated configuration uses `gaussian:9`, a separable Gaussian of size $k_b = 9$ pixels (forced odd at runtime). Gaussian is appropriate when speckle is approximately white noise around the underlying response field; flat and triangle are exposed because some camera-and-bag combinations produce structured noise that the corresponding box or tent filter handles with less bias. Routing both the pre- and post-delta blurs through the same module keeps their behavior identical at matched specifications and ensures that the bandwidth-limited input the peak map sees in stage four is the same kind of bandwidth-limited input the threshold sees in stage nine.
+
+
 
 == Normalization and threshold
 
@@ -128,13 +129,9 @@ The smoothed field is rescaled to the byte range using a min-max linear rescalin
   ],
 ) <fig:threshold_modes>
 
-== Morphological close
+== Morphological cleanup
 
-Stage ten passes the binary mask through morphological closing with an elliptical structuring element of size $k_m$ (default thirteen pixels). Closing welds neighbouring wet patches into a single front and fills small gaps where transient bag wrinkles muted the local response. The kernel size is the parameter that sets the spatial scale at which gaps are considered noise rather than real disconnections in the front; on the resolutions in the eleven labeled samples a $13 times 13$ ellipse is large enough to bridge bag-wrinkle gaps and small enough to leave genuinely separate wet regions separate.
-
-== Morphological open and area filter
-
-Stage eleven passes the closed mask through morphological opening with the same kernel and shape, removing specks below the kernel size that survived the closing pass. A connected-components labelling pass then discards any region whose pixel area is below $a_"min"$ pixels (default $400$), which removes the small islands that the morphology kernels are too small to suppress. Figure~@fig:cleanup shows the same frame at every step of stages nine through eleven.
+Stages ten and eleven clean the thresholded mask. Stage ten passes the binary mask through morphological closing with an elliptical structuring element of size $k_m$ (default thirteen pixels). Closing welds neighbouring wet patches into a single front and fills small gaps where transient bag wrinkles muted the local response. The kernel size sets the spatial scale at which gaps are considered noise rather than real disconnections in the front; on the resolutions in the eleven labeled samples a $13 times 13$ ellipse is large enough to bridge bag-wrinkle gaps and small enough to leave genuinely separate wet regions separate. Stage eleven passes the closed mask through morphological opening with the same kernel and shape, removing specks below the kernel size that survived the closing pass. A connected-components labelling pass then discards any region whose pixel area is below $a_"min"$ pixels (default $400$), which removes the small islands that the morphology kernels are too small to suppress. Figure~@fig:cleanup shows the same frame at every step of stages nine through eleven.
 
 #figure(
   // image("/typst/figures/mask_cleanup.pdf", width: 100%),
