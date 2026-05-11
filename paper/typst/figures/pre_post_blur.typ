@@ -32,9 +32,9 @@
     ([$L^*$, $k_p = 9$],              "pre_post_blur_panels/row0_kp9.png"),
   ),
   (
-    ([$D_t$, $k_p = 0$ (integrated)], "pre_post_blur_panels/row1_kp0.png"),
-    ([$D_t$, $k_p = 5$],              "pre_post_blur_panels/row1_kp5.png"),
-    ([$D_t$, $k_p = 9$],              "pre_post_blur_panels/row1_kp9.png"),
+    ([pre-delta blur = 0 (integrated)], "pre_post_blur_panels/row1_kp0.png"),
+    ([pre-delta blur = 5],              "pre_post_blur_panels/row1_kp5.png"),
+    ([pre-delta blur = 9],              "pre_post_blur_panels/row1_kp9.png"),
   ),
 )
 
