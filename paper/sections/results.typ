@@ -10,32 +10,27 @@ The integrated configuration is the configuration described in Section~3 and hel
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto, auto, auto),
-    align: (left, right, right, right, right, right),
+    columns: (auto, auto, auto, auto, auto, auto, auto, auto),
+    align: (left, right, right, right, right, right, right, right),
     stroke: none,
     inset: 5pt,
     table.hline(stroke: 0.8pt),
     table.header(
       [*Configuration*],
-      [*IoU*], [*Dice*], [*B-$F_1$*], [*Boundary px*], [*Box IoU*],
+      [*IoU*], [*Dice*],
+      [*$F_1$ at $1$ px*], [*$F_1$ at $3$ px*], [*$F_1$ at $5$ px*],
+      [*Boundary px*], [*Box IoU*],
     ),
     table.hline(stroke: 0.5pt),
-    [Integrated (this work)],                        [$0.921$], [$0.954$], [$0.432$], [$17.6$],  [$0.924$],
-    [Lekanidis & Vosniakos 2020 (reimplemented)],    [$0.144$], [$0.247$], [$0.116$], [$86.3$],  [$0.733$],
-    [Almazán-Lázaro 2022 (reimplemented)],           [$0.075$], [$0.136$], [$0.187$], [$65.9$],  [$0.761$],
+    [Integrated (this work)],                     [$0.921$], [$0.954$], [$0.256$], [$0.453$], [$0.586$], [$17.6$], [$0.924$],
+    [Lekanidis & Vosniakos 2020 (reimplemented)], [$0.144$], [$0.247$], [$0.061$], [$0.116$], [$0.172$], [$86.3$], [$0.733$],
+    [Almazán-Lázaro 2022 (reimplemented)],        [$0.075$], [$0.136$], [$0.103$], [$0.193$], [$0.266$], [$65.9$], [$0.761$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
     Integrated configuration versus two reimplemented classical-CV
-    competitor pipelines on the fifty-five-frame labeling subset.
-    Lekanidis-Vosniakos 2020 and Almazán-Lázaro 2022 are
-    reimplementations from the published method sections since
-    neither paper releases source. Each cell carries a bootstrap
-    95% confidence interval over $10,!000$ resamples of the
-    per-frame mean; intervals are omitted from the table for
-    readability and reported in the per-metric breakdown of
-    Table~@tab:agreement_overall. B-$F_1$ is mean boundary $F_1$
-    across $tau in {1, 3, 5}$ pixels.
+    competitor pipelines on the 55-frame labeling subset. Boundary
+    $F_1$ is broken out at three pixel tolerances.
   ],
 ) <tab:headline_vs_baselines>
 
