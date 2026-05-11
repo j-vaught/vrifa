@@ -35,6 +35,27 @@ ARRIVAL_DROP = 30
 # Number of representative pixels to track in the figure.
 N_PIXELS = 4
 
+# Temporal Gaussian smoothing on each per-pixel L* trace, applied
+# before the peak and arrival are computed. Length 9, sigma 1.5.
+SMOOTH_LEN = 9
+SMOOTH_SIGMA = 1.5
+
+
+def gaussian_kernel(length=SMOOTH_LEN, sigma=SMOOTH_SIGMA):
+    half = length // 2
+    x = np.arange(-half, half + 1, dtype=np.float64)
+    k = np.exp(-0.5 * (x / sigma) ** 2)
+    return k / k.sum()
+
+
+def smooth_trace(trace_u8, kernel):
+    """Apply a Gaussian smoothing kernel along the time axis of a single
+    per-pixel uint8 trace, with reflective edge padding so the head and
+    tail of the run are not corrupted."""
+    pad = kernel.size // 2
+    padded = np.pad(trace_u8.astype(np.float64), pad, mode="reflect")
+    return np.convolve(padded, kernel, mode="valid")
+
 
 def load_roi(h, w):
     raw = cv2.imread(str(ROI_MASK_PATH), cv2.IMREAD_GRAYSCALE)
@@ -74,8 +95,17 @@ def main():
     cap.release()
     print(f"trace array shape: {traces.shape}")
 
-    # Per-pixel running peak and arrival frame.
-    traces_i = traces.astype(np.int16)
+    # Apply a length-9 Gaussian smoothing filter to each per-pixel
+    # trace before computing the running peak. Cleans up the
+    # frame-to-frame quantization wobble that would otherwise produce
+    # visible jaggedness in the rendered plot.
+    kernel = gaussian_kernel()
+    traces_smooth = np.zeros(traces.shape, dtype=np.float32)
+    for i in range(traces.shape[1]):
+        traces_smooth[:, i] = smooth_trace(traces[:, i], kernel)
+
+    # Per-pixel running peak and arrival frame (computed on smoothed).
+    traces_i = traces_smooth
     peaks = np.maximum.accumulate(traces_i, axis=0)
     drop_mask = traces_i < peaks - ARRIVAL_DROP
     # Arrival frame is the first row that drops below peak; pixels that
@@ -104,7 +134,8 @@ def main():
         y, x = candidates[s]
         print(f"  ({x:4d}, {y:4d})  arrival frame {int(arrival[s])}")
 
-    # Write traces.csv: frame, L1, P1, L2, P2, L3, P3, L4, P4
+    # Write traces.csv: frame, L1, P1, L2, P2, L3, P3, L4, P4 — values
+    # are the SMOOTHED L* and the running peak of the smoothed L*.
     header = ["frame"]
     for i in range(N_PIXELS):
         header += [f"L{i+1}", f"P{i+1}"]
@@ -112,8 +143,8 @@ def main():
     for t in range(n_frames):
         cells = [str(t)]
         for s in selected:
-            cells.append(str(int(traces[t, s])))
-            cells.append(str(int(peaks[t, s])))
+            cells.append(f"{traces_smooth[t, s]:.2f}")
+            cells.append(f"{peaks[t, s]:.2f}")
         rows.append(",".join(cells))
     (OUT_DIR / "traces.csv").write_text("\n".join(rows) + "\n")
 

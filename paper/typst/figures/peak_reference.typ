@@ -47,8 +47,8 @@
   for r in trace-rows.slice(1) {
     frames.push(int(r.at(0)))
     for i in range(4) {
-      L.at(i).push(int(r.at(1 + 2 * i)))
-      P.at(i).push(int(r.at(2 + 2 * i)))
+      L.at(i).push(float(r.at(1 + 2 * i)))
+      P.at(i).push(float(r.at(2 + 2 * i)))
     }
   }
   (frames: frames, L: L, P: P)
