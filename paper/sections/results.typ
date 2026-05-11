@@ -97,7 +97,7 @@ The eleven samples in Section~4 differ substantially in resolution, frame rate, 
   caption: [
     Per-sample agreement, with boundary $F_1$ broken out at three
     pixel tolerances. Each row aggregates the five anchor frames
-    sampled at the $5/25/50/75/95 %$ fill positions.
+    sampled at the 5 / 25 / 50 / 75 / 95% fill positions.
   ],
 ) <tab:agreement_per_sample>
 
