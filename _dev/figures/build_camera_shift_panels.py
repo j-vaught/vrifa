@@ -143,8 +143,10 @@ def main():
     print(f"  corrected:   max={delta_corr.max()}, "
           f"mean (in ROI)={delta_corr[roi > 0].mean():.2f}")
 
-    # Panel 0: reference frame (raw BGR), full extent, for context.
-    cv2.imwrite(str(OUT_DIR / "panel0_context.png"), fit(pre))
+    # Panel 0: current frame (raw BGR), full extent, for context. The
+    # current frame is what the delta panels are derived against the
+    # reference, so showing it gives the reader the visual anchor.
+    cv2.imwrite(str(OUT_DIR / "panel0_context.png"), fit(post))
 
     # Panels 1 and 2: zoom in on a 50%-by-50% region of the delta
     # heatmap, biased downward (top-edge crop 40 percent of frame

@@ -27,7 +27,7 @@
 #let txt = rgb("#000000")
 
 #let panels = (
-  ([Reference frame (frame 10)],
+  ([Current frame (frame 75)],
    "camera_shift_panels/panel0_context.png"),
   ([Uncorrected delta field],
    "camera_shift_panels/panel1_uncorrected.png"),
