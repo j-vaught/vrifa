@@ -62,12 +62,18 @@
   let ch-w = 2.6
   let ch-h = ch-w * 9 / 16            // 16:9 aspect
   let ch-gap-x = 0.12
-  let ch-gap-y = 0.20                 // bigger y-gap so refs sit nicely between rows
-  let label-h = 0.28                  // per-cell label band above each tile
+  let ch-gap-y = 0.18
+  let label-h = 0.18                  // per-cell label band above each tile
 
-  // Reference tiles: a bit larger than channel tiles. Aspect 16:9 too.
+  // Reference tiles: slightly larger than channel tiles, 16:9.
   let ref-w = 3.6
   let ref-h = ref-w * 9 / 16
+
+  // Text sizes scale to the figure size rather than the paper's body
+  // font: at this tile size, 11pt absolute labels overwhelm the image.
+  let ch-label-size  = 8pt
+  let ref-label-size = 8.5pt
+  let group-size     = 8pt
 
   // Left-column reference panels are stacked vertically, centered on the
   // gaps between channel rows. Compute the row centers and gap centers.
@@ -98,7 +104,7 @@
     // Label.
     content(
       (ref-x-center, label-y),
-      text(weight: 700, size: 11pt, fill: txt)[#label],
+      text(weight: 700, size: ref-label-size, fill: txt)[#label],
     )
     // Tile.
     content(
@@ -121,7 +127,7 @@
       // Per-cell label band.
       content(
         (ch-x-center(c), label-y),
-        text(weight: 700, size: 11pt, fill: txt)[#label],
+        text(weight: 700, size: ch-label-size, fill: txt)[#label],
       )
       // Tile.
       content(
@@ -133,7 +139,7 @@
     // Group label on the right margin of the row.
     content(
       (group-label-x, tile-y),
-      text(weight: 700, size: 10pt, fill: b70)[#row.group],
+      text(weight: 700, size: group-size, fill: b70)[#row.group],
       anchor: "west",
     )
   }
