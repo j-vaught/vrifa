@@ -50,8 +50,8 @@
 )
 
 #let refs = (
-  ([Grayscale], "colorspace_panels/ref_gray.png"),
   ([Raw input], "colorspace_panels/ref_color.png"),
+  ([Grayscale], "colorspace_panels/ref_gray.png"),
 )
 
 #cetz.canvas({
