@@ -104,20 +104,21 @@
     line((x, 0), (x, plot-h), stroke: 0.3pt + b10)
   }
 
-  // Hand-labeled frames (ground truth). Drawn as dotted vertical lines
-  // in a darker neutral so they read as deliberate markers rather than
-  // gridlines, with the frame number annotated at the top of the plot.
-  let labeled-frames = (35, 176, 352, 529, 670)
-  for f in labeled-frames {
-    let x = to-x(f)
+  // Per-pixel arrival markers: a dotted vertical line in each pixel's
+  // own color, at the frame where that pixel first drops more than 30
+  // L* units below its running peak. Tells the reader exactly when the
+  // pipeline considers each pixel to have wetted.
+  for (i, p) in pixels.enumerate() {
+    let color = pixel-colors.at(i)
+    let x = to-x(p.arrival)
     line((x, 0), (x, plot-h),
-         stroke: (paint: b70, thickness: 0.6pt, dash: "dotted"))
-    content((x, plot-h + 0.15),
-            text(size: 6pt, fill: b70)[#f],
+         stroke: (paint: color, thickness: 0.5pt, dash: "dotted"))
+    content((x, plot-h + 0.14),
+            text(size: 6pt, fill: color)[#p.arrival],
             anchor: "south")
   }
-  content((to-x(352), plot-h + 0.42),
-          text(size: 6.5pt, fill: b70, style: "italic")[hand-labeled frames],
+  content((plot-w / 2, plot-h + 0.40),
+          text(size: 6.5pt, fill: b70, style: "italic")[per-pixel arrival frames],
           anchor: "south")
 
   // Draw running peak (dashed) and raw L* (solid) for each pixel.
