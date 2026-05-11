@@ -18,42 +18,60 @@
 
 #let txt = rgb("#000000")
 
-#let panels = (
-  ([(1) normalized response],          "mask_cleanup_panels/panel0_response.png"),
-  ([(2) thresholded mask],             "mask_cleanup_panels/panel1_threshold.png"),
-  ([(3) after closing],                "mask_cleanup_panels/panel2_closed.png"),
-  ([(4) after opening],                "mask_cleanup_panels/panel3_opened.png"),
-  ([(5) after area filter],            "mask_cleanup_panels/panel4_area_filter.png"),
+// Two rows: top row 3 panels, bottom row 2 panels (centered).
+#let rows = (
+  (
+    ([(1) normalized response], "mask_cleanup_panels/panel0_response.png"),
+    ([(2) thresholded mask],    "mask_cleanup_panels/panel1_threshold.png"),
+    ([(3) after closing],       "mask_cleanup_panels/panel2_closed.png"),
+  ),
+  (
+    ([(4) after opening],       "mask_cleanup_panels/panel3_opened.png"),
+    ([(5) after area filter],   "mask_cleanup_panels/panel4_area_filter.png"),
+  ),
 )
 
 #cetz.canvas({
   import cetz.draw: *
 
-  let ch-w = 2.6
+  let ch-w = 3.6
   let ch-h = ch-w * 9 / 16
   let ch-gap-x = 0.30
+  let ch-gap-y = 0.42
   let label-h = 0.22
-  let label-size = 6pt
+  let label-size = 6.5pt
   let label-pad = 0.08
+  let row-block-h = ch-h + label-h + label-pad
 
-  for (i, (label, path)) in panels.enumerate() {
-    let x-center = i * (ch-w + ch-gap-x) + ch-w / 2
-    let tile-y = -ch-h / 2
-    let label-y = -ch-h - label-pad - label-h / 2
+  // Row width based on the widest (top) row, used to center bottom row.
+  let max-cols = calc.max(..rows.map(r => r.len()))
+  let row-width(n) = n * ch-w + (n - 1) * ch-gap-x
+  let max-row-w = row-width(max-cols)
 
-    content(
-      (x-center, tile-y),
-      image(path, width: ch-w * 1cm, height: ch-h * 1cm),
-    )
-    rect(
-      (x-center - ch-w / 2, tile-y + ch-h / 2),
-      (x-center + ch-w / 2, tile-y - ch-h / 2),
-      stroke: 0.6pt + txt,
-      fill: none,
-    )
-    content(
-      (x-center, label-y),
-      text(size: label-size, fill: txt)[#label],
-    )
+  for (r, row) in rows.enumerate() {
+    let n = row.len()
+    let row-w = row-width(n)
+    let row-x0 = (max-row-w - row-w) / 2
+    let tile-y = -r * (row-block-h + ch-gap-y) - ch-h / 2
+    let label-y = tile-y - ch-h / 2 - label-pad - label-h / 2
+
+    for (c, (label, path)) in row.enumerate() {
+      let x-center = row-x0 + c * (ch-w + ch-gap-x) + ch-w / 2
+
+      content(
+        (x-center, tile-y),
+        image(path, width: ch-w * 1cm, height: ch-h * 1cm),
+      )
+      rect(
+        (x-center - ch-w / 2, tile-y + ch-h / 2),
+        (x-center + ch-w / 2, tile-y - ch-h / 2),
+        stroke: 0.6pt + txt,
+        fill: none,
+      )
+      content(
+        (x-center, label-y),
+        text(size: label-size, fill: txt)[#label],
+      )
+    }
   }
 })
