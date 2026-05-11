@@ -116,18 +116,27 @@ def main():
         n_frames,
     )
 
-    # Pick pixels whose arrival frames are spread across the run rather
-    # than concentrated at quantile boundaries. With many pixels wetting
-    # by the 50% fill point, naive quantile sampling clusters in the
-    # first half; explicit target frames give one early, one mid-early,
-    # one mid-late, and one late-wetting pixel.
+    # Pixel coordinates pinned by hand to keep the figure stable across
+    # script re-runs and across changes to the smoothing or arrival
+    # heuristics. These four were chosen on the original unsmoothed run
+    # and gave clean single-event trajectories at arrival times 81,
+    # 230, 403, and 586.
     wetted_idx = np.flatnonzero(arrival < n_frames)
     print(f"{len(wetted_idx)} of {len(candidates)} candidate pixels wetted")
-    target_frames = [80, 230, 400, 600]
+    pinned = [(700, 500), (1100, 650), (650, 300), (200, 850)]
     selected = []
-    for tf in target_frames:
-        i = int(np.argmin(np.abs(arrival[wetted_idx] - tf)))
-        selected.append(int(wetted_idx[i]))
+    for (px, py) in pinned:
+        # Find the candidate index whose (y, x) matches this pin.
+        match = None
+        for i, (cy, cx) in enumerate(candidates):
+            if cx == px and cy == py:
+                match = i
+                break
+        if match is None:
+            raise RuntimeError(
+                f"pinned pixel ({px}, {py}) is not on the grid; "
+                "adjust the pin or the GRID stride")
+        selected.append(match)
 
     print("selected pixels (x, y, arrival frame):")
     for s in selected:
