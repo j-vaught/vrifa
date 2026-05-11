@@ -17,11 +17,50 @@ import argparse
 import re
 import sys
 import time
+import unicodedata
 from collections import namedtuple
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
 import requests
+
+
+# Map common LaTeX accent macros to the Unicode character they produce so
+# that bib surnames like Almaz{\'a}n-L{\'a}zaro compare cleanly against
+# CrossRef's "almazán-lázaro".
+LATEX_ACCENT_RE = re.compile(
+    r"""\{\\(?P<acc>[`'^"~=.uvHckb])\s*\{?(?P<ch>[a-zA-Z\\])(?:\s*[ij])?\}?\}"""
+)
+LATEX_ACCENT_MAP = {
+    "`": "̀", "'": "́", "^": "̂", "~": "̃",
+    "=": "̄", ".": "̇", "\"": "̈", "u": "̆",
+    "v": "̌", "H": "̋", "c": "̧", "k": "̨",
+    "b": "̱",
+}
+
+
+def latex_to_unicode(s: str) -> str:
+    # Replace dotless \i / \j tokens with plain i / j first so subsequent
+    # accent macros like {\'\i} produce 'í' rather than getting eaten.
+    s = re.sub(r"\\i(?![a-zA-Z])", "i", s)
+    s = re.sub(r"\\j(?![a-zA-Z])", "j", s)
+
+    def repl(m):
+        acc = m.group("acc")
+        ch = m.group("ch")
+        if ch == "\\":
+            ch = ""
+        combining = LATEX_ACCENT_MAP.get(acc, "")
+        return unicodedata.normalize("NFC", ch + combining)
+    s = LATEX_ACCENT_RE.sub(repl, s)
+    s = s.replace("{\\ss}", "ß").replace("\\ss", "ß")
+    return s
+
+
+def fold_diacritics(s: str) -> str:
+    """Strip combining marks so 'Almazán' and 'Almazan' compare equal."""
+    nfkd = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 USER_AGENT = "vrifa-ref-verifier/1.0 (mailto:jvaught@sc.edu)"
 CROSSREF_TIMEOUT = 20
@@ -119,7 +158,9 @@ def parse_fields(body: str) -> dict:
 
 
 def normalize_title(s: str) -> str:
-    s = s.lower().replace("{", "").replace("}", "")
+    s = latex_to_unicode(s)
+    s = fold_diacritics(s).lower()
+    s = s.replace("{", "").replace("}", "")
     s = re.sub(r"[^a-z0-9 ]", " ", s)
     return " ".join(s.split())
 
@@ -141,7 +182,10 @@ def extract_surnames(author_field: str) -> list[str]:
         else:
             tokens = chunk.split()
             surname = tokens[-1] if tokens else ""
-        surname = surname.lower().replace("{", "").replace("}", "")
+        # Translate LaTeX accent macros to Unicode, then fold for comparison
+        surname = latex_to_unicode(surname)
+        surname = surname.replace("{", "").replace("}", "")
+        surname = fold_diacritics(surname).lower()
         surname = re.sub(r"[^a-z\- ]", "", surname).strip()
         if surname:
             surnames.append(surname)
@@ -191,7 +235,7 @@ def assess_against_doi(entry: Entry, meta: dict) -> tuple[float, list[str]]:
 
     bib_authors = extract_surnames(entry.fields.get("author", ""))
     cr_authors = [
-        (a.get("family") or "").lower()
+        fold_diacritics(a.get("family") or "").lower()
         for a in meta.get("author", [])
         if a.get("family")
     ]
