@@ -23,12 +23,12 @@
 
 // Two rows of three panels each. Order matches the placeholder.
 #let panels = (
-  (([first-frame + peak (integrated)], "reference_modes_panels/panel0_integrated.png",     true),
-   ([running EMA],                     "reference_modes_panels/panel1_running.png",         false),
-   ([previous, fixed offset],          "reference_modes_panels/panel2_previous.png",        false)),
-  (([absolute pinned frame],           "reference_modes_panels/panel3_absolute.png",        false),
-   ([dynamic sqrt-area],               "reference_modes_panels/panel4_dynamic_sqrt.png",    false),
-   ([dynamic linear lag],              "reference_modes_panels/panel5_dynamic_linear.png",  false)),
+  (([first-frame + peak (integrated)],         "reference_modes_panels/panel0_integrated.png",     true),
+   ([running EMA ($alpha = 0.05$)],            "reference_modes_panels/panel1_running.png",         false),
+   ([previous, fixed offset ($k = 30$)],       "reference_modes_panels/panel2_previous.png",        false)),
+  (([absolute pinned (frame 100)],             "reference_modes_panels/panel3_absolute.png",        false),
+   ([dynamic sqrt-area],                       "reference_modes_panels/panel4_dynamic_sqrt.png",    false),
+   ([dynamic linear lag],                      "reference_modes_panels/panel5_dynamic_linear.png",  false)),
 )
 
 #cetz.canvas({
