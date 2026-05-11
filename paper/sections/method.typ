@@ -77,7 +77,7 @@ $ Delta tau_t = lambda dot.c [ ( (rho |R|) / kappa + sqrt(tau_t) )^2 - tau_t ], 
 clipped to be non-negative and scaled by a user lag factor $lambda$. The reference frame is then read from a small cache at the integer index whose elapsed time is closest to $tau_t - Delta tau_t$, falling back to the first frame whenever the calibration has not yet produced a finite $kappa$. A linear-mode override replaces the sqrt-area growth fit with a linear lag schedule parameterised by `dynamic-lag-linear-start` and `dynamic-lag-linear-max`, which steps the reference frame back at a constant rate independent of the calibration estimate. The override is intended for diagnostic comparisons where the sqrt-area assumption is suspect, and a per-frame log of the chosen lag is written to `dynamic-lag-log` for post-hoc inspection.
 
 #figure(
-  image("/typst/figures/reference_modes.pdf", width: 95%),
+  image("/typst/figures/reference_modes.pdf", width: 100%),
   caption: [
     The five reference-selection modes plus linear-lag dynamic
     override, all evaluated on input_1 frame 352. 
@@ -93,22 +93,13 @@ $ D_t (y, x) = R(y, x) dot.c max(0, w_0 dot.c (G_t (y, x) - F_t (y, x, 0))), $ <
 where the reference $G_t$ is the running peak map (per-pixel maximum of the working channel across all prior frames) when peak-reference is enabled, and the working-channel slice of the frame chosen by the reference-selection mode otherwise. The clip to non-negative values discards every pixel that becomes brighter than the reference, which removes specular flashes from the silicone vacuum bag and from condensation, neither of which are wetting events. A full-color mode replaces the difference with the channel-weighted Euclidean distance across all channels and is intended for HSV and RGB workflows where chrominance shifts are diagnostic. The per-channel weights $w_0, w_1, w_2$ are exposed via `channel-weights` and equal $1, 1, 1$ in the integrated configuration; non-uniform weights are appropriate when one channel of the working colorspace carries the wetting signal more strongly than the others. Figure~@fig:darken_only shows the effect of the clip on a single frame; Table~@tab:ablation reports the IoU cost of removing it across the eleven-sample subset.
 
 #figure(
-  // image("/typst/figures/darken_only_compare.pdf", width: 100%),
-  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
-    _Darken-only delta comparison placeholder._ Two delta panels for
-    the same frame: a naive Euclidean delta that lights up on the
-    vacuum-bag specular highlight, and a darken-only delta that
-    discards it. Regenerated from the new ablation runs.
-
-    TRhis would be input 2 btw
-  ],
+  image("/typst/figures/darken_only_compare.pdf", width: 100%),
   caption: [
-    Same input frame, two delta computations. The naive Euclidean
-    delta (centre) lights up bright on the vacuum-bag specular
-    highlight to the upper right of the laminate. The darken-only
-    delta (right) discards the highlight and isolates the front.
-    The early-fill front in the lower part of the panel is visible
-    in both, though more cleanly in darken-only.
+    Same input frame from input_2 (frame 15 against frame 0 reference)
+    under two delta computations. The naive Euclidean delta lights up
+    the left side, which is bag-side brightening rather than wetting.
+    The darken-only delta clips that brightening to zero and keeps
+    only the true wet region on the right.
   ],
 ) <fig:darken_only>
 
