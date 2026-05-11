@@ -40,10 +40,12 @@
   let label-h = 0.22
   let label-size = 6pt
 
+  let label-pad = 0.08             // extra vertical breathing room before label
+
   for (i, (label, panel)) in panels.enumerate() {
     let x-center = i * (ch-w + ch-gap-x) + ch-w / 2
     let tile-y = -ch-h / 2
-    let label-y = -ch-h - label-h / 2
+    let label-y = -ch-h - label-pad - label-h / 2
 
     // Tile.
     content(

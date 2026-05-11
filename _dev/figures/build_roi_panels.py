@@ -33,8 +33,8 @@ FRAME_IDX = 352
 PANEL_W, PANEL_H = 960, 540
 ROI_MARGIN = 0.15
 
-# Garnet in OpenCV's BGR order. Hex #73000A = (R=115, G=0, B=10).
-GARNET_BGR = (10, 0, 115)
+# Bright red in OpenCV's BGR order. Hex #FF0000 = (R=255, G=0, B=0).
+GARNET_BGR = (0, 0, 255)
 
 # Diagonal-overlay parameters at native (1920x1080) resolution.
 HATCH_SPACING = 45      # pixels between adjacent diagonals
