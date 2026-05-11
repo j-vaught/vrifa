@@ -62,7 +62,7 @@
   let ch-w = 2.6
   let ch-h = ch-w * 9 / 16            // 16:9 aspect
   let ch-gap-x = 0.30
-  let ch-gap-y = 0.28                 // larger y-gap so references fit between rows
+  let ch-gap-y = 0.10
   let label-h = 0.22                  // per-cell label band below each tile
 
   // Reference tiles use the same dimensions as channel tiles.
@@ -98,7 +98,7 @@
   let ch-x-center(c) = grid-x0 + c * (ch-w + ch-gap-x) + ch-w / 2
 
   // Draw reference panels: tile centered on the inter-row line, label
-  // beneath the tile.
+  // beneath the tile, 1pt black outline around each tile.
   for (i, (label, panel)) in refs.enumerate() {
     let tile-y = ref-tile-y(i)
     let label-y = tile-y - ref-h / 2 - label-h / 2
@@ -106,6 +106,13 @@
     content(
       (ref-x-center, tile-y),
       image(panel, width: ref-w * 1cm, height: ref-h * 1cm),
+    )
+    // Outline.
+    rect(
+      (ref-x-center - ref-w / 2, tile-y + ref-h / 2),
+      (ref-x-center + ref-w / 2, tile-y - ref-h / 2),
+      stroke: 1pt + txt,
+      fill: none,
     )
     // Label below tile.
     content(
@@ -125,6 +132,13 @@
       content(
         (ch-x-center(c), tile-y),
         image(panel, width: ch-w * 1cm, height: ch-h * 1cm),
+      )
+      // Outline.
+      rect(
+        (ch-x-center(c) - ch-w / 2, tile-y + ch-h / 2),
+        (ch-x-center(c) + ch-w / 2, tile-y - ch-h / 2),
+        stroke: 1pt + txt,
+        fill: none,
       )
       // Per-cell label band below tile.
       content(
