@@ -36,7 +36,7 @@ OUT_DIR.mkdir(exist_ok=True, parents=True)
 CURRENT_IDX = 352
 KB_POST = 9                  # post-delta blur kernel size
 DELTA_TAU_OFFSET = -30       # threshold offset for Otsu / manual / percentile (matches integrated)
-TRIANGLE_OFFSET = 16         # Triangle-specific offset tuned to match Otsu coverage on this frame
+TRIANGLE_OFFSET = 10         # Triangle-specific offset; kept slightly looser than Otsu so the masks differ visually
 
 # Threshold-mode parameters.
 TAU_MANUAL = 64              # manual mode threshold
