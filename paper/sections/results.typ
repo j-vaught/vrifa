@@ -140,7 +140,7 @@ Three findings deserve direct attention. First, the camera-shift registration ro
   caption: [
     Component-removal ablation on the fifty-five-frame labeling
     subset. Each row holds the integrated configuration of Section~3
-    (Tables~@tab:morph_modes through @tab:scalars) fixed and
+    (Table~@tab:scalars) fixed and
     disables one named component. $Delta$IoU is the signed change in mean IoU
     relative to the integrated configuration; negative values are
     drops, positive values are rises. Rows are listed in the order

@@ -172,23 +172,6 @@ The kernel parities are forced odd at runtime so that anchor handling is symmetr
   ],
 ) <fig:morph_kernels>
 
-#figure(
-  table(
-    columns: (auto, 1fr),
-    align: (left, left),
-    stroke: none,
-    inset: 5pt,
-    table.hline(stroke: 0.8pt),
-    table.header([*Option*], [*Description*]),
-    table.hline(stroke: 0.5pt),
-    [ellipse], [Disk-shaped structuring element. Isotropic; appropriate for round fronts.],
-    [rect],    [Rectangular structuring element. Asymmetric; appropriate for stripe-shaped wet regions.],
-    [cross],   [Plus-shaped structuring element. Minimal; preserves corners.],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [Structuring-element shapes selectable via `--morph-shape`. Used by both the closing and opening passes.],
-) <tab:morph_modes>
-
 == Temporal locking
 
 Stage twelve imposes hysteresis along the time axis. Each pixel keeps a small per-pixel counter that increments while the cleaned mask reports the pixel as wet and resets to zero on any frame where the cleaned mask says dry. Once the counter reaches the threshold $n_"lock"$ frames, a sticky locked-pixel map is set true at that location and never resets. The output of the stage is the elementwise OR of the cleaned mask with the sticky locked map, so a pixel that has ever been wet for $n_"lock"$ consecutive frames stays wet for the remainder of the run.
