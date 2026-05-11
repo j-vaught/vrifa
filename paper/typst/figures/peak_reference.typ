@@ -104,6 +104,22 @@
     line((x, 0), (x, plot-h), stroke: 0.3pt + b10)
   }
 
+  // Hand-labeled frames (ground truth). Drawn as dotted vertical lines
+  // in a darker neutral so they read as deliberate markers rather than
+  // gridlines, with the frame number annotated at the top of the plot.
+  let labeled-frames = (35, 176, 352, 529, 670)
+  for f in labeled-frames {
+    let x = to-x(f)
+    line((x, 0), (x, plot-h),
+         stroke: (paint: b70, thickness: 0.6pt, dash: "dotted"))
+    content((x, plot-h + 0.15),
+            text(size: 6pt, fill: b70)[#f],
+            anchor: "south")
+  }
+  content((to-x(352), plot-h + 0.42),
+          text(size: 6.5pt, fill: b70, style: "italic")[hand-labeled frames],
+          anchor: "south")
+
   // Draw running peak (dashed) and raw L* (solid) for each pixel.
   // Peak goes first so the solid L* line is drawn on top.
   for i in range(4) {
