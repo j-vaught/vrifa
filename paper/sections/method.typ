@@ -33,10 +33,10 @@ The first stage decodes each Blue-Green-Red (BGR) frame from the input video. Th
 The region of interest is a binary mask $R$ that is one inside the laminate and zero elsewhere; all subsequent stages operate only on pixels where $R = 1$. The pipeline supports three forms for constructing $R$, mutually exclusive, selected by which configuration parameter is supplied. The rectangular form takes four fractional margins, one per edge, each clamped to the closed interval from zero to forty-nine hundredths of the corresponding side, and builds the rectangle bounded by those margins. A single configuration parameter sets all four margins symmetrically, with per-edge overrides available. The rectangular form is appropriate for laminates that fit a rectangular bounding box with no internal fixtures, which describes every sample in the labeling subset of Section~4. The imported-PNG form reads a single-channel grayscale image at the source video's resolution from a path supplied via `--roi-mask`, thresholds it at 127, and uses the resulting binary image directly as $R$. The imported-PNG form is appropriate when the laminate is non-rectangular (for instance a curved part boundary) or when fixtures, sensors, or labels inside the bag must be excluded from the difference computation but lie inside any axis-aligned rectangle that contains the laminate. The imported-COCO form reads a Common Objects in Context (COCO) JSON file from the same `--roi-mask` flag, locates the image entry whose `file_name` matches the input video, and rasterizes every polygon annotation on that image into $R$. The imported-COCO form is appropriate when the laminate boundary is already available as a polygon in an existing labeling project. The integrated configuration uses the rectangular form with `roi-margin = 0.15`; the imported forms are exercised in the per-mold tuning regimes described in Section~7.
 
 #figure(
-  image("/typst/figures/roi_crop.pdf", width: 95%),
+  image("/typst/figures/roi_crop.pdf", width: 100%),
   caption: [
     Three forms of the ROI mask $R$ on the canonical input frame, with
-    pixels outside the ROI cross-hatched in garnet.
+    pixels outside the ROI marked by red diagonals.
   ],
 ) <fig:roi_crop>
 
