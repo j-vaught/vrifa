@@ -61,7 +61,7 @@
   // All tiles (channel and reference) share the same size.
   let ch-w = 2.6
   let ch-h = ch-w * 9 / 16            // 16:9 aspect
-  let ch-gap-x = 0.12
+  let ch-gap-x = 0.30
   let ch-gap-y = 0.28                 // larger y-gap so references fit between rows
   let label-h = 0.22                  // per-cell label band below each tile
 
