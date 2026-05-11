@@ -14,10 +14,10 @@
 //***************************************************************
 
 // Drafting margin-notes. Use `#td[...]` inline to drop a margin
-// note in garnet. Grep the project for `#td[` before submission to
-// find and clear any outstanding notes.
+// note in bright red. Grep the project for `#td[` before submission
+// to find and clear any outstanding notes.
 #import "@preview/drafting:0.2.2": margin-note, set-margin-note-defaults
-#set-margin-note-defaults(stroke: rgb("#73000A"), side: right)
+#set-margin-note-defaults(stroke: rgb("#FF0000"), side: right)
 #let td = margin-note
 
 // This function gets your whole document as its `body` and formats
