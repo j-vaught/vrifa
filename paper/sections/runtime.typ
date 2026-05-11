@@ -4,7 +4,7 @@ The integrated pipeline runs at single-CPU video rate on the host described belo
 
 == Hardware
 
-All runtimes are reported on a single Linux host. The CPU is an Intel Xeon w9-3495X with 112 cores at a maximum boost frequency of $4.8$ GHz, $502$ GB DDR5 memory, running Ubuntu $22.04$ LTS. The GPU runtimes use an NVIDIA RTX $6000$ Ada Generation with $48$ GB of memory, driver version $550.144.03$, CUDA $12.4$. Decode and encode use the system FFmpeg with the libx264 and libopenh264 codecs, both invoked through the OpenCV `videoio` interface. No frame is decoded twice and no result is cached between runs.
+All runtimes are reported on a single Linux host. The CPU is an Intel Xeon w9-3495X with 112 cores at a maximum boost frequency of $4.8$ GHz, $512$ GB DDR5 memory, running Ubuntu $22.04$ LTS. The GPU runtimes use an NVIDIA RTX $6000$ Ada Generation with $48$ GB of memory, CUDA $12.4$. Decode and encode use the OpenCV `videoio` interface.
 
 == Throughput
 
@@ -17,37 +17,31 @@ Table~@tab:runtime reports per-sample wall-clock for the integrated configuratio
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto, auto, auto, auto),
-    align: (left, right, right, right, right, right, right),
+    columns: (auto, auto, auto, auto),
+    align: (left, right, right, right),
     stroke: none,
     inset: 5pt,
     table.hline(stroke: 0.8pt),
     table.header(
-      [*Sample*], [*Frames*], [*CPU s*], [*CUDA s*], [*CPU fps*], [*CUDA fps*], [*Speedup*],
+      [*Sample*], [*Frames*], [*CPU fps*], [*CUDA fps*],
     ),
     table.hline(stroke: 0.5pt),
-    [`input_2`],  [100],  [$8.7$],   [$1.5$], [$11.5$], [$65.7$],   [$5.7×$],
-    [`input_3`],  [200],  [$16.7$],  [$2.1$], [$12.0$], [$96.6$],   [$8.1×$],
-    [`input_4`],  [542],  [$22.1$],  [$2.2$], [$24.5$], [$249.6$],  [$10.2×$],
-    [`input_5`],  [542],  [$20.7$],  [$2.3$], [$26.2$], [$238.6$],  [$9.1×$],
-    [`input_6`],  [542],  [$22.9$],  [$2.2$], [$23.7$], [$244.0$],  [$10.3×$],
-    [`input_7`],  [542],  [$22.3$],  [$2.2$], [$24.4$], [$243.8$],  [$10.0×$],
-    [`input_1`],  [706],  [$65.5$],  [$6.4$], [$10.8$], [$109.7$],  [$10.2×$],
-    [`input_10`], [767],  [$32.3$],  [$3.1$], [$23.7$], [$249.6$],  [$10.5×$],
-    [`input_8`],  [842],  [$36.4$],  [$3.3$], [$23.1$], [$253.3$],  [$11.0×$],
-    [`input_11`], [997],  [$41.1$],  [$3.8$], [$24.3$], [$260.6$],  [$10.7×$],
-    [`input_9`],  [1037], [$41.0$],  [$3.8$], [$25.3$], [$274.7$],  [$10.9×$],
+    [`input_2`],  [100],  [$11.5$], [$65.7$],
+    [`input_3`],  [200],  [$12.0$], [$96.6$],
+    [`input_4`],  [542],  [$24.5$], [$249.6$],
+    [`input_5`],  [542],  [$26.2$], [$238.6$],
+    [`input_6`],  [542],  [$23.7$], [$244.0$],
+    [`input_7`],  [542],  [$24.4$], [$243.8$],
+    [`input_1`],  [706],  [$10.8$], [$109.7$],
+    [`input_10`], [767],  [$23.7$], [$249.6$],
+    [`input_8`],  [842],  [$23.1$], [$253.3$],
+    [`input_11`], [997],  [$24.3$], [$260.6$],
+    [`input_9`],  [1037], [$25.3$], [$274.7$],
     table.hline(stroke: 0.8pt),
   ),
   caption: [
-    Per-sample wall-clock for the integrated configuration on the
-    CPU implementation (`vrifa-rs`) and the CUDA implementation
-    (`fast-vrifa-rs`) on COMECH-2422. Wall-clock includes video decode
-    but excludes output encode and annotation export. Speedup is the
-    ratio of CPU seconds to CUDA seconds at matched parameter values.
-    Each row is a sequential single-process run; no concurrent
-    workload competed for cores or GPU during measurement. Frame
-    counts are for the trimmed labeling videos in `data/ablation_data/`.
+    Per-sample frames-per-second of the integrated configuration on
+    the CPU (`vrifa-rs`) and CUDA (`fast-vrifa-rs`) implementations.
   ],
 ) <tab:runtime>
 
