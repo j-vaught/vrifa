@@ -20,7 +20,7 @@
 // the AIAA template's narrow margins make true margin notes overflow
 // into the text column. Inline marker is more robust.)
 #let td(body) = box(
-  fill: rgb("#FFE5E5"),
+  fill: white,
   stroke: 0.6pt + rgb("#FF0000"),
   inset: (x: 3pt, y: 1pt),
   outset: (y: 1pt),
