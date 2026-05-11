@@ -58,14 +58,9 @@ The pipeline accumulates a running maximum of the working channel across all fra
 #figure(
   image("/typst/figures/peak_reference.pdf", width: 95%),
   caption: [
-    Four pixels of input_1 tracked across all 706 frames, chosen to
-    span the run with arrival frames near 80, 230, 400, and 590.
-    Solid lines are raw $L^*$ and dashed lines are the per-pixel
-    running peak $P$. Each pixel drifts upward during lamp warm-up,
+    Four pixels of input_1 tracked across all 706 frames. Each pixel drifts upward during lamp warm-up,
     the running peak absorbs that drift, and the front arrival
-    collapses $L^*$ sharply below $P$. The four traces wet at
-    different times, which is why a single fixed reference frame
-    cannot serve every pixel.
+    collapses $L^*$ sharply below $P$.
   ],
 ) <fig:peak>
 
@@ -82,24 +77,12 @@ $ Delta tau_t = lambda dot.c [ ( (rho |R|) / kappa + sqrt(tau_t) )^2 - tau_t ], 
 clipped to be non-negative and scaled by a user lag factor $lambda$. The reference frame is then read from a small cache at the integer index whose elapsed time is closest to $tau_t - Delta tau_t$, falling back to the first frame whenever the calibration has not yet produced a finite $kappa$. A linear-mode override replaces the sqrt-area growth fit with a linear lag schedule parameterised by `dynamic-lag-linear-start` and `dynamic-lag-linear-max`, which steps the reference frame back at a constant rate independent of the calibration estimate. The override is intended for diagnostic comparisons where the sqrt-area assumption is suspect, and a per-frame log of the chosen lag is written to `dynamic-lag-log` for post-hoc inspection.
 
 #figure(
-  // image("/typst/figures/reference_modes.pdf", width: 95%),
-  rect(width: 100%, height: 2.0in, stroke: 0.5pt, inset: 8pt)[
-    _Reference-mode comparison placeholder._ Six-panel grid showing
-    the same canonical input frame at fill position 50% under the
-    five reference modes plus the dynamic linear-lag override. Top
-    row: first-frame reference, running EMA reference,
-    previous-frame fixed-offset reference. Bottom row: absolute-frame
-    reference, dynamic sqrt-area reference, dynamic linear-lag
-    override. Each panel shows the resulting $D_t$ scalar field in
-    the Turbo colormap so the reader can see how each reference mode
-    selects different evidence on the same frame. The integrated-
-    configuration mode (first-frame combined with the peak map) is
-    bordered in garnet. Regenerated from the new ablation runs.
-  ],
+  image("/typst/figures/reference_modes.pdf", width: 95%),
   caption: [
-    The five reference-selection modes the pipeline supports plus
-    the linear-lag dynamic override. The integrated configuration
-    uses the first-frame mode combined with the peak map.
+    The five reference-selection modes plus the linear-lag dynamic
+    override, all evaluated on input_1 frame 352 with the same Turbo
+    scale. The integrated configuration (garnet border) uses the
+    first-frame mode combined with the peak map.
   ],
 ) <fig:reference_modes>
 
@@ -138,6 +121,8 @@ where the reference $G_t$ is the running peak map (per-pixel maximum of the work
     the same frame: a naive Euclidean delta that lights up on the
     vacuum-bag specular highlight, and a darken-only delta that
     discards it. Regenerated from the new ablation runs.
+
+    TRhis would be input 2 btw
   ],
   caption: [
     Same input frame, two delta computations. The naive Euclidean
@@ -210,7 +195,6 @@ The smoothed field is rescaled to the byte range using a min-max linear rescalin
     plotted with the Otsu and Triangle thresholds annotated. The
     integrated mode is bordered in garnet.
 
-    TRhis would be input 2 btw
   ],
   caption: [
     The six threshold modes the pipeline supports applied to the
