@@ -33,8 +33,9 @@ OUT_DIR.mkdir(exist_ok=True, parents=True)
 REF_IDX = 0
 CUR_IDX = 15
 
-# Rectangular ROI: 15% fractional margin (the integrated default).
-ROI_MARGIN = 0.15
+# Rectangular ROI: 0% margin (input_2 and other inputs except input_1
+# are processed without ROI restriction).
+ROI_MARGIN = 0.0
 
 # Output dimensions for each rendered panel.
 PANEL_W, PANEL_H = 960, 540
