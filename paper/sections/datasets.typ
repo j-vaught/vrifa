@@ -47,22 +47,7 @@ The labeling subset is constructed by sampling five frames from every clip at th
 
 == Labeling protocol
 
-Each anchor frame is labeled by a single human annotator under the protocol committed at `data/LABELING_PROTOCOL.md`. The annotator marks one polygon per frame indicating the resin-wetted region, defined as the area where resin has visibly transitioned the fabric from dry to saturated. Specular reflections from the silicone vacuum bag, vacuum-bag wrinkles and creases that pre-date the front, fabric-weave shadows that pre-date the front, and pooled resin in inlet runners outside the laminate boundary are explicitly excluded. The annotator distinguishes real wetting from transient appearance changes by scrubbing forward a few frames and confirming that the candidate region's brightness has changed monotonically. Real wetting darkens once and stays dark; reflections and wrinkles oscillate. The labeling tool is the browser-based polygon editor at #link("https://www.makesense.ai")[makesense.ai], chosen for its ability to import a flat directory of PNGs and export Common Objects in Context (COCO) JSON without intermediate format conversion. Fifty-five labeled images are exported as a single COCO file at `data/labels.json`. Figure~@fig:labeling shows a representative labeled frame.
-
-#figure(
-  // image("../typst/figures/labeling_protocol.pdf"),
-  rect(width: 100%, height: 1.4in, stroke: 0.5pt, inset: 8pt)[
-    _Labeling protocol illustration placeholder._ One representative
-    frame from the fifty-five-frame ground-truth subset, with the
-    operator's polygon overlaid in rose. Replaced once labels arrive.
-  ],
-  caption: [
-    Example labeled frame from the labeling pass. The rose polygon
-    indicates the wet region as judged by the human annotator
-    following the criteria in
-    `data/LABELING_PROTOCOL.md`.
-  ],
-) <fig:labeling>
+Each anchor frame is labeled by a single human annotator under the protocol committed at `data/LABELING_PROTOCOL.md`. The annotator marks one polygon per frame indicating the resin-wetted region, defined as the area where resin has visibly transitioned the fabric from dry to saturated. Specular reflections from the silicone vacuum bag, vacuum-bag wrinkles and creases that pre-date the front, fabric-weave shadows that pre-date the front, and pooled resin in inlet runners outside the laminate boundary are explicitly excluded. The annotator distinguishes real wetting from transient appearance changes by scrubbing forward a few frames and confirming that the candidate region's brightness has changed monotonically. Real wetting darkens once and stays dark; reflections and wrinkles oscillate. The labeling tool is the browser-based polygon editor at #link("https://www.makesense.ai")[makesense.ai], chosen for its ability to import a flat directory of PNGs and export Common Objects in Context (COCO) JSON without intermediate format conversion. Fifty-five labeled images are exported as a single COCO file at `data/labels.json`.
 
 == Scope and known limits of the labeling subset
 
