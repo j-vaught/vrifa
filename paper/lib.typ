@@ -1,17 +1,24 @@
 //***************************************************************
 // AIAA TYPST TEMPLATE
-// 
+//
 // The author of this work hereby waives all claim of copyright
-// (economic and moral) in this work and immediately places it 
-// in the public domain; it may be used, distorted or 
+// (economic and moral) in this work and immediately places it
+// in the public domain; it may be used, distorted or
 // in any manner whatsoever without further attribution or notice
-// to the creator. The author is not responsible for any liability 
+// to the creator. The author is not responsible for any liability
 // from the usage or dissemination of this code.
 //
 // Author: Isaac Weintraub, Alexander Von Moll
 // Date: 03 DEC 2024
 // BAMDONE!
 //***************************************************************
+
+// Drafting margin-notes. Use `#mn[...]` inline to drop a margin
+// note in garnet. Grep the project for `#mn[` before submission to
+// find and clear any outstanding notes.
+#import "@preview/drafting:0.2.2": margin-note, set-margin-note-defaults
+#set-margin-note-defaults(stroke: rgb("#73000A"), side: right)
+#let mn = margin-note
 
 // This function gets your whole document as its `body` and formats
 // it as an article in the style of the AIAA.
