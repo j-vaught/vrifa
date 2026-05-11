@@ -146,11 +146,14 @@ def main():
     # Panel 0: reference frame (raw BGR), full extent, for context.
     cv2.imwrite(str(OUT_DIR / "panel0_context.png"), fit(pre))
 
-    # Panels 1 and 2: zoom in on the central 50% (crop outer 25% on
-    # every edge) of the delta heatmap so the laminate-edge structure
-    # reads clearly at print size.
-    x0, y0 = w // 4, h // 4
-    x1, y1 = x0 + w // 2, y0 + h // 2
+    # Panels 1 and 2: zoom in on a 50%-by-50% region of the delta
+    # heatmap, biased downward (top-edge crop 40 percent of frame
+    # height, bottom-edge crop 10 percent) so the lower-laminate
+    # structure where the bump signal concentrates fills the panel.
+    x0 = w // 4
+    x1 = x0 + w // 2
+    y0 = int(h * 0.40)
+    y1 = int(h * 0.90)
     def crop_center(img):
         return img[y0:y1, x0:x1]
 
