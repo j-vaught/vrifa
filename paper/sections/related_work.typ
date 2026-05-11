@@ -1,5 +1,3 @@
-#import "../lib.typ": td
-
 = Related Work
 
 This work builds upon three research pillars of the composite-manufacturing literature. The first pillar is the forward and inverse physical modeling of resin flow in Liquid Composite Molding (LCM) and Vacuum-Assisted Resin Transfer Molding (VARTM), which predicts the per-pixel front from a permeability field or recovers a permeability field from observed front geometry. The second pillar is the embedded-sensor observation of the front during infusion, which produces dense in-plane wetness signals at an instrumentation cost that scales with sensor density. The third pillar is the real-time control of resin infusion, where the front signal drives valves, vents, or pumps, and where a recent camera-based subset replaces point sensors with computer vision. The remainder of this section addresses each pillar in turn. The third pillar's camera-based subset is the closest prior art and receives its own subsection.

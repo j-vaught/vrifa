@@ -79,9 +79,8 @@ clipped to be non-negative and scaled by a user lag factor $lambda$. The referen
 #figure(
   image("/typst/figures/reference_modes.pdf", width: 95%),
   caption: [
-    The five reference-selection modes plus the linear-lag dynamic
-    override, all evaluated on input_1 frame 352 with the same Turbo
-    scale. 
+    The five reference-selection modes plus linear-lag dynamic
+    override, all evaluated on input_1 frame 352. 
   ],
 ) <fig:reference_modes>
 
