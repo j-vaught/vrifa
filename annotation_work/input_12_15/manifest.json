@@ -1,0 +1,164 @@
+{
+  "images": [
+    {
+      "image": "images/._input_12__frame_000049.png",
+      "labels": "labels/._input_12__frame_000049.txt"
+    },
+    {
+      "image": "images/._input_12__frame_000243.png",
+      "labels": "labels/._input_12__frame_000243.txt"
+    },
+    {
+      "image": "images/._input_12__frame_000486.png",
+      "labels": "labels/._input_12__frame_000486.txt"
+    },
+    {
+      "image": "images/._input_12__frame_000730.png",
+      "labels": "labels/._input_12__frame_000730.txt"
+    },
+    {
+      "image": "images/._input_12__frame_000924.png",
+      "labels": "labels/._input_12__frame_000924.txt"
+    },
+    {
+      "image": "images/._input_13__frame_000060.png",
+      "labels": "labels/._input_13__frame_000060.txt"
+    },
+    {
+      "image": "images/._input_13__frame_000302.png",
+      "labels": "labels/._input_13__frame_000302.txt"
+    },
+    {
+      "image": "images/._input_13__frame_000604.png",
+      "labels": "labels/._input_13__frame_000604.txt"
+    },
+    {
+      "image": "images/._input_13__frame_000905.png",
+      "labels": "labels/._input_13__frame_000905.txt"
+    },
+    {
+      "image": "images/._input_13__frame_001147.png",
+      "labels": "labels/._input_13__frame_001147.txt"
+    },
+    {
+      "image": "images/._input_14__frame_000027.png",
+      "labels": "labels/._input_14__frame_000027.txt"
+    },
+    {
+      "image": "images/._input_14__frame_000137.png",
+      "labels": "labels/._input_14__frame_000137.txt"
+    },
+    {
+      "image": "images/._input_14__frame_000274.png",
+      "labels": "labels/._input_14__frame_000274.txt"
+    },
+    {
+      "image": "images/._input_14__frame_000412.png",
+      "labels": "labels/._input_14__frame_000412.txt"
+    },
+    {
+      "image": "images/._input_14__frame_000522.png",
+      "labels": "labels/._input_14__frame_000522.txt"
+    },
+    {
+      "image": "images/._input_15__frame_000017.png",
+      "labels": "labels/._input_15__frame_000017.txt"
+    },
+    {
+      "image": "images/._input_15__frame_000086.png",
+      "labels": "labels/._input_15__frame_000086.txt"
+    },
+    {
+      "image": "images/._input_15__frame_000172.png",
+      "labels": "labels/._input_15__frame_000172.txt"
+    },
+    {
+      "image": "images/._input_15__frame_000258.png",
+      "labels": "labels/._input_15__frame_000258.txt"
+    },
+    {
+      "image": "images/._input_15__frame_000327.png",
+      "labels": "labels/._input_15__frame_000327.txt"
+    },
+    {
+      "image": "images/input_12__frame_000049.png",
+      "labels": "labels/input_12__frame_000049.txt"
+    },
+    {
+      "image": "images/input_12__frame_000243.png",
+      "labels": "labels/input_12__frame_000243.txt"
+    },
+    {
+      "image": "images/input_12__frame_000486.png",
+      "labels": "labels/input_12__frame_000486.txt"
+    },
+    {
+      "image": "images/input_12__frame_000730.png",
+      "labels": "labels/input_12__frame_000730.txt"
+    },
+    {
+      "image": "images/input_12__frame_000924.png",
+      "labels": "labels/input_12__frame_000924.txt"
+    },
+    {
+      "image": "images/input_13__frame_000060.png",
+      "labels": "labels/input_13__frame_000060.txt"
+    },
+    {
+      "image": "images/input_13__frame_000302.png",
+      "labels": "labels/input_13__frame_000302.txt"
+    },
+    {
+      "image": "images/input_13__frame_000604.png",
+      "labels": "labels/input_13__frame_000604.txt"
+    },
+    {
+      "image": "images/input_13__frame_000905.png",
+      "labels": "labels/input_13__frame_000905.txt"
+    },
+    {
+      "image": "images/input_13__frame_001147.png",
+      "labels": "labels/input_13__frame_001147.txt"
+    },
+    {
+      "image": "images/input_14__frame_000027.png",
+      "labels": "labels/input_14__frame_000027.txt"
+    },
+    {
+      "image": "images/input_14__frame_000137.png",
+      "labels": "labels/input_14__frame_000137.txt"
+    },
+    {
+      "image": "images/input_14__frame_000274.png",
+      "labels": "labels/input_14__frame_000274.txt"
+    },
+    {
+      "image": "images/input_14__frame_000412.png",
+      "labels": "labels/input_14__frame_000412.txt"
+    },
+    {
+      "image": "images/input_14__frame_000522.png",
+      "labels": "labels/input_14__frame_000522.txt"
+    },
+    {
+      "image": "images/input_15__frame_000017.png",
+      "labels": "labels/input_15__frame_000017.txt"
+    },
+    {
+      "image": "images/input_15__frame_000086.png",
+      "labels": "labels/input_15__frame_000086.txt"
+    },
+    {
+      "image": "images/input_15__frame_000172.png",
+      "labels": "labels/input_15__frame_000172.txt"
+    },
+    {
+      "image": "images/input_15__frame_000258.png",
+      "labels": "labels/input_15__frame_000258.txt"
+    },
+    {
+      "image": "images/input_15__frame_000327.png",
+      "labels": "labels/input_15__frame_000327.txt"
+    }
+  ]
+}
