@@ -14,7 +14,6 @@ use std::time::Instant;
 use vrifa_annotations::AnnotationFrame;
 use vrifa_core::blur::{self, BlurSpec};
 use vrifa_core::colorspace::{convert_frame_to_colorspace, ColorSpace};
-use vrifa_core::threshold::ThresholdMode;
 use vrifa_core::contours::extract_bounding_boxes;
 use vrifa_core::lock::{apply_locking, LockState};
 use vrifa_core::morphology::MorphShape;
@@ -24,6 +23,7 @@ use vrifa_core::peak::update_peak_brightness_plane;
 use vrifa_core::reference::{select_dynamic_reference_index, DynamicReferenceParams};
 use vrifa_core::registration::{fit_affine_warp, strong_gradient_mask, MotionModel};
 use vrifa_core::roi::{build_roi_mask_with_override, resolve_roi_margins, RoiMargins};
+use vrifa_core::threshold::ThresholdMode;
 
 pub mod roi_mask;
 use vrifa_core::warp::{apply_warp, apply_warp_plane, AffineWarp};
@@ -162,6 +162,8 @@ pub struct CliArgs {
     debug_dump_frames: Option<String>,
     #[arg(long)]
     debug_dump_dir: Option<PathBuf>,
+    #[arg(long, action = ArgAction::SetTrue)]
+    debug_dump_mask_only: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -382,8 +384,7 @@ impl TryFrom<CliArgs> for Config {
         let ref_mode = parse_ref_mode(&args.ref_mode)?;
         let motion_model = MotionModel::parse(&args.motion_model)?;
         let peak_on_shift = PeakOnShift::parse(&args.peak_on_shift)?;
-        let post_blur = BlurSpec::parse(&args.blur)
-            .map_err(|e| anyhow!("invalid --blur: {e}"))?;
+        let post_blur = BlurSpec::parse(&args.blur).map_err(|e| anyhow!("invalid --blur: {e}"))?;
         let pre_delta_blur = BlurSpec::parse(&args.pre_delta_blur)
             .map_err(|e| anyhow!("invalid --pre-delta-blur: {e}"))?;
         let threshold_mode = ThresholdMode::parse(&args.threshold)
@@ -620,10 +621,11 @@ pub fn run() -> Result<()> {
     let args = CliArgs::parse();
     let debug_dump_frames = parse_frame_list(args.debug_dump_frames.as_deref())?;
     let debug_dump_dir = args.debug_dump_dir.clone();
+    let debug_dump_mask_only = args.debug_dump_mask_only;
     let config = Config::try_from(args)?;
     if let Some(frames) = debug_dump_frames {
         let output_dir = debug_dump_dir.unwrap_or_else(|| config.output_dir.clone());
-        return dump_debug_stages(config, &frames, &output_dir);
+        return dump_debug_stages(config, &frames, &output_dir, debug_dump_mask_only);
     }
     run_config(config)
 }
@@ -1127,9 +1129,8 @@ pub fn run_config(config: Config) -> Result<()> {
                     let time_seconds = (frame_index - 1) as f32 / metadata.fps as f32;
                     dynamic_measurements.push((time_seconds, mask_area as f32));
                     if dynamic_measurements.len() >= config.dynamic_calibration_frames {
-                        dynamic_factor = vrifa_core::reference::compute_dynamic_factor(
-                            &dynamic_measurements,
-                        );
+                        dynamic_factor =
+                            vrifa_core::reference::compute_dynamic_factor(&dynamic_measurements);
                     }
                 }
             }
@@ -1260,7 +1261,12 @@ struct StageDumpFrame {
     overlay: Array3<u8>,
 }
 
-fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Result<()> {
+fn dump_debug_stages(
+    config: Config,
+    frames: &[usize],
+    output_dir: &Path,
+    mask_only: bool,
+) -> Result<()> {
     let targets: BTreeSet<usize> = frames.iter().copied().collect();
     if targets.is_empty() {
         bail!("--debug-dump-frames requires at least one positive frame index");
@@ -1405,49 +1411,71 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
             )?;
             peak_brightness_map = camera_stable.peak_map;
 
-            let detect = detect_front_debug(
-                &frame_converted,
-                &camera_stable.aligned_reference,
-                &roi_mask,
-                &params,
-                peak_brightness_map.as_ref(),
-            )?;
-            let mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
-            camera_stable_state.prev_registration_mask = Some(mask.clone());
-
-            if targets.contains(&frame_index) {
-                let overlay = create_overlay(&frame_bgr, &mask)?;
-                write_stage_dump_frame(
-                    output_dir,
-                    frame_index,
-                    &StageDumpFrame {
-                        frame_converted: frame_converted.clone(),
-                        reference_for_frame: reference_for_frame.clone(),
-                        aligned_reference: camera_stable.aligned_reference.clone(),
-                        detect: detect.clone(),
-                        mask,
-                        overlay,
-                    },
+            let raw_mask_area = if mask_only {
+                let (mask_raw, _) = detect_front(
+                    &frame_converted,
+                    &camera_stable.aligned_reference,
+                    &roi_mask,
+                    &params,
+                    peak_brightness_map.as_ref(),
                 )?;
-                dumped.insert(frame_index);
-                if dumped.len() == targets.len() {
-                    break;
+                let raw_mask_area = mask_raw.iter().filter(|value| **value > 0).count();
+                let mask = apply_locking(&mask_raw, config.lock_frames, lock_state.as_mut())?;
+                camera_stable_state.prev_registration_mask = Some(mask.clone());
+
+                if targets.contains(&frame_index) {
+                    write_mask_dump_frame(output_dir, frame_index, &mask)?;
+                    dumped.insert(frame_index);
+                    if dumped.len() == targets.len() {
+                        break;
+                    }
                 }
-            }
+                raw_mask_area
+            } else {
+                let detect = detect_front_debug(
+                    &frame_converted,
+                    &camera_stable.aligned_reference,
+                    &roi_mask,
+                    &params,
+                    peak_brightness_map.as_ref(),
+                )?;
+                let raw_mask_area = detect.mask.iter().filter(|value| **value > 0).count();
+                let mask = apply_locking(&detect.mask, config.lock_frames, lock_state.as_mut())?;
+                camera_stable_state.prev_registration_mask = Some(mask.clone());
+
+                if targets.contains(&frame_index) {
+                    let overlay = create_overlay(&frame_bgr, &mask)?;
+                    write_stage_dump_frame(
+                        output_dir,
+                        frame_index,
+                        &StageDumpFrame {
+                            frame_converted: frame_converted.clone(),
+                            reference_for_frame: reference_for_frame.clone(),
+                            aligned_reference: camera_stable.aligned_reference.clone(),
+                            detect: detect.clone(),
+                            mask,
+                            overlay,
+                        },
+                    )?;
+                    dumped.insert(frame_index);
+                    if dumped.len() == targets.len() {
+                        break;
+                    }
+                }
+                raw_mask_area
+            };
 
             if matches!(config.ref_mode, ReferenceMode::Dynamic) {
-                let mask_area = detect.mask.iter().filter(|value| **value > 0).count();
                 if dynamic_factor.is_none()
                     && metadata.fps > 0.0
                     && frame_index > 1
-                    && mask_area > 0
+                    && raw_mask_area > 0
                 {
                     let time_seconds = (frame_index - 1) as f32 / metadata.fps as f32;
-                    dynamic_measurements.push((time_seconds, mask_area as f32));
+                    dynamic_measurements.push((time_seconds, raw_mask_area as f32));
                     if dynamic_measurements.len() >= config.dynamic_calibration_frames {
-                        dynamic_factor = vrifa_core::reference::compute_dynamic_factor(
-                            &dynamic_measurements,
-                        );
+                        dynamic_factor =
+                            vrifa_core::reference::compute_dynamic_factor(&dynamic_measurements);
                     }
                 }
             }
@@ -1475,7 +1503,12 @@ fn dump_debug_stages(config: Config, frames: &[usize], output_dir: &Path) -> Res
     }
 
     println!(
-        "Dumped stage intermediates for frame(s) {:?} to {}",
+        "Dumped {} for frame(s) {:?} to {}",
+        if mask_only {
+            "masks"
+        } else {
+            "stage intermediates"
+        },
         frames,
         output_dir.display()
     );
@@ -1508,6 +1541,13 @@ fn write_stage_dump_frame(
     save_npy(&frame_dir.join("mask.npy"), &dump.mask)?;
     save_npy(&frame_dir.join("overlay.npy"), &dump.overlay)?;
     save_npy(&frame_dir.join("heatmap.npy"), &dump.detect.heatmap)?;
+    Ok(())
+}
+
+fn write_mask_dump_frame(output_dir: &Path, frame_index: usize, mask: &Array2<u8>) -> Result<()> {
+    let frame_dir = output_dir.join(format!("frame_{frame_index:06}"));
+    fs::create_dir_all(&frame_dir)?;
+    save_npy(&frame_dir.join("mask.npy"), mask)?;
     Ok(())
 }
 
@@ -1920,5 +1960,9 @@ pub fn resolve_configured_roi_mask(
     } else {
         None
     };
-    Ok(build_roi_mask_with_override(shape, roi_margins, supplied.as_ref()))
+    Ok(build_roi_mask_with_override(
+        shape,
+        roi_margins,
+        supplied.as_ref(),
+    ))
 }

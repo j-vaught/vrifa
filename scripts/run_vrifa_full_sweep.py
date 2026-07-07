@@ -486,6 +486,7 @@ def run_video(
         ",".join(str(frame) for frame in frames),
         "--debug-dump-dir",
         str(video_out),
+        "--debug-dump-mask-only",
         *case.args,
     ]
     env = os.environ.copy()
