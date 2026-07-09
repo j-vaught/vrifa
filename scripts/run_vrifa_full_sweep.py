@@ -417,7 +417,8 @@ def load_gt_masks(annot_root: pathlib.Path) -> dict[tuple[str, int], np.ndarray]
                     x_text, y_text = pair.split(",")
                     points.append((float(x_text), float(y_text)))
                 if len(points) >= 3:
-                    draw.polygon(points, fill=1)
+                    fill = 0 if int(item.get("class", 1)) == 2 else 1
+                    draw.polygon(points, fill=fill)
             masks[(video, frame)] = np.array(mask_image, dtype=np.uint8) > 0
     return masks
 
