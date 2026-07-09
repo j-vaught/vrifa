@@ -1,15 +1,17 @@
 {
   "info": {
-    "description": "my-project-name"
+    "description": "VRIFA hand-labeled annotations for inputs 1-14. Category 1 Wet marks positive wetted regions. Category 2 Dry marks explicit dry exclusions; standard COCO importers should load it as a separate class, and binary wet-mask loaders should subtract it from Wet."
   },
   "categories": [
     {
       "id": 1,
-      "name": "Wet"
+      "name": "Wet",
+      "supercategory": "surface_state"
     },
     {
       "id": 2,
-      "name": "Dry"
+      "name": "Dry",
+      "supercategory": "surface_state"
     }
   ],
   "images": [
